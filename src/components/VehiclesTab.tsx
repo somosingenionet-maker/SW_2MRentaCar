@@ -9,6 +9,7 @@ import Pagination from './Pagination';
 import { formatDate } from '../utils/dateFormat';
 import { downloadCsv, slugify } from '../utils/csvExport';
 import { getEmpresaConfig } from '../data/mockData';
+import { genId } from '../utils/id';
 
 interface VehiclesTabProps {
   vehiculos: Vehiculo[];
@@ -123,7 +124,7 @@ export default function VehiclesTab({
     setAddFormError('');
     const nuevo: Vehiculo = {
       ...formData,
-      id: 'veh-' + Date.now().toString(),
+      id: genId('veh'),
       fechaRegistro: new Date().toISOString().split('T')[0],
       kilometraje: Number(formData.kilometraje)
     };

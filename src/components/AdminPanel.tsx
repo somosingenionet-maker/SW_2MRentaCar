@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { X, Shield, Plus, Edit2, Trash2, Check, ChevronDown, ChevronUp } from 'lucide-react';
 import { Usuario, ModuloId } from '../types';
 import { getUsuarios, saveUsuarios } from '../data/mockData';
+import { genId } from '../utils/id';
 import { hashPassword } from '../utils/auth';
 
 interface AdminPanelProps {
@@ -113,7 +114,7 @@ export default function AdminPanel({ currentUser, onClose }: AdminPanelProps) {
       persist(updated);
     } else {
       const nuevo: Usuario = {
-        id: 'usr-' + Date.now().toString(),
+        id: genId('usr'),
         nombre: form.nombre.trim(),
         email: form.email.trim(),
         passwordHash: await hashPassword(form.password),

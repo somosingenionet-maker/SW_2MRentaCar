@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { contrastText } from './utils/color';
+import { genId } from './utils/id';
 import {
   getVehiculos, saveVehiculos,
   getIntervenciones, saveIntervenciones,
@@ -107,7 +108,7 @@ export default function App() {
     saveVehiculos(updated);
 
     const nuevaAlerta: Alerta = {
-      id: 'al-aut-' + Date.now().toString(),
+      id: genId('al-aut'),
       vehiculoId: nuevo.id,
       tipo: 'itv',
       descripcion: `Inspección Técnica obligatoria (ITV) programada para el vencimiento: ${nuevo.itvVencimiento}.`,
@@ -182,7 +183,7 @@ export default function App() {
     const targetVeh = vehiculos.find(v => v.id === nueva.vehiculoId);
     if (targetCli && targetVeh) {
       const nuevaInteraccion: InteraccionCliente = {
-        id: 'int-cli-aut-res-' + Date.now().toString(),
+        id: genId('int-cli-aut-res'),
         fecha: new Date().toISOString().split('T')[0],
         tipo: 'registro_contrato',
         notas: `Contrato de alquiler firmado de coche (${targetVeh.marca} con matrícula ${targetVeh.matricula}). Rango: ${nueva.fechaInicio} al ${nueva.fechaFin}. Liquidado total: ${nueva.totalCobrado.toFixed(2)} €.`
@@ -220,7 +221,7 @@ export default function App() {
     const targetCli = clientes.find(c => c.id === notif.clienteId);
     if (targetCli) {
       const nuevaInteraccion: InteraccionCliente = {
-        id: 'int-cli-not-' + Date.now().toString(),
+        id: genId('int-cli-not'),
         fecha: new Date().toISOString().split('T')[0],
         tipo: notif.tipoEnvio === 'whatsapp' ? 'whatsapp' : notif.tipoEnvio === 'email' ? 'email' : 'llamada',
         notas: `Notificación enviada por [${notif.tipoEnvio.toUpperCase()}]: "${notif.mensaje.slice(0, 85)}..."`
@@ -246,7 +247,7 @@ export default function App() {
     else if (tipo === 'mantenimiento') {
       updatedVeh.kilometraje = Math.max(veh.kilometraje, Number(nuevaFechaOrKm) - 15000);
       const autoTask: Intervencion = {
-        id: 'int-auto-' + Date.now().toString(),
+        id: genId('int-auto'),
         vehiculoId: vehId,
         tipo: 'preventivo',
         descripcion: 'Servicio periódico oficial: Sustitución de aceite sintético, juego completo de filtros y corrección de niveles.',

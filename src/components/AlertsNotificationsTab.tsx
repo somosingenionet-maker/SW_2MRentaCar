@@ -6,6 +6,7 @@ import {
 import ConfirmDialog from './ConfirmDialog';
 import { formatDate } from '../utils/dateFormat';
 import { getEmpresaConfig } from '../data/mockData';
+import { genId } from '../utils/id';
 
 interface AlertsNotificationsTabProps {
   alertas: Alerta[];
@@ -94,7 +95,7 @@ export default function AlertsNotificationsTab({
     // Simulate network delay
     setTimeout(() => {
       const nueva: NotificacionCliente = {
-        id: 'not-' + Date.now().toString(),
+        id: genId('not'),
         clienteId: targetClienteId,
         vehiculoId: targetVehiculoId || undefined,
         tipoEnvio: dispatchChannel,

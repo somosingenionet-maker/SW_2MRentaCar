@@ -9,6 +9,7 @@ import ConfirmDialog from './ConfirmDialog';
 import Pagination from './Pagination';
 import { formatDate } from '../utils/dateFormat';
 import { downloadCsv, slugify } from '../utils/csvExport';
+import { genId } from '../utils/id';
 import { getEmpresaConfig } from '../data/mockData';
 
 interface RentalsTabProps {
@@ -79,7 +80,7 @@ export default function RentalsTab({
     const duration = calculateDays(formFechaInicio, formFechaFin);
     const total = duration * Number(formTarifa) + (formSeguro ? duration * 15 : 0);
     return {
-      id: 'res-' + Date.now().toString(),
+      id: genId('res'),
       vehiculoId: formVehiculoId,
       clienteId: formClienteId,
       fechaInicio: formFechaInicio,

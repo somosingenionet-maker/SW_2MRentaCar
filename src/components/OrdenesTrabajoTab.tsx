@@ -7,6 +7,7 @@ import {
 } from 'lucide-react';
 import { OrdenTrabajo, OTEstado, LineaOT, LineaOTTipo, Vehiculo, Cliente, EventoOT, Tecnico } from '../types';
 import { getEmpresaConfig, getTecnicos } from '../data/mockData';
+import { genId } from '../utils/id';
 
 interface Props {
   ordenes: OrdenTrabajo[];
@@ -161,7 +162,7 @@ export default function OrdenesTrabajoTab({ ordenes, vehiculos, clientes, onAdd,
   const handleAddLinea = () => {
     if (!newLinea.descripcion || newLinea.cantidad === '' || newLinea.precioUnitario === '') return;
     const linea: LineaOT = {
-      id: 'lot-' + Date.now(),
+      id: genId('lot'),
       tipo: newLinea.tipo,
       descripcion: newLinea.descripcion,
       cantidad: Number(newLinea.cantidad),
@@ -207,7 +208,7 @@ export default function OrdenesTrabajoTab({ ordenes, vehiculos, clientes, onAdd,
     const { subtotal, totalIva, total } = calcTotals(formLineas, otForm.ivaPct);
     const nextNum = 'OT-' + new Date().getFullYear() + '-' + String(ordenes.length + 1).padStart(3, '0');
     const ot: OrdenTrabajo = {
-      id: 'ot-' + Date.now(),
+      id: genId('ot'),
       numero: nextNum,
       fechaActualizacion: new Date().toISOString(),
       historial: [evento(esPresupuesto ? 'Presupuesto creado' : 'Vehículo recibido en taller')],
@@ -1042,7 +1043,7 @@ export default function OrdenesTrabajoTab({ ordenes, vehiculos, clientes, onAdd,
                     <button type="button" onClick={() => {
                       if (!editOTNewLinea.descripcion || editOTNewLinea.cantidad === '' || editOTNewLinea.precioUnitario === '') return;
                       const linea: LineaOT = {
-                        id: 'lot-' + Date.now(),
+                        id: genId('lot'),
                         tipo: editOTNewLinea.tipo,
                         descripcion: editOTNewLinea.descripcion,
                         cantidad: Number(editOTNewLinea.cantidad),

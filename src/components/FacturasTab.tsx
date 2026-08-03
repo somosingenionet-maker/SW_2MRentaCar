@@ -3,6 +3,7 @@ import { Plus, Trash2, Edit2, X, Check, Receipt, Import, Printer, MessageCircle,
 import { Factura, LineaDocumento, Cliente, Vehiculo, Intervencion } from '../types';
 import { formatDate } from '../utils/dateFormat';
 import { getEmpresaConfig } from '../data/mockData';
+import { genId } from '../utils/id';
 
 interface FacturasTabProps {
   facturas: Factura[];
@@ -38,7 +39,6 @@ const calcLineTotals = (lines: LineaDocumento[], ivaPct: number) => {
   return { subtotal, totalIva, total: subtotal + totalIva };
 };
 
-const genId = (prefix: string) => `${prefix}-${Date.now()}`;
 
 // -------- Factura Modal --------
 interface FacturaModalProps {

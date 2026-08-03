@@ -1,6 +1,7 @@
 import React, { useState, useRef } from 'react';
 import { X, Upload, RotateCcw, Check, Building2, Wrench, Plus, Edit2, Trash2 } from 'lucide-react';
 import { EmpresaConfig, DEFAULT_EMPRESA_CONFIG, getTecnicos, saveTecnicos } from '../data/mockData';
+import { genId } from '../utils/id';
 import { Tecnico } from '../types';
 import { contrastText } from '../utils/color';
 
@@ -49,7 +50,7 @@ export default function CompanySettingsPanel({ config, onSave, onClose }: Props)
         ? { ...t, nombre: tecnicoForm.nombre.trim(), especialidad: tecnicoForm.especialidad.trim() }
         : t));
     } else {
-      persistTecnicos([...tecnicos, { id: `tec-${Date.now()}`, nombre: tecnicoForm.nombre.trim(), especialidad: tecnicoForm.especialidad.trim(), activo: true }]);
+      persistTecnicos([...tecnicos, { id: genId('tec'), nombre: tecnicoForm.nombre.trim(), especialidad: tecnicoForm.especialidad.trim(), activo: true }]);
     }
     setTecnicoForm(null);
     setEditingTecnicoId(null);

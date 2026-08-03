@@ -9,6 +9,7 @@ import ConfirmDialog from './ConfirmDialog';
 import Pagination from './Pagination';
 import { formatDate } from '../utils/dateFormat';
 import { downloadCsv, slugify } from '../utils/csvExport';
+import { genId } from '../utils/id';
 
 interface CrmTabProps {
   clientes: Cliente[];
@@ -113,11 +114,11 @@ export default function CrmTab({
     setAddFormError('');
     const nuevo: Cliente = {
       ...formData,
-      id: 'cli-' + Date.now().toString(),
+      id: genId('cli'),
       fechaRegistro: new Date().toISOString().split('T')[0],
       interacciones: [
         {
-          id: 'int-cli-aut-' + Date.now().toString(),
+          id: genId('int-cli-aut'),
           fecha: new Date().toISOString().split('T')[0],
           tipo: 'registro_contrato',
           notas: 'Registro de la ficha de cliente en el sistema CRM de Backoffice.'
@@ -161,7 +162,7 @@ export default function CrmTab({
     if (!selectedCliente || !newInteractionNotes) return;
 
     const nuevaInt: InteraccionCliente = {
-      id: 'int-cli-' + Date.now().toString(),
+      id: genId('int-cli'),
       fecha: new Date().toISOString().split('T')[0],
       tipo: newInteractionTipo,
       notas: newInteractionNotes
