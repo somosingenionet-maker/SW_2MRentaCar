@@ -4,6 +4,7 @@ import { Factura, LineaDocumento, Cliente, Vehiculo, Intervencion } from '../typ
 import { formatDate } from '../utils/dateFormat';
 import { getEmpresaConfig } from '../data/mockData';
 import { genId } from '../utils/id';
+import ConfirmDialog from './ConfirmDialog';
 
 interface FacturasTabProps {
   facturas: Factura[];
@@ -267,6 +268,7 @@ export default function FacturasTab({
 }: FacturasTabProps) {
   const [facturaModal, setFacturaModal] = useState<{ open: boolean; factura: Factura | null }>({ open: false, factura: null });
   const [viewingDoc, setViewingDoc] = useState<Factura | null>(null);
+  const [confirmDelete, setConfirmDelete] = useState<{ isOpen: boolean; factura: Factura | null }>({ isOpen: false, factura: null });
 
   const nombreCliente = (id: string) => {
     const c = clientes.find(c => c.id === id);
@@ -374,7 +376,12 @@ export default function FacturasTab({
                         <button onClick={() => setFacturaModal({ open: true, factura: f })} className="p-1.5 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition cursor-pointer" title="Editar">
                           <Edit2 className="w-3.5 h-3.5" />
                         </button>
-                        <button onClick={() => onDeleteFactura(f.id)} className="p-1.5 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition cursor-pointer" title="Eliminar">
+                        <button
+                          onClick={() => f.estado === 'borrador' && setConfirmDelete({ isOpen: true, factura: f })}
+                          disabled={f.estado !== 'borrador'}
+                          className="p-1.5 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition cursor-pointer disabled:opacity-30 disabled:cursor-not-allowed disabled:hover:bg-transparent disabled:hover:text-slate-400"
+                          title={f.estado === 'borrador' ? 'Eliminar borrador' : 'Las facturas emitidas o pagadas no se pueden borrar (numeración correlativa). Debe anularse en su lugar.'}
+                        >
                           <Trash2 className="w-3.5 h-3.5" />
                         </button>
                       </div>
@@ -398,6 +405,20 @@ export default function FacturasTab({
           onClose={() => setFacturaModal({ open: false, factura: null })}
         />
       )}
+
+      <ConfirmDialog
+        isOpen={confirmDelete.isOpen}
+        title="Eliminar borrador de factura"
+        message={`¿Eliminar el borrador ${confirmDelete.factura?.numero ?? ''}? Esta acción no se puede deshacer. Solo se eliminan borradores: una factura emitida o pagada debe anularse para conservar la numeración correlativa.`}
+        confirmLabel="Sí, eliminar borrador"
+        cancelLabel="Cancelar"
+        variant="danger"
+        onConfirm={() => {
+          if (confirmDelete.factura) onDeleteFactura(confirmDelete.factura.id);
+          setConfirmDelete({ isOpen: false, factura: null });
+        }}
+        onCancel={() => setConfirmDelete({ isOpen: false, factura: null })}
+      />
 
       {/* Visor de factura */}
       {viewingDoc && (() => {
