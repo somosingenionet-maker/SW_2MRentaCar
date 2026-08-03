@@ -535,8 +535,8 @@ export const getOrdenesTrabajo = (): OrdenTrabajo[] => {
       ? ot.historial
       : [{ fecha: ot.fechaRecepcion + 'T00:00:00.000Z', descripcion: ESTADO_LABEL[ot.estado as string] ?? 'OT creada' }];
     return {
-      fechaActualizacion: ot.fechaRecepcion + 'T00:00:00.000Z',
       ...ot,
+      fechaActualizacion: ot.fechaActualizacion ?? (ot.fechaRecepcion + 'T00:00:00.000Z'),
       estado: estadoNormalizado,
       historial: historialBase,
     };
