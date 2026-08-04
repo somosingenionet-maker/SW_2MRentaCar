@@ -1,18 +1,10 @@
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { contrastText } from './utils/color';
 import { genId } from './utils/id';
-import {
-  getIntervenciones, saveIntervenciones,
-  getClientes, saveClientes,
-  getReservas, saveReservas,
-  getAlertas, saveAlertas,
-  getNotificaciones, saveNotificaciones,
-  getFacturas, saveFacturas,
-  getOrdenesTrabajo, saveOrdenesTrabajo,
-} from './data/mockData';
 import { Vehiculo, Intervencion, Cliente, Reserva, Alerta, NotificacionCliente, InteraccionCliente, AlertaTipo, Usuario, Factura, ModuloId, OrdenTrabajo } from './types';
 import { getSessionUsuario, signOut } from './lib/auth';
 import { fetchVehiculos, upsertVehiculo, deleteVehiculoDb } from './data/vehiculosDb';
+import { fetchAll, upsertOne, deleteOne } from './data/db';
 import VehiclesTab from './components/VehiclesTab';
 import OrdenesTrabajoTab from './components/OrdenesTrabajoTab';
 import CrmTab from './components/CrmTab';
@@ -59,23 +51,23 @@ export default function App() {
       .finally(() => setAuthChecked(true));
   }, []);
 
-  // Load from local storage on mount (entidades aún no migradas a Supabase)
+  // Todas las entidades se cargan desde Supabase al iniciar sesión
+  // (requiere estar autenticado: las reglas RLS exigen sesión válida).
   useEffect(() => {
-    setIntervenciones(getIntervenciones());
-    setClientes(getClientes());
-    setReservas(getReservas());
-    setAlertas(getAlertas());
-    setNotificaciones(getNotificaciones());
-    setFacturas(getFacturas());
-    setOrdenesTrabajo(getOrdenesTrabajo());
-  }, []);
-
-  // Vehículos: se cargan desde Supabase al iniciar sesión (requiere estar autenticado por RLS).
-  useEffect(() => {
-    if (!currentUser) { setVehiculos([]); return; }
-    fetchVehiculos()
-      .then(setVehiculos)
-      .catch(err => console.error('Error cargando vehículos', err));
+    if (!currentUser) {
+      setVehiculos([]); setIntervenciones([]); setClientes([]); setReservas([]);
+      setAlertas([]); setNotificaciones([]); setFacturas([]); setOrdenesTrabajo([]);
+      return;
+    }
+    const log = (e: string) => (err: unknown) => console.error(`Error cargando ${e}`, err);
+    fetchVehiculos().then(setVehiculos).catch(log('vehículos'));
+    fetchAll<Intervencion>('intervenciones').then(setIntervenciones).catch(log('intervenciones'));
+    fetchAll<Cliente>('clientes').then(setClientes).catch(log('clientes'));
+    fetchAll<Reserva>('reservas').then(setReservas).catch(log('reservas'));
+    fetchAll<Alerta>('alertas').then(setAlertas).catch(log('alertas'));
+    fetchAll<NotificacionCliente>('notificaciones').then(setNotificaciones).catch(log('notificaciones'));
+    fetchAll<Factura>('facturas').then(setFacturas).catch(log('facturas'));
+    fetchAll<OrdenTrabajo>('ordenes_trabajo').then(setOrdenesTrabajo).catch(log('órdenes de trabajo'));
   }, [currentUser]);
 
   // Set default tab based on user modules
@@ -116,10 +108,9 @@ export default function App() {
       estado: 'pendiente',
       fechaLimite: nuevo.itvVencimiento
     };
-    const updatedAl = [...alertas, nuevaAlerta];
-    setAlertas(updatedAl);
-    saveAlertas(updatedAl);
-  }, [alertas]);
+    setAlertas(prev => [...prev, nuevaAlerta]);
+    upsertOne('alertas', nuevaAlerta).catch(err => console.error('Error guardando alerta', err));
+  }, []);
 
   const handleUpdateVehiculo = useCallback((editado: Vehiculo) => {
     setVehiculos(prev => prev.map(v => v.id === editado.id ? editado : v));
@@ -132,51 +123,43 @@ export default function App() {
   }, []);
 
   const handleAddIntervencion = useCallback((nueva: Intervencion, updateVehicleMileage: boolean) => {
-    const updatedInt = [...intervenciones, nueva];
-    setIntervenciones(updatedInt);
-    saveIntervenciones(updatedInt);
+    setIntervenciones(prev => [...prev, nueva]);
+    upsertOne('intervenciones', nueva).catch(err => console.error('Error guardando intervención', err));
 
     if (updateVehicleMileage) {
       const targetV = vehiculos.find(v => v.id === nueva.vehiculoId);
       if (targetV && nueva.kilometrajeEnIntervencion > targetV.kilometraje) {
-        const updatedVSpec = { ...targetV, kilometraje: nueva.kilometrajeEnIntervencion };
-        handleUpdateVehiculo(updatedVSpec);
+        handleUpdateVehiculo({ ...targetV, kilometraje: nueva.kilometrajeEnIntervencion });
 
-        let alertChanged = false;
-        const updatedAl = alertas.map(a => {
-          if (a.vehiculoId === nueva.vehiculoId && a.tipo === 'mantenimiento' && a.estado !== 'atendida') {
-            alertChanged = true;
-            return { ...a, estado: 'atendida' as const, descripcion: `${a.descripcion} (Amortizado con éxito en visita ${nueva.fechaIntervencion})` };
-          }
-          return a;
-        });
-        if (alertChanged) { setAlertas(updatedAl); saveAlertas(updatedAl); }
+        const afectadas = alertas
+          .filter(a => a.vehiculoId === nueva.vehiculoId && a.tipo === 'mantenimiento' && a.estado !== 'atendida')
+          .map(a => ({ ...a, estado: 'atendida' as const, descripcion: `${a.descripcion} (Amortizado con éxito en visita ${nueva.fechaIntervencion})` }));
+        if (afectadas.length) {
+          setAlertas(prev => prev.map(a => afectadas.find(u => u.id === a.id) ?? a));
+          afectadas.forEach(a => upsertOne('alertas', a).catch(err => console.error('Error actualizando alerta', err)));
+        }
       }
     }
-  }, [intervenciones, vehiculos, alertas, handleUpdateVehiculo]);
+  }, [vehiculos, alertas, handleUpdateVehiculo]);
 
   const handleAddCliente = useCallback((nuevo: Cliente) => {
-    const updated = [...clientes, nuevo];
-    setClientes(updated);
-    saveClientes(updated);
-  }, [clientes]);
+    setClientes(prev => [...prev, nuevo]);
+    upsertOne('clientes', nuevo).catch(err => console.error('Error guardando cliente', err));
+  }, []);
 
   const handleUpdateCliente = useCallback((editado: Cliente) => {
-    const updated = clientes.map(c => c.id === editado.id ? editado : c);
-    setClientes(updated);
-    saveClientes(updated);
-  }, [clientes]);
+    setClientes(prev => prev.map(c => c.id === editado.id ? editado : c));
+    upsertOne('clientes', editado).catch(err => console.error('Error actualizando cliente', err));
+  }, []);
 
   const handleDeleteCliente = useCallback((id: string) => {
-    const updated = clientes.filter(c => c.id !== id);
-    setClientes(updated);
-    saveClientes(updated);
-  }, [clientes]);
+    setClientes(prev => prev.filter(c => c.id !== id));
+    deleteOne('clientes', id).catch(err => console.error('Error eliminando cliente', err));
+  }, []);
 
   const handleAddReserva = useCallback((nueva: Reserva) => {
-    const updatedRes = [...reservas, nueva];
-    setReservas(updatedRes);
-    saveReservas(updatedRes);
+    setReservas(prev => [...prev, nueva]);
+    upsertOne('reservas', nueva).catch(err => console.error('Error guardando reserva', err));
 
     const targetCli = clientes.find(c => c.id === nueva.clienteId);
     const targetVeh = vehiculos.find(v => v.id === nueva.vehiculoId);
@@ -190,13 +173,12 @@ export default function App() {
       const updatedCli = { ...targetCli, interacciones: [nuevaInteraccion, ...targetCli.interacciones] };
       handleUpdateCliente(updatedCli);
     }
-  }, [reservas, clientes, vehiculos, handleUpdateCliente]);
+  }, [clientes, vehiculos, handleUpdateCliente]);
 
   const handleUpdateReserva = useCallback((editada: Reserva) => {
-    const updated = reservas.map(r => r.id === editada.id ? editada : r);
-    setReservas(updated);
-    saveReservas(updated);
-  }, [reservas]);
+    setReservas(prev => prev.map(r => r.id === editada.id ? editada : r));
+    upsertOne('reservas', editada).catch(err => console.error('Error actualizando reserva', err));
+  }, []);
 
   const handleAddInteraccion = useCallback((cliId: string, interaccion: InteraccionCliente) => {
     const targetCli = clientes.find(c => c.id === cliId);
@@ -207,15 +189,16 @@ export default function App() {
   }, [clientes, handleUpdateCliente]);
 
   const handleResolveAlerta = useCallback((id: string) => {
-    const updated = alertas.map(a => a.id === id ? { ...a, estado: 'atendida' as const } : a);
-    setAlertas(updated);
-    saveAlertas(updated);
+    const changed = alertas.find(a => a.id === id);
+    if (!changed) return;
+    const actualizada = { ...changed, estado: 'atendida' as const };
+    setAlertas(prev => prev.map(a => a.id === id ? actualizada : a));
+    upsertOne('alertas', actualizada).catch(err => console.error('Error actualizando alerta', err));
   }, [alertas]);
 
   const handleAddNotificacion = useCallback((notif: NotificacionCliente) => {
-    const updatedNot = [...notificaciones, notif];
-    setNotificaciones(updatedNot);
-    saveNotificaciones(updatedNot);
+    setNotificaciones(prev => [...prev, notif]);
+    upsertOne('notificaciones', notif).catch(err => console.error('Error guardando notificación', err));
 
     const targetCli = clientes.find(c => c.id === notif.clienteId);
     if (targetCli) {
@@ -228,13 +211,12 @@ export default function App() {
       const updatedCli = { ...targetCli, interacciones: [nuevaInteraccion, ...targetCli.interacciones] };
       handleUpdateCliente(updatedCli);
     }
-  }, [notificaciones, clientes, handleUpdateCliente]);
+  }, [clientes, handleUpdateCliente]);
 
   const handleDeleteNotificacion = useCallback((id: string) => {
-    const updated = notificaciones.filter(n => n.id !== id);
-    setNotificaciones(updated);
-    saveNotificaciones(updated);
-  }, [notificaciones]);
+    setNotificaciones(prev => prev.filter(n => n.id !== id));
+    deleteOne('notificaciones', id).catch(err => console.error('Error eliminando notificación', err));
+  }, []);
 
   const handleTriggerAutoRenew = useCallback((vehId: string, tipo: AlertaTipo, nuevaFechaOrKm: string) => {
     const veh = vehiculos.find(v => v.id === vehId);
@@ -263,41 +245,35 @@ export default function App() {
 
   // Factura handlers
   const handleAddFactura = useCallback((f: Factura) => {
-    const updated = [...facturas, f];
-    setFacturas(updated);
-    saveFacturas(updated);
-  }, [facturas]);
+    setFacturas(prev => [...prev, f]);
+    upsertOne('facturas', f).catch(err => console.error('Error guardando factura', err));
+  }, []);
 
   const handleUpdateFactura = useCallback((f: Factura) => {
-    const updated = facturas.map(x => x.id === f.id ? f : x);
-    setFacturas(updated);
-    saveFacturas(updated);
-  }, [facturas]);
+    setFacturas(prev => prev.map(x => x.id === f.id ? f : x));
+    upsertOne('facturas', f).catch(err => console.error('Error actualizando factura', err));
+  }, []);
 
   const handleDeleteFactura = useCallback((id: string) => {
-    const updated = facturas.filter(x => x.id !== id);
-    setFacturas(updated);
-    saveFacturas(updated);
-  }, [facturas]);
+    setFacturas(prev => prev.filter(x => x.id !== id));
+    deleteOne('facturas', id).catch(err => console.error('Error eliminando factura', err));
+  }, []);
 
   // OT handlers
   const handleAddOT = useCallback((ot: OrdenTrabajo) => {
-    const updated = [...ordenesTrabajo, ot];
-    setOrdenesTrabajo(updated);
-    saveOrdenesTrabajo(updated);
-  }, [ordenesTrabajo]);
+    setOrdenesTrabajo(prev => [...prev, ot]);
+    upsertOne('ordenes_trabajo', ot).catch(err => console.error('Error guardando orden de trabajo', err));
+  }, []);
 
   const handleUpdateOT = useCallback((ot: OrdenTrabajo) => {
-    const updated = ordenesTrabajo.map(x => x.id === ot.id ? ot : x);
-    setOrdenesTrabajo(updated);
-    saveOrdenesTrabajo(updated);
-  }, [ordenesTrabajo]);
+    setOrdenesTrabajo(prev => prev.map(x => x.id === ot.id ? ot : x));
+    upsertOne('ordenes_trabajo', ot).catch(err => console.error('Error actualizando orden de trabajo', err));
+  }, []);
 
   const handleDeleteOT = useCallback((id: string) => {
-    const updated = ordenesTrabajo.filter(x => x.id !== id);
-    setOrdenesTrabajo(updated);
-    saveOrdenesTrabajo(updated);
-  }, [ordenesTrabajo]);
+    setOrdenesTrabajo(prev => prev.filter(x => x.id !== id));
+    deleteOne('ordenes_trabajo', id).catch(err => console.error('Error eliminando orden de trabajo', err));
+  }, []);
 
   const handleSaveEmpresa = useCallback((config: EmpresaConfig) => {
     setEmpresaConfig(config);
