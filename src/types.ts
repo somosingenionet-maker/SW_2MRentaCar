@@ -189,9 +189,9 @@ export interface Usuario {
   id: string;
   nombre: string;
   email: string;
-  /** SHA-256(SALT + contraseña). Nunca se almacena la contraseña en claro. */
-  passwordHash: string;
-  rol: 'admin' | 'usuario';
+  /** Solo se usaba en el esquema antiguo de localStorage. Con Supabase Auth ya no se almacena. */
+  passwordHash?: string;
+  rol: 'super_admin' | 'admin' | 'usuario';
   modulos: ModuloId[];
   activo: boolean;
   fechaCreacion: string;

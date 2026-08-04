@@ -10,10 +10,9 @@ import {
   getNotificaciones, saveNotificaciones,
   getFacturas, saveFacturas,
   getOrdenesTrabajo, saveOrdenesTrabajo,
-  getUsuarios,
-  getCurrentUserId, setCurrentUserId,
 } from './data/mockData';
 import { Vehiculo, Intervencion, Cliente, Reserva, Alerta, NotificacionCliente, InteraccionCliente, AlertaTipo, Usuario, Factura, ModuloId, OrdenTrabajo } from './types';
+import { getSessionUsuario, signOut } from './lib/auth';
 import VehiclesTab from './components/VehiclesTab';
 import OrdenesTrabajoTab from './components/OrdenesTrabajoTab';
 import CrmTab from './components/CrmTab';
@@ -53,15 +52,11 @@ export default function App() {
   const [facturas, setFacturas] = useState<Factura[]>([]);
   const [ordenesTrabajo, setOrdenesTrabajo] = useState<OrdenTrabajo[]>([]);
 
-  // Check session on mount
+  // Check session on mount (Supabase)
   useEffect(() => {
-    const uid = getCurrentUserId();
-    if (uid) {
-      const usuarios = getUsuarios();
-      const user = usuarios.find(u => u.id === uid && u.activo);
-      if (user) setCurrentUser(user);
-    }
-    setAuthChecked(true);
+    getSessionUsuario()
+      .then(user => setCurrentUser(user))
+      .finally(() => setAuthChecked(true));
   }, []);
 
   // Load from local storage on mount
@@ -87,14 +82,13 @@ export default function App() {
   }, [currentUser]);
 
   const handleLogin = useCallback((user: Usuario) => {
-    setCurrentUserId(user.id);
     setCurrentUser(user);
     const mods = user.modulos;
     if (mods.length > 0) setActiveTab(mods[0]);
   }, []);
 
   const handleLogout = useCallback(() => {
-    setCurrentUserId(null);
+    signOut();
     setCurrentUser(null);
   }, []);
 
@@ -429,7 +423,7 @@ export default function App() {
                   {currentUser.nombre[0].toUpperCase()}
                 </div>
                 <span className="text-xs font-semibold hidden sm:block">{currentUser.nombre}</span>
-                {currentUser.rol === 'admin' && (
+                {(currentUser.rol === 'admin' || currentUser.rol === 'super_admin') && (
                   <span className="text-[9px] font-bold px-1.5 py-0.5 rounded-full" style={{ backgroundColor: `${brandText}22`, color: brandText }}>ADMIN</span>
                 )}
               </div>
@@ -486,7 +480,7 @@ export default function App() {
 
             {/* Actions right */}
             <div className="hidden md:flex items-center gap-2 shrink-0">
-              {currentUser.rol === 'admin' && (
+              {(currentUser.rol === 'admin' || currentUser.rol === 'super_admin') && (
                 <button
                   onClick={() => setAdminPanelOpen(true)}
                   title="Panel de administración"
@@ -523,7 +517,7 @@ export default function App() {
               </button>
             ))}
             <div className="pt-2 border-t border-slate-100 space-y-1">
-              {currentUser.rol === 'admin' && (
+              {(currentUser.rol === 'admin' || currentUser.rol === 'super_admin') && (
                 <button onClick={() => { setAdminPanelOpen(true); setMobileMenuOpen(false); }} className="w-full text-left px-3 py-2 text-xs font-bold rounded-lg text-blue-700 block hover:bg-blue-50">
                   🛡️ Panel de Administración
                 </button>

@@ -1,8 +1,8 @@
 import React, { useState } from 'react';
 import { LogIn, Eye, EyeOff, Mail, Lock } from 'lucide-react';
 import { Usuario } from '../types';
-import { getUsuarios, getEmpresaConfig } from '../data/mockData';
-import { hashPassword, migrateLegacyPasswords } from '../utils/auth';
+import { getEmpresaConfig } from '../data/mockData';
+import { signIn, resetPassword } from '../lib/auth';
 
 interface LoginScreenProps {
   onLogin: (user: Usuario) => void;
@@ -27,36 +27,34 @@ export default function LoginScreen({ onLogin }: LoginScreenProps) {
   const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
-  const [showReset, setShowReset] = useState(false);
+  const [resetMsg, setResetMsg] = useState('');
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
     setLoading(true);
-
-    // Convierte contraseñas guardadas en texto plano por versiones anteriores
-    await migrateLegacyPasswords();
-
-    const inputHash = await hashPassword(password);
-    const usuarios = getUsuarios();
-    const user = usuarios.find(
-      u => u.email.toLowerCase() === email.trim().toLowerCase() && u.passwordHash === inputHash
-    );
-
-    if (!user) {
-      setError('Credenciales incorrectas. Verifica tu email y contraseña.');
+    try {
+      const user = await signIn(email, password);
+      onLogin(user);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'No se pudo iniciar sesión.');
+    } finally {
       setLoading(false);
+    }
+  };
+
+  const handleReset = async () => {
+    setResetMsg('');
+    if (!email.trim()) {
+      setResetMsg('Escribe tu correo arriba y vuelve a pulsar el enlace.');
       return;
     }
-
-    if (!user.activo) {
-      setError('Tu cuenta está desactivada. Contacta con el administrador.');
-      setLoading(false);
-      return;
+    try {
+      await resetPassword(email);
+      setResetMsg('Si el correo existe, recibirás un enlace para restablecer tu contraseña.');
+    } catch {
+      setResetMsg('No se pudo enviar el correo. Inténtalo de nuevo o contacta con el administrador.');
     }
-
-    setLoading(false);
-    onLogin(user);
   };
 
   const initials = empresaConfig.nombre
@@ -168,7 +166,7 @@ export default function LoginScreen({ onLogin }: LoginScreenProps) {
             <div className="flex justify-end">
               <button
                 type="button"
-                onClick={() => setShowReset(s => !s)}
+                onClick={handleReset}
                 className="text-xs font-semibold transition cursor-pointer hover:underline"
                 style={{ color: BRAND.profundo }}
               >
@@ -176,9 +174,9 @@ export default function LoginScreen({ onLogin }: LoginScreenProps) {
               </button>
             </div>
 
-            {showReset && (
+            {resetMsg && (
               <div className="bg-violet-50 border border-violet-200 text-violet-800 text-xs px-4 py-2.5 rounded-lg">
-                Para restablecer tu contraseña, contacta con el administrador del sistema.
+                {resetMsg}
               </div>
             )}
 

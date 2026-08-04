@@ -66,7 +66,7 @@ export default function AdminPanel({ currentUser, onClose }: AdminPanelProps) {
       nombre: u.nombre,
       email: u.email,
       password: '', // vacío = mantener la contraseña actual
-      rol: u.rol,
+      rol: u.rol === 'super_admin' ? 'admin' : u.rol,
       activo: u.activo,
       modulos: [...u.modulos],
     });
