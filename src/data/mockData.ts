@@ -355,13 +355,21 @@ export const DEFAULT_EMPRESA_CONFIG: EmpresaConfig = {
 // Se hace spread con DEFAULT_EMPRESA_CONFIG para que configuraciones guardadas
 // en versiones anteriores (sin los campos nuevos) reciban los valores por
 // defecto en lugar de devolver `undefined`.
-export const getEmpresaConfig = (): EmpresaConfig => ({
+// Caché en memoria de la configuración de empresa. Se siembra desde
+// localStorage/valores por defecto (acceso síncrono inmediato) y se actualiza
+// con lo que llega de Supabase al arrancar (ver data/empresaDb.ts).
+let empresaCache: EmpresaConfig = {
   ...DEFAULT_EMPRESA_CONFIG,
   ...getLocalStorageItem<Partial<EmpresaConfig>>('ingenio_empresa_config', DEFAULT_EMPRESA_CONFIG),
-});
+};
 
-export const saveEmpresaConfig = (data: EmpresaConfig) =>
-  setLocalStorageItem('ingenio_empresa_config', data);
+export const getEmpresaConfig = (): EmpresaConfig => empresaCache;
+
+/** Actualiza la caché local (y localStorage como respaldo). No toca Supabase. */
+export const setEmpresaConfigCache = (data: EmpresaConfig) => {
+  empresaCache = { ...DEFAULT_EMPRESA_CONFIG, ...data };
+  setLocalStorageItem('ingenio_empresa_config', empresaCache);
+};
 
 const BASE_MODULOS: ModuloId[] = ['vehiculos', 'clientes', 'taller', 'alertas', 'rentabilidad', 'facturas'];
 const ALL_MODULOS: ModuloId[] = [...BASE_MODULOS, 'alquileres'];

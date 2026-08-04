@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { contrastText } from './utils/color';
 import { genId } from './utils/id';
-import { Vehiculo, Intervencion, Cliente, Reserva, Alerta, NotificacionCliente, InteraccionCliente, AlertaTipo, Usuario, Factura, ModuloId, OrdenTrabajo } from './types';
+import { Vehiculo, Intervencion, Cliente, Reserva, Alerta, NotificacionCliente, InteraccionCliente, AlertaTipo, Usuario, Factura, ModuloId, OrdenTrabajo, Tecnico } from './types';
 import { getSessionUsuario, signOut } from './lib/auth';
 import { fetchVehiculos, upsertVehiculo, deleteVehiculoDb } from './data/vehiculosDb';
 import { fetchAll, upsertOne, deleteOne } from './data/db';
@@ -18,7 +18,8 @@ import {
   Car, Wrench, Users, Calendar, BarChart2, Bell, Shield, Phone, Mail, Globe, Menu, X, Settings, FileText, LogOut
 } from 'lucide-react';
 import CompanySettingsPanel from './components/CompanySettingsPanel';
-import { EmpresaConfig, getEmpresaConfig, saveEmpresaConfig } from './data/mockData';
+import { EmpresaConfig, getEmpresaConfig } from './data/mockData';
+import { loadEmpresaConfig, saveEmpresaConfigDb } from './data/empresaDb';
 
 type TabId = ModuloId;
 
@@ -43,6 +44,7 @@ export default function App() {
   const [notificaciones, setNotificaciones] = useState<NotificacionCliente[]>([]);
   const [facturas, setFacturas] = useState<Factura[]>([]);
   const [ordenesTrabajo, setOrdenesTrabajo] = useState<OrdenTrabajo[]>([]);
+  const [tecnicos, setTecnicos] = useState<Tecnico[]>([]);
 
   // Check session on mount (Supabase)
   useEffect(() => {
@@ -56,7 +58,7 @@ export default function App() {
   useEffect(() => {
     if (!currentUser) {
       setVehiculos([]); setIntervenciones([]); setClientes([]); setReservas([]);
-      setAlertas([]); setNotificaciones([]); setFacturas([]); setOrdenesTrabajo([]);
+      setAlertas([]); setNotificaciones([]); setFacturas([]); setOrdenesTrabajo([]); setTecnicos([]);
       return;
     }
     const log = (e: string) => (err: unknown) => console.error(`Error cargando ${e}`, err);
@@ -68,6 +70,8 @@ export default function App() {
     fetchAll<NotificacionCliente>('notificaciones').then(setNotificaciones).catch(log('notificaciones'));
     fetchAll<Factura>('facturas').then(setFacturas).catch(log('facturas'));
     fetchAll<OrdenTrabajo>('ordenes_trabajo').then(setOrdenesTrabajo).catch(log('órdenes de trabajo'));
+    fetchAll<Tecnico>('tecnicos').then(setTecnicos).catch(log('técnicos'));
+    loadEmpresaConfig().then(setEmpresaConfig).catch(log('configuración de empresa'));
   }, [currentUser]);
 
   // Set default tab based on user modules
@@ -277,7 +281,22 @@ export default function App() {
 
   const handleSaveEmpresa = useCallback((config: EmpresaConfig) => {
     setEmpresaConfig(config);
-    saveEmpresaConfig(config);
+    saveEmpresaConfigDb(config).catch(err => console.error('Error guardando configuración de empresa', err));
+  }, []);
+
+  const handleAddTecnico = useCallback((t: Tecnico) => {
+    setTecnicos(prev => [...prev, t]);
+    upsertOne('tecnicos', t).catch(err => console.error('Error guardando técnico', err));
+  }, []);
+
+  const handleUpdateTecnico = useCallback((t: Tecnico) => {
+    setTecnicos(prev => prev.map(x => x.id === t.id ? t : x));
+    upsertOne('tecnicos', t).catch(err => console.error('Error actualizando técnico', err));
+  }, []);
+
+  const handleDeleteTecnico = useCallback((id: string) => {
+    setTecnicos(prev => prev.filter(x => x.id !== id));
+    deleteOne('tecnicos', id).catch(err => console.error('Error eliminando técnico', err));
   }, []);
 
   const activeAlertsCount = useMemo(() => alertas.filter(a => a.estado === 'activa').length, [alertas]);
@@ -532,6 +551,7 @@ export default function App() {
             ordenes={ordenesTrabajo}
             vehiculos={vehiculos}
             clientes={clientes}
+            tecnicos={tecnicos}
             onAdd={handleAddOT}
             onUpdate={handleUpdateOT}
             onDelete={handleDeleteOT}
@@ -601,6 +621,10 @@ export default function App() {
         <CompanySettingsPanel
           config={empresaConfig}
           onSave={handleSaveEmpresa}
+          tecnicos={tecnicos}
+          onAddTecnico={handleAddTecnico}
+          onUpdateTecnico={handleUpdateTecnico}
+          onDeleteTecnico={handleDeleteTecnico}
           onClose={() => setSettingsOpen(false)}
         />
       )}

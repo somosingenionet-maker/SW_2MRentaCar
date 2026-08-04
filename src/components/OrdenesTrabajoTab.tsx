@@ -6,13 +6,14 @@ import {
   Bell, Printer, Pencil, MessageCircle, Mail
 } from 'lucide-react';
 import { OrdenTrabajo, OTEstado, LineaOT, LineaOTTipo, Vehiculo, Cliente, EventoOT, Tecnico } from '../types';
-import { getEmpresaConfig, getTecnicos } from '../data/mockData';
+import { getEmpresaConfig } from '../data/mockData';
 import { genId } from '../utils/id';
 
 interface Props {
   ordenes: OrdenTrabajo[];
   vehiculos: Vehiculo[];
   clientes: Cliente[];
+  tecnicos: Tecnico[];
   onAdd: (ot: OrdenTrabajo) => void;
   onUpdate: (ot: OrdenTrabajo) => void;
   onDelete: (id: string) => void;
@@ -109,8 +110,7 @@ function evento(descripcion: string): EventoOT {
   return { fecha: new Date().toISOString(), descripcion };
 }
 
-export default function OrdenesTrabajoTab({ ordenes, vehiculos, clientes, onAdd, onUpdate, onDelete }: Props) {
-  const [tecnicos] = useState<Tecnico[]>(getTecnicos);
+export default function OrdenesTrabajoTab({ ordenes, vehiculos, clientes, tecnicos, onAdd, onUpdate, onDelete }: Props) {
   const [search, setSearch] = useState('');
   const [filterEstado, setFilterEstado] = useState<OTEstado | 'todas'>('todas');
   const [selected, setSelected] = useState<OrdenTrabajo | null>(null);
