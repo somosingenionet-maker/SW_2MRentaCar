@@ -1,4 +1,4 @@
-import { Vehiculo, Intervencion, Cliente, Reserva, Alerta, NotificacionCliente, Usuario, ModuloId, Factura, OrdenTrabajo, Tecnico } from '../types';
+import { Vehiculo, Intervencion, Cliente, Reserva, Alerta, NotificacionCliente, Factura, OrdenTrabajo } from '../types';
 
 export const INITIAL_VEHICULES: Vehiculo[] = [
   {
@@ -370,41 +370,6 @@ export const setEmpresaConfigCache = (data: EmpresaConfig) => {
   empresaCache = { ...DEFAULT_EMPRESA_CONFIG, ...data };
   setLocalStorageItem('ingenio_empresa_config', empresaCache);
 };
-
-const BASE_MODULOS: ModuloId[] = ['vehiculos', 'clientes', 'taller', 'alertas', 'rentabilidad', 'facturas'];
-const ALL_MODULOS: ModuloId[] = [...BASE_MODULOS, 'alquileres'];
-
-export const DEFAULT_ADMIN: Usuario = {
-  id: 'usr-admin',
-  nombre: 'Administrador',
-  email: 'admin@ingenio.net',
-  // SHA-256 de 'admin123' (ver utils/auth.ts)
-  passwordHash: '108062f7485618c99bf2752056bdaf172c87cc3d0d883b78e40049aa20886447',
-  rol: 'admin',
-  modulos: ALL_MODULOS,
-  activo: true,
-  fechaCreacion: '2024-01-01',
-};
-
-export const getUsuarios = (): Usuario[] =>
-  getLocalStorageItem<Usuario[]>('ingenio_usuarios', [DEFAULT_ADMIN]);
-
-export const saveUsuarios = (data: Usuario[]) =>
-  setLocalStorageItem('ingenio_usuarios', data);
-
-export const getCurrentUserId = (): string | null =>
-  sessionStorage.getItem('ingenio_session_uid');
-
-export const setCurrentUserId = (id: string | null) => {
-  if (id) sessionStorage.setItem('ingenio_session_uid', id);
-  else sessionStorage.removeItem('ingenio_session_uid');
-};
-
-export const getTecnicos = (): Tecnico[] =>
-  getLocalStorageItem<Tecnico[]>('ingenio_tecnicos', []);
-
-export const saveTecnicos = (data: Tecnico[]) =>
-  setLocalStorageItem('ingenio_tecnicos', data);
 
 export const getFacturas = (): Factura[] =>
   getLocalStorageItem<Factura[]>('ingenio_facturas', []);
