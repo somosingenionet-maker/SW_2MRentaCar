@@ -2,7 +2,6 @@ import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { contrastText } from './utils/color';
 import { genId } from './utils/id';
 import {
-  getVehiculos, saveVehiculos,
   getIntervenciones, saveIntervenciones,
   getClientes, saveClientes,
   getReservas, saveReservas,
@@ -13,6 +12,7 @@ import {
 } from './data/mockData';
 import { Vehiculo, Intervencion, Cliente, Reserva, Alerta, NotificacionCliente, InteraccionCliente, AlertaTipo, Usuario, Factura, ModuloId, OrdenTrabajo } from './types';
 import { getSessionUsuario, signOut } from './lib/auth';
+import { fetchVehiculos, upsertVehiculo, deleteVehiculoDb } from './data/vehiculosDb';
 import VehiclesTab from './components/VehiclesTab';
 import OrdenesTrabajoTab from './components/OrdenesTrabajoTab';
 import CrmTab from './components/CrmTab';
@@ -59,9 +59,8 @@ export default function App() {
       .finally(() => setAuthChecked(true));
   }, []);
 
-  // Load from local storage on mount
+  // Load from local storage on mount (entidades aún no migradas a Supabase)
   useEffect(() => {
-    setVehiculos(getVehiculos());
     setIntervenciones(getIntervenciones());
     setClientes(getClientes());
     setReservas(getReservas());
@@ -70,6 +69,14 @@ export default function App() {
     setFacturas(getFacturas());
     setOrdenesTrabajo(getOrdenesTrabajo());
   }, []);
+
+  // Vehículos: se cargan desde Supabase al iniciar sesión (requiere estar autenticado por RLS).
+  useEffect(() => {
+    if (!currentUser) { setVehiculos([]); return; }
+    fetchVehiculos()
+      .then(setVehiculos)
+      .catch(err => console.error('Error cargando vehículos', err));
+  }, [currentUser]);
 
   // Set default tab based on user modules
   useEffect(() => {
@@ -97,10 +104,10 @@ export default function App() {
 
   // Sync utilities
   const handleAddVehiculo = useCallback((nuevo: Vehiculo) => {
-    const updated = [...vehiculos, nuevo];
-    setVehiculos(updated);
-    saveVehiculos(updated);
+    setVehiculos(prev => [...prev, nuevo]);
+    upsertVehiculo(nuevo).catch(err => console.error('Error guardando vehículo', err));
 
+    // Alerta ITV automática (las alertas aún viven en localStorage).
     const nuevaAlerta: Alerta = {
       id: genId('al-aut'),
       vehiculoId: nuevo.id,
@@ -112,19 +119,17 @@ export default function App() {
     const updatedAl = [...alertas, nuevaAlerta];
     setAlertas(updatedAl);
     saveAlertas(updatedAl);
-  }, [vehiculos, alertas]);
+  }, [alertas]);
 
   const handleUpdateVehiculo = useCallback((editado: Vehiculo) => {
-    const updated = vehiculos.map(v => v.id === editado.id ? editado : v);
-    setVehiculos(updated);
-    saveVehiculos(updated);
-  }, [vehiculos]);
+    setVehiculos(prev => prev.map(v => v.id === editado.id ? editado : v));
+    upsertVehiculo(editado).catch(err => console.error('Error actualizando vehículo', err));
+  }, []);
 
   const handleDeleteVehiculo = useCallback((id: string) => {
-    const updated = vehiculos.filter(v => v.id !== id);
-    setVehiculos(updated);
-    saveVehiculos(updated);
-  }, [vehiculos]);
+    setVehiculos(prev => prev.filter(v => v.id !== id));
+    deleteVehiculoDb(id).catch(err => console.error('Error eliminando vehículo', err));
+  }, []);
 
   const handleAddIntervencion = useCallback((nueva: Intervencion, updateVehicleMileage: boolean) => {
     const updatedInt = [...intervenciones, nueva];
