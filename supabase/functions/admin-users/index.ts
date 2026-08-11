@@ -52,7 +52,7 @@ Deno.serve(async (req: Request) => {
         email,
         password,
         email_confirm: true,
-        user_metadata: { nombre },
+        user_metadata: { nombre, display_name: nombre },
       });
       if (error || !created.user) return json({ error: error?.message ?? 'No se pudo crear' }, 400);
       // Solo un super_admin puede crear otro super_admin.
