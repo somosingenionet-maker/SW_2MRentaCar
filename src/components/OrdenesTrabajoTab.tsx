@@ -1034,11 +1034,6 @@ export default function OrdenesTrabajoTab({ ordenes, vehiculos, clientes, tecnic
                   {/* Nueva línea */}
                   <div className="bg-slate-50 rounded-xl p-3 space-y-2 border border-slate-100">
                     <p className="text-[10px] font-bold text-slate-400 uppercase">Añadir línea</p>
-                    {editFormEsFlota && (
-                      <p className="text-[10px] text-violet-600 bg-violet-50 border border-violet-100 rounded-lg px-2 py-1.5">
-                        Vehículo de flota propia: no se vende, solo se registra el coste real del taller.
-                      </p>
-                    )}
                     <div className="grid grid-cols-2 gap-2">
                       <select value={editOTNewLinea.tipo} onChange={e => setEditOTNewLinea(f => ({ ...f, tipo: e.target.value as LineaOTTipo }))}
                         className="px-2 py-1.5 border border-slate-200 rounded-lg text-xs focus:outline-none bg-white">
@@ -1369,11 +1364,6 @@ export default function OrdenesTrabajoTab({ ordenes, vehiculos, clientes, tecnic
                         onChange={e => setNewLinea(l => ({ ...l, descripcion: e.target.value }))}
                         className="px-2 py-1.5 border border-slate-200 rounded-lg text-xs focus:outline-none" />
                     </div>
-                    {otFormEsFlota && (
-                      <p className="text-[10px] text-violet-600 bg-violet-50 border border-violet-100 rounded-lg px-2 py-1.5">
-                        Vehículo de flota propia: no se vende, solo se registra el coste real del taller.
-                      </p>
-                    )}
                     <div className={otFormEsFlota ? 'grid grid-cols-2 gap-2' : 'grid grid-cols-3 gap-2'}>
                       <input type="number" min="1" step="1" placeholder={newLinea.tipo === 'mano_de_obra' ? 'Horas *' : 'Cantidad *'} value={newLinea.cantidad}
                         onChange={e => setNewLinea(l => ({ ...l, cantidad: e.target.value === '' ? '' : Math.max(1, Math.round(Number(e.target.value))) }))}

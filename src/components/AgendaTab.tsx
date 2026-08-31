@@ -146,7 +146,12 @@ export default function AgendaTab({ citas, vehiculos, clientes, tecnicos, ordene
   // como esa cita, marcada 'convertida'.
   const otsSinCita = useMemo(() => {
     const otIdsConCita = new Set(citas.map((c) => c.otId).filter(Boolean));
-    return ordenes.filter((ot) => !otIdsConCita.has(ot.id));
+    // Solo vehículos que ya han ingresado al taller: un presupuesto todavía
+    // no es un coche físicamente en el taller, y una OT cancelada tampoco
+    // representa nada programado ese día.
+    return ordenes.filter((ot) =>
+      !otIdsConCita.has(ot.id) && ot.estado !== 'presupuesto' && ot.estado !== 'cancelado'
+    );
   }, [citas, ordenes]);
 
   const entriesDelDia = useMemo(() => {
