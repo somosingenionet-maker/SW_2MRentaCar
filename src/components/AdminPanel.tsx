@@ -9,6 +9,7 @@ interface AdminPanelProps {
 }
 
 const MODULOS_BASE = [
+  { id: 'citas' as ModuloId, label: 'Agenda', desc: 'Citas y programación del taller' },
   { id: 'vehiculos' as ModuloId, label: 'Vehículos', desc: 'Gestión de flota' },
   { id: 'clientes' as ModuloId, label: 'Clientes CRM', desc: 'Directorio de clientes' },
   { id: 'taller' as ModuloId, label: 'Taller', desc: 'Diario de mantenimientos' },

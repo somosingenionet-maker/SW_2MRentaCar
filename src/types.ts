@@ -182,8 +182,30 @@ export interface Tecnico {
   activo: boolean;
 }
 
+/**
+ * Cita de la Agenda del taller: programación previa a la creación de la OT.
+ * Admite datos libres (contactoNombre/contactoTelefono/vehiculoDescripcion)
+ * para clientes o vehículos que aún no están registrados — se completan al
+ * convertir la cita en Orden de Trabajo.
+ */
+export interface Cita {
+  id: string;
+  fechaHora: string; // ISO timestamp
+  duracionMinutos: number;
+  clienteId?: string;
+  vehiculoId?: string;
+  contactoNombre?: string;
+  contactoTelefono?: string;
+  vehiculoDescripcion?: string;
+  motivo: string;
+  tecnicoId?: string;
+  estado: 'pendiente' | 'confirmada' | 'cancelada' | 'convertida';
+  notas?: string;
+  otId?: string;
+}
+
 /** Identificador de módulo funcional. Controla qué pestañas ve cada usuario. */
-export type ModuloId = 'vehiculos' | 'clientes' | 'taller' | 'alertas' | 'rentabilidad' | 'facturas' | 'alquileres';
+export type ModuloId = 'vehiculos' | 'clientes' | 'taller' | 'alertas' | 'rentabilidad' | 'facturas' | 'alquileres' | 'citas';
 
 export interface Usuario {
   id: string;

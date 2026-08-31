@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { contrastText } from './utils/color';
 import { genId } from './utils/id';
-import { Vehiculo, Intervencion, Cliente, Reserva, Alerta, NotificacionCliente, InteraccionCliente, AlertaTipo, Usuario, Factura, ModuloId, OrdenTrabajo, Tecnico } from './types';
+import { Vehiculo, Intervencion, Cliente, Reserva, Alerta, NotificacionCliente, InteraccionCliente, AlertaTipo, Usuario, Factura, ModuloId, OrdenTrabajo, Tecnico, Cita } from './types';
 import { getSessionUsuario, signOut } from './lib/auth';
 import { supabase } from './lib/supabase';
 import LoginScreenReset from './components/ResetPasswordScreen';
@@ -14,10 +14,11 @@ import RentalsTab from './components/RentalsTab';
 import AnalyticsTab from './components/AnalyticsTab';
 import AlertsNotificationsTab from './components/AlertsNotificationsTab';
 import FacturasTab from './components/FacturasTab';
+import AgendaTab from './components/AgendaTab';
 import LoginScreen from './components/LoginScreen';
 import AdminPanel from './components/AdminPanel';
 import {
-  Car, Wrench, Users, Calendar, BarChart2, Bell, Shield, Phone, Mail, Globe, Menu, X, Settings, FileText, LogOut
+  Car, Wrench, Users, Calendar, CalendarClock, BarChart2, Bell, Shield, Phone, Mail, Globe, Menu, X, Settings, FileText, LogOut
 } from 'lucide-react';
 import CompanySettingsPanel from './components/CompanySettingsPanel';
 import { EmpresaConfig, getEmpresaConfig } from './data/mockData';
@@ -50,6 +51,7 @@ export default function App() {
   const [facturas, setFacturas] = useState<Factura[]>([]);
   const [ordenesTrabajo, setOrdenesTrabajo] = useState<OrdenTrabajo[]>([]);
   const [tecnicos, setTecnicos] = useState<Tecnico[]>([]);
+  const [citas, setCitas] = useState<Cita[]>([]);
 
   // Check session on mount (Supabase)
   useEffect(() => {
@@ -71,7 +73,7 @@ export default function App() {
   useEffect(() => {
     if (!currentUser) {
       setVehiculos([]); setIntervenciones([]); setClientes([]); setReservas([]);
-      setAlertas([]); setNotificaciones([]); setFacturas([]); setOrdenesTrabajo([]); setTecnicos([]);
+      setAlertas([]); setNotificaciones([]); setFacturas([]); setOrdenesTrabajo([]); setTecnicos([]); setCitas([]);
       return;
     }
     const log = (e: string) => (err: unknown) => console.error(`Error cargando ${e}`, err);
@@ -84,6 +86,7 @@ export default function App() {
     fetchAll<Factura>('facturas').then(setFacturas).catch(log('facturas'));
     fetchAll<OrdenTrabajo>('ordenes_trabajo').then(setOrdenesTrabajo).catch(log('órdenes de trabajo'));
     fetchAll<Tecnico>('tecnicos').then(setTecnicos).catch(log('técnicos'));
+    fetchAll<Cita>('citas').then(setCitas).catch(log('citas'));
     loadEmpresaConfig().then(setEmpresaConfig).catch(log('configuración de empresa'));
   }, [currentUser]);
 
@@ -341,6 +344,21 @@ export default function App() {
     deleteOne('tecnicos', id).catch(err => console.error('Error eliminando técnico', err));
   }, []);
 
+  const handleAddCita = useCallback((c: Cita) => {
+    setCitas(prev => [...prev, c]);
+    upsertOne('citas', c).catch(err => console.error('Error guardando cita', err));
+  }, []);
+
+  const handleUpdateCita = useCallback((c: Cita) => {
+    setCitas(prev => prev.map(x => x.id === c.id ? c : x));
+    upsertOne('citas', c).catch(err => console.error('Error actualizando cita', err));
+  }, []);
+
+  const handleDeleteCita = useCallback((id: string) => {
+    setCitas(prev => prev.filter(x => x.id !== id));
+    deleteOne('citas', id).catch(err => console.error('Error eliminando cita', err));
+  }, []);
+
   const activeAlertsCount = useMemo(() => alertas.filter(a => a.estado === 'activa').length, [alertas]);
 
   const brandColor = empresaConfig.brandColor;
@@ -377,6 +395,7 @@ export default function App() {
 
   const tabDefs: { id: ModuloId; label: string; icon: React.ReactNode; emoji: string }[] = (
     [
+      { id: 'citas' as ModuloId, label: 'Agenda', icon: <CalendarClock className="w-4 h-4" />, emoji: '📅' },
       { id: 'vehiculos' as ModuloId, label: 'Vehículos', icon: <Car className="w-4 h-4" />, emoji: '🚗' },
       { id: 'clientes' as ModuloId, label: 'Clientes', icon: <Users className="w-4 h-4" />, emoji: '👥' },
       { id: 'taller' as ModuloId, label: 'Taller', icon: <Wrench className="w-4 h-4" />, emoji: '🔧' },
@@ -590,6 +609,20 @@ export default function App() {
 
       {/* CORE WORKSPACE */}
       <main className="flex-1 w-full max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 overflow-y-auto">
+        {activeTab === 'citas' && (
+          <AgendaTab
+            citas={citas}
+            vehiculos={vehiculos}
+            clientes={clientes}
+            tecnicos={tecnicos}
+            ordenes={ordenesTrabajo}
+            onAddCita={handleAddCita}
+            onUpdateCita={handleUpdateCita}
+            onDeleteCita={handleDeleteCita}
+            onCreateOT={handleAddOT}
+          />
+        )}
+
         {activeTab === 'vehiculos' && (
           <VehiclesTab
             vehiculos={vehiculos}
