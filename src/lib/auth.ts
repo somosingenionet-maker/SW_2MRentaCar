@@ -25,7 +25,14 @@ async function fetchPerfil(userId: string): Promise<Usuario | null> {
 export async function signIn(email: string, password: string): Promise<Usuario> {
   const { data, error } = await supabase.auth.signInWithPassword({ email: email.trim(), password });
   if (error || !data.user) {
-    throw new Error('Credenciales incorrectas. Verifica tu email y contraseña.');
+    const msg = error?.message ?? '';
+    if (/invalid login credentials/i.test(msg)) {
+      throw new Error('Credenciales incorrectas. Verifica tu email y contraseña.');
+    }
+    if (/email not confirmed/i.test(msg)) {
+      throw new Error('Tu email aún no está confirmado.');
+    }
+    throw new Error(msg || 'No se pudo iniciar sesión.');
   }
   const perfil = await fetchPerfil(data.user.id);
   if (!perfil) {
