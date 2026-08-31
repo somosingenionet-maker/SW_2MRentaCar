@@ -2,7 +2,7 @@ import { useState, useMemo } from 'react';
 import { Cliente, Reserva, InteraccionCliente, Vehiculo, OrdenTrabajo, Factura, OTEstado } from '../types';
 import { getEmpresaConfig } from '../data/mockData';
 import {
-  Users, UserPlus, Search, Mail, Phone, MapPin, CreditCard, Clock, MessageSquare, Plus, Trash2, X, Check, Save, Download, PenTool, Car, Wrench, Receipt
+  Users, UserPlus, Search, Mail, Phone, MapPin, CreditCard, Clock, MessageSquare, Plus, Trash2, X, Check, Save, Download, PenTool, Car, Wrench, Receipt, ChevronDown, ChevronRight
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import ConfirmDialog from './ConfirmDialog';
@@ -63,6 +63,8 @@ export default function CrmTab({
   );
   const [isAddingOpen, setIsAddingOpen] = useState(false);
   const [isEditing, setIsEditing] = useState(false);
+  // Id de la orden de trabajo expandida en el historial unificado (para ver su proceso completo).
+  const [expandedTimelineOTId, setExpandedTimelineOTId] = useState<string | null>(null);
 
   // New interaction form state
   const [isAddingInteraction, setIsAddingInteraction] = useState(false);
@@ -216,6 +218,18 @@ export default function CrmTab({
 
   const getClientFacturas = (cliId: string) =>
     facturas.filter(f => f.clienteId === cliId).sort((a, b) => b.numero.localeCompare(a.numero));
+
+  // Historial unificado: interacciones manuales + órdenes de trabajo del
+  // taller, mezcladas en un único cronograma ordenado por fecha.
+  type TimelineEntry =
+    | { kind: 'interaccion'; fecha: string; data: InteraccionCliente }
+    | { kind: 'ot'; fecha: string; data: OrdenTrabajo };
+
+  const getClientTimeline = (cliente: Cliente): TimelineEntry[] => {
+    const interacciones: TimelineEntry[] = cliente.interacciones.map(int => ({ kind: 'interaccion', fecha: int.fecha, data: int }));
+    const ordenes: TimelineEntry[] = getClientOrdenes(cliente.id).map(ot => ({ kind: 'ot', fecha: ot.fechaRecepcion, data: ot }));
+    return [...interacciones, ...ordenes].sort((a, b) => b.fecha.localeCompare(a.fecha));
+  };
 
   return (
     <div className="space-y-6" id="crm-tab-root">
@@ -482,7 +496,7 @@ export default function CrmTab({
                 <div className="flex justify-between items-center">
                   <h4 className="text-xs font-bold text-slate-700 uppercase tracking-wider flex items-center gap-1.5">
                     <MessageSquare className="w-4 h-4 text-blue-600" />
-                    Historial de Interacciones CRM
+                    Historial del Cliente
                   </h4>
                   <button
                     onClick={() => setIsAddingInteraction(!isAddingInteraction)}
@@ -543,27 +557,72 @@ export default function CrmTab({
                   </form>
                 )}
 
-                <div className="overflow-y-auto max-h-[220px] space-y-3 pr-1" id="crm-interactions-timeline">
-                  {selectedCliente.interacciones.length === 0 ? (
+                <div className="overflow-y-auto max-h-[320px] space-y-2 pr-1" id="crm-interactions-timeline">
+                  {getClientTimeline(selectedCliente).length === 0 ? (
                     <div className="text-center py-6 text-slate-400 text-xs">
-                      No se han registrado interacciones con este cliente.
+                      No se han registrado interacciones ni trabajos con este cliente.
                     </div>
                   ) : (
-                    selectedCliente.interacciones.map((int) => (
-                      <div key={int.id} className="p-3 bg-slate-50 border-l border-slate-200 rounded-r-xl space-y-1">
-                        <div className="flex justify-between items-center text-[10px]">
-                          <span className={`px-1.5 py-0.5 rounded text-[9px] font-bold uppercase ${
-                            int.tipo === 'registro_contrato' ? 'bg-slate-100 text-slate-600' :
-                            int.tipo === 'whatsapp' ? 'bg-emerald-100 text-emerald-800' :
-                            int.tipo === 'llamada' ? 'bg-blue-100 text-blue-800' : 'bg-purple-100 text-purple-800'
-                          }`}>
-                            {int.tipo.replace('_', ' ')}
-                          </span>
-                          <span className="text-slate-400 font-bold">{formatDate(int.fecha)}</span>
+                    getClientTimeline(selectedCliente).map(entry => {
+                      if (entry.kind === 'interaccion') {
+                        const int = entry.data;
+                        return (
+                          <div key={int.id} className="p-3 bg-slate-50 border-l border-slate-200 rounded-r-xl space-y-1">
+                            <div className="flex justify-between items-center text-[10px]">
+                              <span className={`px-1.5 py-0.5 rounded text-[9px] font-bold uppercase ${
+                                int.tipo === 'registro_contrato' ? 'bg-slate-100 text-slate-600' :
+                                int.tipo === 'whatsapp' ? 'bg-emerald-100 text-emerald-800' :
+                                int.tipo === 'llamada' ? 'bg-blue-100 text-blue-800' : 'bg-purple-100 text-purple-800'
+                              }`}>
+                                {int.tipo.replace('_', ' ')}
+                              </span>
+                              <span className="text-slate-400 font-bold">{formatDate(int.fecha)}</span>
+                            </div>
+                            <p className="text-xs text-slate-600 leading-relaxed font-semibold">{int.notas}</p>
+                          </div>
+                        );
+                      }
+
+                      const ot = entry.data;
+                      const expanded = expandedTimelineOTId === ot.id;
+                      return (
+                        <div key={ot.id} className="border-l border-blue-200 rounded-r-xl overflow-hidden">
+                          <button
+                            type="button"
+                            onClick={() => setExpandedTimelineOTId(expanded ? null : ot.id)}
+                            className="w-full p-3 bg-blue-50/40 hover:bg-blue-50 transition text-left cursor-pointer"
+                          >
+                            <div className="flex justify-between items-center text-[10px]">
+                              <span className="px-1.5 py-0.5 rounded text-[9px] font-bold uppercase bg-blue-100 text-blue-800 flex items-center gap-1">
+                                <Wrench className="w-2.5 h-2.5" /> orden de trabajo
+                              </span>
+                              <span className="text-slate-400 font-bold">{formatDate(ot.fechaRecepcion)}</span>
+                            </div>
+                            <div className="flex justify-between items-center mt-1">
+                              <p className="text-xs text-slate-700 font-bold flex items-center gap-1">
+                                {expanded ? <ChevronDown className="w-3 h-3 text-blue-500" /> : <ChevronRight className="w-3 h-3 text-blue-500" />}
+                                {ot.numero} <span className="font-normal text-slate-500">— {OT_ESTADO_META[ot.estado].label}</span>
+                              </p>
+                              <span className="text-xs font-bold text-slate-800 font-mono">{ot.total.toFixed(2)} €</span>
+                            </div>
+                          </button>
+
+                          {expanded && (
+                            <div className="bg-white px-3 py-2.5 space-y-2 border-t border-blue-100">
+                              <p className="text-xs text-slate-600 font-semibold">{ot.descripcionProblema}</p>
+                              <div className="space-y-1.5">
+                                {ot.historial.map((ev, idx) => (
+                                  <div key={idx} className="flex items-start gap-2 text-[11px]">
+                                    <span className="text-slate-400 font-mono shrink-0">{formatDate(ev.fecha.slice(0, 10))}</span>
+                                    <span className="text-slate-600">{ev.descripcion}</span>
+                                  </div>
+                                ))}
+                              </div>
+                            </div>
+                          )}
                         </div>
-                        <p className="text-xs text-slate-600 leading-relaxed font-semibold">{int.notas}</p>
-                      </div>
-                    ))
+                      );
+                    })
                   )}
                 </div>
               </div>
@@ -596,37 +655,6 @@ export default function CrmTab({
                           <span className={`inline-block text-[9px] font-bold uppercase rounded px-1.5 ${
                             res.estado === 'cancelada' ? 'bg-rose-50 text-rose-600' : 'bg-emerald-50 text-emerald-700'
                           }`}>{res.estado === 'cancelada' ? 'Anulado' : 'Activo'}</span>
-                        </div>
-                      </div>
-                    ))
-                  )}
-                </div>
-              </div>
-
-              {/* Historial de Taller (Órdenes de Trabajo) */}
-              <div className="pt-4 border-t border-slate-100">
-                <h4 className="text-xs font-bold text-slate-700 uppercase tracking-wider flex items-center gap-1.5 mb-2 font-display">
-                  <Wrench className="w-4 h-4 text-blue-600" />
-                  Historial de Taller
-                </h4>
-
-                <div className="space-y-2 max-h-[140px] overflow-y-auto">
-                  {getClientOrdenes(selectedCliente.id).length === 0 ? (
-                    <div className="text-center py-4 text-slate-400 text-xs font-sans">
-                      Este cliente no registra órdenes de trabajo en el taller.
-                    </div>
-                  ) : (
-                    getClientOrdenes(selectedCliente.id).map(ot => (
-                      <div key={ot.id} className="p-2.5 bg-slate-50 border border-slate-100 rounded-xl flex justify-between items-center text-xs font-sans">
-                        <div>
-                          <div className="font-bold text-slate-800 font-mono">{ot.numero}</div>
-                          <div className="text-[10px] text-slate-500">{formatDate(ot.fechaRecepcion)}</div>
-                        </div>
-                        <div className="text-right">
-                          <span className="font-bold text-slate-900 block font-mono">{ot.total.toFixed(2)} €</span>
-                          <span className={`inline-block text-[9px] font-bold uppercase rounded px-1.5 ${OT_ESTADO_META[ot.estado].cls}`}>
-                            {OT_ESTADO_META[ot.estado].label}
-                          </span>
                         </div>
                       </div>
                     ))
