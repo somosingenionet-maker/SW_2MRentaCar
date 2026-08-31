@@ -63,6 +63,12 @@ function addDays(d: Date, n: number): Date {
   return copy;
 }
 
+function addMonths(d: Date, n: number): Date {
+  const copy = new Date(d);
+  copy.setMonth(copy.getMonth() + n);
+  return copy;
+}
+
 function evento(descripcion: string): EventoOT {
   return { fecha: new Date().toISOString(), descripcion };
 }
@@ -146,9 +152,23 @@ function otOcupaDia(ot: OrdenTrabajo, key: string, hoy: string): boolean {
 
 export default function AgendaTab({ citas, vehiculos, clientes, tecnicos, ordenes, onAddCita, onUpdateCita, onDeleteCita, onCreateOT }: Props) {
   const [selectedDay, setSelectedDay] = useState(() => new Date());
-  const [vista, setVista] = useState<'dia' | 'semana'>('dia');
+  const [vista, setVista] = useState<'dia' | 'semana' | 'mes'>('dia');
   const weekStart = useMemo(() => startOfWeek(selectedDay), [selectedDay]);
   const weekDays = useMemo(() => Array.from({ length: 7 }, (_, i) => addDays(weekStart, i)), [weekStart]);
+
+  // Cuadrícula del mes: desde el lunes de la semana del día 1 hasta el
+  // domingo de la semana del último día, en filas completas de 7.
+  const monthDays = useMemo(() => {
+    const monthStart = new Date(selectedDay.getFullYear(), selectedDay.getMonth(), 1);
+    const monthEnd = new Date(selectedDay.getFullYear(), selectedDay.getMonth() + 1, 0);
+    const gridStart = startOfWeek(monthStart);
+    const gridEnd = addDays(startOfWeek(monthEnd), 6);
+    const days: Date[] = [];
+    for (let cursor = gridStart; cursor <= gridEnd; cursor = addDays(cursor, 1)) {
+      days.push(cursor);
+    }
+    return days;
+  }, [selectedDay]);
 
   const [showForm, setShowForm] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
@@ -289,7 +309,7 @@ export default function AgendaTab({ citas, vehiculos, clientes, tecnicos, ordene
       <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3">
         <div className="flex items-center gap-2 flex-wrap">
           <button
-            onClick={() => setSelectedDay((d) => addDays(d, -7))}
+            onClick={() => setSelectedDay((d) => vista === 'mes' ? addMonths(d, -1) : addDays(d, -7))}
             className="p-2 border border-slate-200 rounded-xl text-slate-500 hover:bg-slate-50 transition cursor-pointer"
           >
             <ChevronLeft className="w-4 h-4" />
@@ -301,11 +321,14 @@ export default function AgendaTab({ citas, vehiculos, clientes, tecnicos, ordene
             Hoy
           </button>
           <button
-            onClick={() => setSelectedDay((d) => addDays(d, 7))}
+            onClick={() => setSelectedDay((d) => vista === 'mes' ? addMonths(d, 1) : addDays(d, 7))}
             className="p-2 border border-slate-200 rounded-xl text-slate-500 hover:bg-slate-50 transition cursor-pointer"
           >
             <ChevronRight className="w-4 h-4" />
           </button>
+          <span className="text-xs font-bold text-slate-500 capitalize px-1">
+            {vista === 'mes' && selectedDay.toLocaleDateString('es-ES', { month: 'long', year: 'numeric' })}
+          </span>
           <div className="flex bg-slate-100 rounded-xl p-1 gap-1 ml-1">
             <button
               onClick={() => setVista('dia')}
@@ -318,6 +341,12 @@ export default function AgendaTab({ citas, vehiculos, clientes, tecnicos, ordene
               className={`px-3 py-1.5 text-xs font-bold rounded-lg transition cursor-pointer ${vista === 'semana' ? 'bg-white text-slate-800 shadow-3xs' : 'text-slate-500 hover:text-slate-700'}`}
             >
               Semana
+            </button>
+            <button
+              onClick={() => setVista('mes')}
+              className={`px-3 py-1.5 text-xs font-bold rounded-lg transition cursor-pointer ${vista === 'mes' ? 'bg-white text-slate-800 shadow-3xs' : 'text-slate-500 hover:text-slate-700'}`}
+            >
+              Mes
             </button>
           </div>
         </div>
@@ -522,6 +551,57 @@ export default function AgendaTab({ citas, vehiculos, clientes, tecnicos, ordene
               </div>
             );
           })}
+        </div>
+      )}
+
+      {vista === 'mes' && (
+        <div className="bg-white border border-slate-200 rounded-2xl overflow-hidden">
+          <div className="grid grid-cols-7 border-b border-slate-100">
+            {DIAS_SEMANA.map((d) => (
+              <div key={d} className="py-2 text-center text-[10px] font-bold uppercase tracking-wider text-slate-400">{d}</div>
+            ))}
+          </div>
+          <div className="grid grid-cols-7">
+            {monthDays.map((d) => {
+              const key = localKey(d);
+              const esHoy = key === hoy;
+              const esMesActual = d.getMonth() === selectedDay.getMonth();
+              const entradas = entriesForDay(d);
+              return (
+                <button
+                  key={key}
+                  type="button"
+                  onClick={() => irADia(d)}
+                  className={`min-h-[92px] p-1.5 border-b border-r border-slate-100 text-left cursor-pointer transition hover:bg-slate-50 flex flex-col gap-0.5 ${esMesActual ? 'bg-white' : 'bg-slate-50/50'}`}
+                >
+                  <span className={`text-xs font-bold w-5 h-5 flex items-center justify-center rounded-full ${
+                    esHoy ? 'bg-blue-600 text-white' : esMesActual ? 'text-slate-700' : 'text-slate-300'
+                  }`}>
+                    {d.getDate()}
+                  </span>
+                  {entradas.slice(0, 2).map((entry) => {
+                    if (entry.kind === 'ot') {
+                      const meta = OT_BADGE_META[entry.data.estado];
+                      return (
+                        <span key={`ot-${entry.data.id}`} className={`block text-[9px] font-semibold truncate px-1 rounded ${meta.bg} ${meta.color}`}>
+                          {entry.data.numero}
+                        </span>
+                      );
+                    }
+                    const meta = ESTADO_META[entry.data.estado];
+                    return (
+                      <span key={entry.data.id} className={`block text-[9px] font-semibold truncate px-1 rounded ${meta.bg} ${meta.color}`}>
+                        {new Date(entry.data.fechaHora).toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' })} {entry.data.motivo}
+                      </span>
+                    );
+                  })}
+                  {entradas.length > 2 && (
+                    <span className="block text-[9px] text-slate-400 font-semibold px-1">+{entradas.length - 2} más</span>
+                  )}
+                </button>
+              );
+            })}
+          </div>
         </div>
       )}
 
