@@ -4,6 +4,7 @@ import {
   TrendingUp, TrendingDown, Clock, CheckCircle, XCircle, Users, Wrench, BarChart2, Target, Download, Car, Calendar
 } from 'lucide-react';
 import { downloadCsv } from '../utils/csvExport';
+import { FLOTA_CLIENTE_ID } from './OrdenesTrabajoTab';
 
 interface AnalyticsTabProps {
   ordenesTrabajo: OrdenTrabajo[];
@@ -116,13 +117,16 @@ export default function AnalyticsTab({ ordenesTrabajo, clientes, reservas, vehic
 
   const { start, end, prevStart, prevEnd } = useMemo(() => periodoRange(periodo), [periodo]);
 
-  // OTs del período actual y anterior
+  // OTs del período actual y anterior. Se excluyen las de flota propia: no
+  // son ventas a un cliente (no hay precio de venta, solo coste interno),
+  // así que no deben inflar facturación/ticket medio/margen — su coste real
+  // ya se ve en Rentabilidad > flota de alquiler ("Inversión en taller").
   const otsActual = useMemo(() =>
-    ordenesTrabajo.filter(ot => inRange(ot.fechaRecepcion, start, end)),
+    ordenesTrabajo.filter(ot => ot.clienteId !== FLOTA_CLIENTE_ID && inRange(ot.fechaRecepcion, start, end)),
     [ordenesTrabajo, start, end]
   );
   const otsAnterior = useMemo(() =>
-    ordenesTrabajo.filter(ot => inRange(ot.fechaRecepcion, prevStart, prevEnd)),
+    ordenesTrabajo.filter(ot => ot.clienteId !== FLOTA_CLIENTE_ID && inRange(ot.fechaRecepcion, prevStart, prevEnd)),
     [ordenesTrabajo, prevStart, prevEnd]
   );
 
@@ -197,10 +201,10 @@ export default function AnalyticsTab({ ordenesTrabajo, clientes, reservas, vehic
       .sort((a, b) => b.facturado - a.facturado);
   }, [otsActual]);
 
-  // 7. Clientes frecuentes (acumulado total)
+  // 7. Clientes frecuentes (acumulado total; excluye flota propia, que no es un cliente real)
   const clienteStats = useMemo(() => {
     const map: Record<string, { visitas: number; facturado: number }> = {};
-    ordenesTrabajo.filter(ot => ot.estado === 'entregado').forEach(ot => {
+    ordenesTrabajo.filter(ot => ot.estado === 'entregado' && ot.clienteId !== FLOTA_CLIENTE_ID).forEach(ot => {
       if (!map[ot.clienteId]) map[ot.clienteId] = { visitas: 0, facturado: 0 };
       map[ot.clienteId].visitas++;
       map[ot.clienteId].facturado += ot.total;
