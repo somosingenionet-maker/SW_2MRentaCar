@@ -26,13 +26,17 @@ export async function signIn(email: string, password: string): Promise<Usuario> 
   const { data, error } = await supabase.auth.signInWithPassword({ email: email.trim(), password });
   if (error || !data.user) {
     const msg = error?.message ?? '';
+    if (msg) console.error('Error de inicio de sesión:', msg);
     if (/invalid login credentials/i.test(msg)) {
       throw new Error('Credenciales incorrectas. Verifica tu email y contraseña.');
     }
     if (/email not confirmed/i.test(msg)) {
-      throw new Error('Tu email aún no está confirmado.');
+      throw new Error('Tu email aún no está confirmado. Contacta con el administrador.');
     }
-    throw new Error(msg || 'No se pudo iniciar sesión.');
+    if (/failed to fetch|networkerror|load failed|fetch/i.test(msg)) {
+      throw new Error('No se pudo conectar con el servidor. Revisa tu conexión e inténtalo de nuevo en unos minutos.');
+    }
+    throw new Error('No se pudo iniciar sesión. Inténtalo de nuevo.');
   }
   const perfil = await fetchPerfil(data.user.id);
   if (!perfil) {
