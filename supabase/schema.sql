@@ -220,16 +220,19 @@ create trigger on_auth_user_created
 -- 3. SEGURIDAD (Row Level Security)
 -- ---------------------------------------------------------------------------
 
--- Tablas de negocio: cualquier usuario autenticado puede LEER.
--- Solo admin/super_admin puede crear/editar/borrar (rol 'usuario' = solo lectura).
+-- Tablas de negocio (trabajo diario del personal de oficina): cualquier
+-- usuario autenticado puede leer y escribir por igual (crear/editar
+-- vehículos, clientes, órdenes de trabajo, reservas, alertas,
+-- notificaciones, técnicos). El rol 'usuario' es el que hace este trabajo
+-- día a día; 'admin'/'super_admin' es el dueño/gerencia.
 -- (El control por módulos sigue aplicándose en la interfaz para decidir qué
---  pestañas ve cada usuario; esto es la barrera a nivel de BD por debajo.)
+--  pestañas ve cada usuario.)
 do $$
 declare t text;
 begin
   foreach t in array array[
     'vehiculos','clientes','intervenciones','ordenes_trabajo','reservas',
-    'alertas','notificaciones','tecnicos','facturas'
+    'alertas','notificaciones','tecnicos'
   ]
   loop
     execute format('alter table public.%I enable row level security;', t);
@@ -237,13 +240,32 @@ begin
     execute format('drop policy if exists %I_read on public.%I;', t, t);
     execute format('drop policy if exists %I_write on public.%I;', t, t);
     execute format(
-      'create policy %I_read on public.%I for select to authenticated using (true);', t, t
-    );
-    execute format(
-      'create policy %I_write on public.%I for all to authenticated using (public.current_rol() in (''admin'',''super_admin'')) with check (public.current_rol() in (''admin'',''super_admin''));', t, t
+      'create policy auth_all on public.%I for all to authenticated using (true) with check (true);', t
     );
   end loop;
 end $$;
+
+-- facturas: cualquier autenticado puede leer y crear facturas nuevas, pero
+-- una factura ya creada solo puede editarse o eliminarse por admin/super_admin
+-- (protege el registro contable una vez emitido).
+alter table public.facturas enable row level security;
+drop policy if exists auth_all on public.facturas;
+drop policy if exists facturas_read on public.facturas;
+drop policy if exists facturas_write on public.facturas;
+drop policy if exists facturas_insert on public.facturas;
+drop policy if exists facturas_update on public.facturas;
+drop policy if exists facturas_delete on public.facturas;
+create policy facturas_read on public.facturas
+  for select to authenticated using (true);
+create policy facturas_insert on public.facturas
+  for insert to authenticated with check (true);
+create policy facturas_update on public.facturas
+  for update to authenticated
+  using (public.current_rol() in ('admin','super_admin'))
+  with check (public.current_rol() in ('admin','super_admin'));
+create policy facturas_delete on public.facturas
+  for delete to authenticated
+  using (public.current_rol() in ('admin','super_admin'));
 
 -- empresa_config: todos los autenticados leen; solo admin/super_admin escriben.
 alter table public.empresa_config enable row level security;
@@ -520,7 +542,4 @@ alter table public.citas enable row level security;
 drop policy if exists auth_all on public.citas;
 drop policy if exists citas_read on public.citas;
 drop policy if exists citas_write on public.citas;
-create policy citas_read on public.citas for select to authenticated using (true);
-create policy citas_write on public.citas for all to authenticated
-  using (public.current_rol() in ('admin','super_admin'))
-  with check (public.current_rol() in ('admin','super_admin'));
+create policy auth_all on public.citas for all to authenticated using (true) with check (true);

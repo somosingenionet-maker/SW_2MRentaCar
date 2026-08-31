@@ -563,13 +563,15 @@ export default function App() {
                   <Shield className="w-3.5 h-3.5" /> Admin
                 </button>
               )}
-              <button
-                onClick={() => setSettingsOpen(true)}
-                title="Configuración de empresa"
-                className="p-2 py-1 bg-slate-50 hover:bg-slate-100 text-slate-600 hover:text-slate-800 rounded-lg text-[10px] font-black transition flex items-center gap-1 cursor-pointer border border-slate-200"
-              >
-                <Settings className="w-3.5 h-3.5" /> Empresa
-              </button>
+              {(currentUser.rol === 'admin' || currentUser.rol === 'super_admin') && (
+                <button
+                  onClick={() => setSettingsOpen(true)}
+                  title="Configuración de empresa"
+                  className="p-2 py-1 bg-slate-50 hover:bg-slate-100 text-slate-600 hover:text-slate-800 rounded-lg text-[10px] font-black transition flex items-center gap-1 cursor-pointer border border-slate-200"
+                >
+                  <Settings className="w-3.5 h-3.5" /> Empresa
+                </button>
+              )}
             </div>
 
           </div>
@@ -596,9 +598,11 @@ export default function App() {
                   🛡️ Panel de Administración
                 </button>
               )}
-              <button onClick={() => { setSettingsOpen(true); setMobileMenuOpen(false); }} className="w-full text-left px-3 py-2 text-xs font-bold rounded-lg text-slate-700 block hover:bg-slate-50">
-                ⚙️ Configuración de empresa
-              </button>
+              {(currentUser.rol === 'admin' || currentUser.rol === 'super_admin') && (
+                <button onClick={() => { setSettingsOpen(true); setMobileMenuOpen(false); }} className="w-full text-left px-3 py-2 text-xs font-bold rounded-lg text-slate-700 block hover:bg-slate-50">
+                  ⚙️ Configuración de empresa
+                </button>
+              )}
               <button onClick={handleLogout} className="w-full text-left px-3 py-2 text-xs font-bold rounded-lg text-slate-600 block hover:bg-slate-50">
                 🚪 Cerrar sesión
               </button>
