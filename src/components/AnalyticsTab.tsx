@@ -173,13 +173,13 @@ export default function AnalyticsTab({ ordenesTrabajo, clientes, reservas, vehic
 
   // 5. Margen por tipo de línea
   const margenTipo = useMemo(() => {
-    const totals = { mano_de_obra: 0, pieza: 0, material: 0 };
+    const totals = { mano_de_obra: 0, producto: 0 };
     otsActual.filter(ot => ot.estado === 'entregado').forEach(ot => {
       ot.lineas.forEach(l => {
         if (l.tipo in totals) totals[l.tipo as keyof typeof totals] += l.subtotal;
       });
     });
-    const total = totals.mano_de_obra + totals.pieza + totals.material;
+    const total = totals.mano_de_obra + totals.producto;
     return { totals, total };
   }, [otsActual]);
 
@@ -382,8 +382,7 @@ export default function AnalyticsTab({ ordenesTrabajo, clientes, reservas, vehic
             <div className="space-y-4">
               {([
                 { key: 'mano_de_obra', label: 'Mano de obra', color: 'bg-blue-500' },
-                { key: 'pieza', label: 'Piezas', color: 'bg-violet-500' },
-                { key: 'material', label: 'Material', color: 'bg-orange-400' },
+                { key: 'producto', label: 'Productos', color: 'bg-violet-500' },
               ] as const).map(({ key, label, color }) => {
                 const val = margenTipo.totals[key];
                 const pct = margenTipo.total > 0 ? (val / margenTipo.total) * 100 : 0;

@@ -49,7 +49,7 @@ export type OTEstado =
   | 'entregado'
   | 'cancelado';
 
-export type LineaOTTipo = 'mano_de_obra' | 'pieza' | 'material';
+export type LineaOTTipo = 'mano_de_obra' | 'producto';
 
 export interface EventoOT {
   fecha: string;       // ISO timestamp

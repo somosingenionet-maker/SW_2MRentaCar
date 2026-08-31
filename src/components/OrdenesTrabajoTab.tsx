@@ -34,8 +34,7 @@ const ESTADO_FLOW: OTEstado[] = [
 
 const TIPO_META: Record<LineaOTTipo, { label: string; icon: React.ReactNode }> = {
   mano_de_obra: { label: 'Mano de obra', icon: <Wrench size={12} /> },
-  pieza:        { label: 'Pieza',        icon: <Package size={12} /> },
-  material:     { label: 'Material',     icon: <Package size={12} /> },
+  producto:     { label: 'Producto',     icon: <Package size={12} /> },
 };
 
 const IVA_DEFAULT = 21;
