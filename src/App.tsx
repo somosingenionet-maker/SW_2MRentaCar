@@ -619,6 +619,7 @@ export default function App() {
             reservas={reservas}
             vehiculos={vehiculos}
             ordenesTrabajo={ordenesTrabajo}
+            facturas={facturas}
             hasAlquileres={hasAlquileres}
             onAddCliente={handleAddCliente}
             onUpdateCliente={handleUpdateCliente}

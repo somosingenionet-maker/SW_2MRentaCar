@@ -1,8 +1,8 @@
 import { useState, useMemo } from 'react';
-import { Cliente, Reserva, InteraccionCliente, Vehiculo, OrdenTrabajo } from '../types';
+import { Cliente, Reserva, InteraccionCliente, Vehiculo, OrdenTrabajo, Factura, OTEstado } from '../types';
 import { getEmpresaConfig } from '../data/mockData';
 import {
-  Users, UserPlus, Search, Mail, Phone, MapPin, CreditCard, Clock, MessageSquare, Plus, Trash2, X, Check, Save, Download, PenTool, Car
+  Users, UserPlus, Search, Mail, Phone, MapPin, CreditCard, Clock, MessageSquare, Plus, Trash2, X, Check, Save, Download, PenTool, Car, Wrench, Receipt
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import ConfirmDialog from './ConfirmDialog';
@@ -16,6 +16,7 @@ interface CrmTabProps {
   reservas: Reserva[];
   vehiculos: Vehiculo[];
   ordenesTrabajo: OrdenTrabajo[];
+  facturas: Factura[];
   hasAlquileres?: boolean;
   onAddCliente: (cliente: Cliente) => void;
   onUpdateCliente: (cliente: Cliente) => void;
@@ -23,11 +24,29 @@ interface CrmTabProps {
   onAddInteraccion: (clienteId: string, interaccion: InteraccionCliente) => void;
 }
 
+const OT_ESTADO_META: Record<OTEstado, { label: string; cls: string }> = {
+  presupuesto:   { label: 'Presupuesto',   cls: 'bg-violet-50 text-violet-700' },
+  recibido:      { label: 'Recibido',      cls: 'bg-slate-100 text-slate-600' },
+  en_reparacion: { label: 'En reparación', cls: 'bg-orange-50 text-orange-700' },
+  listo:         { label: 'Listo',         cls: 'bg-cyan-50 text-cyan-700' },
+  entregado:     { label: 'Entregado',     cls: 'bg-emerald-50 text-emerald-700' },
+  cancelado:     { label: 'Cancelado',     cls: 'bg-rose-50 text-rose-600' },
+};
+
+const FACTURA_ESTADO_META: Record<Factura['estado'], { label: string; cls: string }> = {
+  borrador:  { label: 'Borrador', cls: 'bg-slate-100 text-slate-600' },
+  emitida:   { label: 'Emitida',  cls: 'bg-blue-50 text-blue-700' },
+  pagada:    { label: 'Pagada',   cls: 'bg-emerald-50 text-emerald-700' },
+  vencida:   { label: 'Vencida',  cls: 'bg-rose-50 text-rose-600' },
+  cancelada: { label: 'Anulada',  cls: 'bg-slate-200 text-slate-500' },
+};
+
 export default function CrmTab({
   clientes,
   reservas,
   vehiculos,
   ordenesTrabajo,
+  facturas,
   hasAlquileres = false,
   onAddCliente,
   onUpdateCliente,
@@ -190,6 +209,13 @@ export default function CrmTab({
   const getClientReservas = (cliId: string) => {
     return reservas.filter(res => res.clienteId === cliId);
   };
+
+  // Historial de taller y facturación del cliente (para la ficha del CRM).
+  const getClientOrdenes = (cliId: string) =>
+    ordenesTrabajo.filter(ot => ot.clienteId === cliId).sort((a, b) => b.fechaActualizacion.localeCompare(a.fechaActualizacion));
+
+  const getClientFacturas = (cliId: string) =>
+    facturas.filter(f => f.clienteId === cliId).sort((a, b) => b.numero.localeCompare(a.numero));
 
   return (
     <div className="space-y-6" id="crm-tab-root">
@@ -570,6 +596,68 @@ export default function CrmTab({
                           <span className={`inline-block text-[9px] font-bold uppercase rounded px-1.5 ${
                             res.estado === 'cancelada' ? 'bg-rose-50 text-rose-600' : 'bg-emerald-50 text-emerald-700'
                           }`}>{res.estado === 'cancelada' ? 'Anulado' : 'Activo'}</span>
+                        </div>
+                      </div>
+                    ))
+                  )}
+                </div>
+              </div>
+
+              {/* Historial de Taller (Órdenes de Trabajo) */}
+              <div className="pt-4 border-t border-slate-100">
+                <h4 className="text-xs font-bold text-slate-700 uppercase tracking-wider flex items-center gap-1.5 mb-2 font-display">
+                  <Wrench className="w-4 h-4 text-blue-600" />
+                  Historial de Taller
+                </h4>
+
+                <div className="space-y-2 max-h-[140px] overflow-y-auto">
+                  {getClientOrdenes(selectedCliente.id).length === 0 ? (
+                    <div className="text-center py-4 text-slate-400 text-xs font-sans">
+                      Este cliente no registra órdenes de trabajo en el taller.
+                    </div>
+                  ) : (
+                    getClientOrdenes(selectedCliente.id).map(ot => (
+                      <div key={ot.id} className="p-2.5 bg-slate-50 border border-slate-100 rounded-xl flex justify-between items-center text-xs font-sans">
+                        <div>
+                          <div className="font-bold text-slate-800 font-mono">{ot.numero}</div>
+                          <div className="text-[10px] text-slate-500">{formatDate(ot.fechaRecepcion)}</div>
+                        </div>
+                        <div className="text-right">
+                          <span className="font-bold text-slate-900 block font-mono">{ot.total.toFixed(2)} €</span>
+                          <span className={`inline-block text-[9px] font-bold uppercase rounded px-1.5 ${OT_ESTADO_META[ot.estado].cls}`}>
+                            {OT_ESTADO_META[ot.estado].label}
+                          </span>
+                        </div>
+                      </div>
+                    ))
+                  )}
+                </div>
+              </div>
+
+              {/* Facturas */}
+              <div className="pt-4 border-t border-slate-100">
+                <h4 className="text-xs font-bold text-slate-700 uppercase tracking-wider flex items-center gap-1.5 mb-2 font-display">
+                  <Receipt className="w-4 h-4 text-blue-600" />
+                  Facturas
+                </h4>
+
+                <div className="space-y-2 max-h-[140px] overflow-y-auto">
+                  {getClientFacturas(selectedCliente.id).length === 0 ? (
+                    <div className="text-center py-4 text-slate-400 text-xs font-sans">
+                      Este cliente no tiene facturas emitidas.
+                    </div>
+                  ) : (
+                    getClientFacturas(selectedCliente.id).map(f => (
+                      <div key={f.id} className="p-2.5 bg-slate-50 border border-slate-100 rounded-xl flex justify-between items-center text-xs font-sans">
+                        <div>
+                          <div className="font-bold text-slate-800 font-mono">{f.numero}</div>
+                          <div className="text-[10px] text-slate-500">{formatDate(f.fecha)}</div>
+                        </div>
+                        <div className="text-right">
+                          <span className="font-bold text-slate-900 block font-mono">{f.total.toFixed(2)} €</span>
+                          <span className={`inline-block text-[9px] font-bold uppercase rounded px-1.5 ${FACTURA_ESTADO_META[f.estado].cls}`}>
+                            {FACTURA_ESTADO_META[f.estado].label}
+                          </span>
                         </div>
                       </div>
                     ))
