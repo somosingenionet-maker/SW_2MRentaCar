@@ -227,22 +227,6 @@ export interface LineaDocumento {
   subtotal: number;
 }
 
-export interface Albaran {
-  id: string;
-  numero: string;
-  clienteId: string;
-  vehiculoId: string;
-  intervencionIds: string[];
-  fecha: string;
-  estado: 'borrador' | 'enviado' | 'rechazado';
-  lineas: LineaDocumento[];
-  notas: string;
-  subtotal: number;
-  ivaPct: number;
-  totalIva: number;
-  total: number;
-}
-
 export interface Factura {
   id: string;
   numero: string;

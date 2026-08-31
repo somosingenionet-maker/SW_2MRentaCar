@@ -481,7 +481,11 @@ begin
 end $$;
 
 -- ============================================================================
--- 8. AGENDA DE CITAS
+-- 7. AGENDA DE CITAS
+-- (nota: la migración 004_unificar_pieza_material.sql fue solo de datos —
+-- convierte líneas 'pieza'/'material' ya guardadas a 'producto' — no toca
+-- la estructura, así que no aporta nada a este archivo de instalación
+-- limpia; por eso no hay una sección numerada para ella aquí.)
 --
 -- Admite datos libres (contacto_nombre/contacto_telefono/vehiculo_descripcion)
 -- para clientes o vehículos que aún no están registrados — se completan al
