@@ -11,6 +11,8 @@ interface FacturasTabProps {
   clientes: Cliente[];
   vehiculos: Vehiculo[];
   ordenesTrabajo: OrdenTrabajo[];
+  /** Solo admin/super_admin puede editar, cambiar el estado o eliminar una factura ya creada. */
+  puedeGestionarFacturas: boolean;
   onAddFactura: (f: Factura) => void;
   onUpdateFactura: (f: Factura) => void;
   onDeleteFactura: (id: string) => void;
@@ -292,7 +294,7 @@ function FacturaModal({ factura, clientes, vehiculos, ordenesTrabajo, nextNumero
 
 // -------- Main FacturasTab --------
 export default function FacturasTab({
-  facturas, clientes, vehiculos, ordenesTrabajo,
+  facturas, clientes, vehiculos, ordenesTrabajo, puedeGestionarFacturas,
   onAddFactura, onUpdateFactura, onDeleteFactura, onUpdateOT,
 }: FacturasTabProps) {
   const [facturaModal, setFacturaModal] = useState<{ open: boolean; factura: Factura | null }>({ open: false, factura: null });
@@ -390,15 +392,21 @@ export default function FacturasTab({
                     <td className="px-4 py-3 text-xs text-slate-500">{formatDate(f.fecha)}</td>
                     <td className="px-4 py-3 text-xs text-slate-500">{formatDate(f.fechaVencimiento)}</td>
                     <td className="px-4 py-3">
-                      <select
-                        value={f.estado}
-                        onChange={e => onUpdateFactura({ ...f, estado: e.target.value as Factura['estado'] })}
-                        className={`text-[10px] font-bold px-2 py-0.5 rounded-full border-0 cursor-pointer focus:outline-none focus:ring-2 focus:ring-blue-400 ${ESTADO_FACTURA_COLORS[f.estado]}`}
-                      >
-                        {Object.entries(ESTADO_FACTURA_LABELS).map(([k, v]) => (
-                          <option key={k} value={k}>{v}</option>
-                        ))}
-                      </select>
+                      {puedeGestionarFacturas ? (
+                        <select
+                          value={f.estado}
+                          onChange={e => onUpdateFactura({ ...f, estado: e.target.value as Factura['estado'] })}
+                          className={`text-[10px] font-bold px-2 py-0.5 rounded-full border-0 cursor-pointer focus:outline-none focus:ring-2 focus:ring-blue-400 ${ESTADO_FACTURA_COLORS[f.estado]}`}
+                        >
+                          {Object.entries(ESTADO_FACTURA_LABELS).map(([k, v]) => (
+                            <option key={k} value={k}>{v}</option>
+                          ))}
+                        </select>
+                      ) : (
+                        <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${ESTADO_FACTURA_COLORS[f.estado]}`}>
+                          {ESTADO_FACTURA_LABELS[f.estado]}
+                        </span>
+                      )}
                     </td>
                     <td className="px-4 py-3 text-xs font-bold text-slate-700">{fmt(f.total)} €</td>
                     <td className="px-4 py-3">
@@ -406,17 +414,21 @@ export default function FacturasTab({
                         <button onClick={() => setViewingDoc(f)} className="p-1.5 text-slate-400 hover:text-emerald-600 hover:bg-emerald-50 rounded-lg transition cursor-pointer" title="Ver / Descargar">
                           <Receipt className="w-3.5 h-3.5" />
                         </button>
-                        <button onClick={() => setFacturaModal({ open: true, factura: f })} className="p-1.5 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition cursor-pointer" title="Editar">
-                          <Edit2 className="w-3.5 h-3.5" />
-                        </button>
-                        <button
-                          onClick={() => f.estado === 'borrador' && setConfirmDelete({ isOpen: true, factura: f })}
-                          disabled={f.estado !== 'borrador'}
-                          className="p-1.5 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition cursor-pointer disabled:opacity-30 disabled:cursor-not-allowed disabled:hover:bg-transparent disabled:hover:text-slate-400"
-                          title={f.estado === 'borrador' ? 'Eliminar borrador' : 'Las facturas emitidas o pagadas no se pueden borrar (numeración correlativa). Debe anularse en su lugar.'}
-                        >
-                          <Trash2 className="w-3.5 h-3.5" />
-                        </button>
+                        {puedeGestionarFacturas && (
+                          <>
+                            <button onClick={() => setFacturaModal({ open: true, factura: f })} className="p-1.5 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition cursor-pointer" title="Editar">
+                              <Edit2 className="w-3.5 h-3.5" />
+                            </button>
+                            <button
+                              onClick={() => f.estado === 'borrador' && setConfirmDelete({ isOpen: true, factura: f })}
+                              disabled={f.estado !== 'borrador'}
+                              className="p-1.5 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition cursor-pointer disabled:opacity-30 disabled:cursor-not-allowed disabled:hover:bg-transparent disabled:hover:text-slate-400"
+                              title={f.estado === 'borrador' ? 'Eliminar borrador' : 'Las facturas emitidas o pagadas no se pueden borrar (numeración correlativa). Debe anularse en su lugar.'}
+                            >
+                              <Trash2 className="w-3.5 h-3.5" />
+                            </button>
+                          </>
+                        )}
                       </div>
                     </td>
                   </tr>

@@ -703,6 +703,7 @@ export default function App() {
             clientes={clientes}
             vehiculos={vehiculos}
             ordenesTrabajo={ordenesTrabajo}
+            puedeGestionarFacturas={currentUser.rol === 'admin' || currentUser.rol === 'super_admin'}
             onAddFactura={handleAddFactura}
             onUpdateFactura={handleUpdateFactura}
             onDeleteFactura={handleDeleteFactura}
