@@ -413,3 +413,69 @@ drop trigger if exists trg_vehiculos_sync_alertas on public.vehiculos;
 create trigger trg_vehiculos_sync_alertas
   after update of itv_vencimiento, seguro_vencimiento, impuesto_vencimiento on public.vehiculos
   for each row execute function public.sincronizar_alertas_vencimiento();
+
+-- ============================================================================
+-- 6. INTEGRIDAD REFERENCIAL AL BORRAR VEHÍCULOS/CLIENTES
+--
+-- vehiculo_id/cliente_id eran simples columnas de texto sin restricción — al
+-- borrar un vehículo o cliente, todo lo que lo referenciaba se quedaba
+-- huérfano. Regla aplicada:
+--   - alertas: se BORRAN en cascada (datos derivados, sin sentido sin el
+--     vehículo).
+--   - intervenciones/ordenes_trabajo/reservas/facturas/notificaciones: NUNCA
+--     se borran (historial real, y en facturas, contable). Al borrar el
+--     vehículo/cliente solo se desvincula la referencia (queda en null); la
+--     interfaz ya muestra "—"/"Eliminado" cuando falta.
+-- ============================================================================
+
+alter table public.intervenciones alter column vehiculo_id drop not null;
+alter table public.ordenes_trabajo alter column vehiculo_id drop not null;
+alter table public.ordenes_trabajo alter column cliente_id drop not null;
+alter table public.reservas alter column vehiculo_id drop not null;
+alter table public.reservas alter column cliente_id drop not null;
+alter table public.facturas alter column cliente_id drop not null;
+alter table public.notificaciones alter column cliente_id drop not null;
+
+do $$
+begin
+  if not exists (select 1 from pg_constraint where conname = 'alertas_vehiculo_id_fkey') then
+    alter table public.alertas
+      add constraint alertas_vehiculo_id_fkey foreign key (vehiculo_id) references public.vehiculos(id) on delete cascade;
+  end if;
+  if not exists (select 1 from pg_constraint where conname = 'intervenciones_vehiculo_id_fkey') then
+    alter table public.intervenciones
+      add constraint intervenciones_vehiculo_id_fkey foreign key (vehiculo_id) references public.vehiculos(id) on delete set null;
+  end if;
+  if not exists (select 1 from pg_constraint where conname = 'ordenes_trabajo_vehiculo_id_fkey') then
+    alter table public.ordenes_trabajo
+      add constraint ordenes_trabajo_vehiculo_id_fkey foreign key (vehiculo_id) references public.vehiculos(id) on delete set null;
+  end if;
+  if not exists (select 1 from pg_constraint where conname = 'ordenes_trabajo_cliente_id_fkey') then
+    alter table public.ordenes_trabajo
+      add constraint ordenes_trabajo_cliente_id_fkey foreign key (cliente_id) references public.clientes(id) on delete set null;
+  end if;
+  if not exists (select 1 from pg_constraint where conname = 'reservas_vehiculo_id_fkey') then
+    alter table public.reservas
+      add constraint reservas_vehiculo_id_fkey foreign key (vehiculo_id) references public.vehiculos(id) on delete set null;
+  end if;
+  if not exists (select 1 from pg_constraint where conname = 'reservas_cliente_id_fkey') then
+    alter table public.reservas
+      add constraint reservas_cliente_id_fkey foreign key (cliente_id) references public.clientes(id) on delete set null;
+  end if;
+  if not exists (select 1 from pg_constraint where conname = 'facturas_vehiculo_id_fkey') then
+    alter table public.facturas
+      add constraint facturas_vehiculo_id_fkey foreign key (vehiculo_id) references public.vehiculos(id) on delete set null;
+  end if;
+  if not exists (select 1 from pg_constraint where conname = 'facturas_cliente_id_fkey') then
+    alter table public.facturas
+      add constraint facturas_cliente_id_fkey foreign key (cliente_id) references public.clientes(id) on delete set null;
+  end if;
+  if not exists (select 1 from pg_constraint where conname = 'notificaciones_vehiculo_id_fkey') then
+    alter table public.notificaciones
+      add constraint notificaciones_vehiculo_id_fkey foreign key (vehiculo_id) references public.vehiculos(id) on delete set null;
+  end if;
+  if not exists (select 1 from pg_constraint where conname = 'notificaciones_cliente_id_fkey') then
+    alter table public.notificaciones
+      add constraint notificaciones_cliente_id_fkey foreign key (cliente_id) references public.clientes(id) on delete set null;
+  end if;
+end $$;
