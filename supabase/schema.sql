@@ -220,9 +220,10 @@ create trigger on_auth_user_created
 -- 3. SEGURIDAD (Row Level Security)
 -- ---------------------------------------------------------------------------
 
--- Tablas de negocio: cualquier usuario autenticado puede operar.
--- (El control por módulos se aplica en la interfaz; a nivel de BD basta con
---  exigir sesión válida para un backoffice interno de un solo cliente.)
+-- Tablas de negocio: cualquier usuario autenticado puede LEER.
+-- Solo admin/super_admin puede crear/editar/borrar (rol 'usuario' = solo lectura).
+-- (El control por módulos sigue aplicándose en la interfaz para decidir qué
+--  pestañas ve cada usuario; esto es la barrera a nivel de BD por debajo.)
 do $$
 declare t text;
 begin
@@ -233,8 +234,13 @@ begin
   loop
     execute format('alter table public.%I enable row level security;', t);
     execute format('drop policy if exists auth_all on public.%I;', t);
+    execute format('drop policy if exists %I_read on public.%I;', t, t);
+    execute format('drop policy if exists %I_write on public.%I;', t, t);
     execute format(
-      'create policy auth_all on public.%I for all to authenticated using (true) with check (true);', t
+      'create policy %I_read on public.%I for select to authenticated using (true);', t, t
+    );
+    execute format(
+      'create policy %I_write on public.%I for all to authenticated using (public.current_rol() in (''admin'',''super_admin'')) with check (public.current_rol() in (''admin'',''super_admin''));', t, t
     );
   end loop;
 end $$;
@@ -512,4 +518,9 @@ create index if not exists citas_fecha_hora_idx on public.citas (fecha_hora);
 
 alter table public.citas enable row level security;
 drop policy if exists auth_all on public.citas;
-create policy auth_all on public.citas for all to authenticated using (true) with check (true);
+drop policy if exists citas_read on public.citas;
+drop policy if exists citas_write on public.citas;
+create policy citas_read on public.citas for select to authenticated using (true);
+create policy citas_write on public.citas for all to authenticated
+  using (public.current_rol() in ('admin','super_admin'))
+  with check (public.current_rol() in ('admin','super_admin'));
