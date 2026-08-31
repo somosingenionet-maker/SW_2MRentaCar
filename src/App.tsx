@@ -3,6 +3,8 @@ import { contrastText } from './utils/color';
 import { genId } from './utils/id';
 import { Vehiculo, Intervencion, Cliente, Reserva, Alerta, NotificacionCliente, InteraccionCliente, AlertaTipo, Usuario, Factura, ModuloId, OrdenTrabajo, Tecnico } from './types';
 import { getSessionUsuario, signOut } from './lib/auth';
+import { supabase } from './lib/supabase';
+import LoginScreenReset from './components/ResetPasswordScreen';
 import { fetchVehiculos, upsertVehiculo, deleteVehiculoDb } from './data/vehiculosDb';
 import { fetchAll, upsertOne, deleteOne } from './data/db';
 import VehiclesTab from './components/VehiclesTab';
@@ -27,6 +29,7 @@ export default function App() {
   // Auth state
   const [currentUser, setCurrentUser] = useState<Usuario | null>(null);
   const [authChecked, setAuthChecked] = useState(false);
+  const [passwordRecovery, setPasswordRecovery] = useState(false);
 
   // Navigation
   const [activeTab, setActiveTab] = useState<TabId>('vehiculos');
@@ -51,6 +54,14 @@ export default function App() {
     getSessionUsuario()
       .then(user => setCurrentUser(user))
       .finally(() => setAuthChecked(true));
+  }, []);
+
+  // Detecta el enlace de restablecimiento de contraseña (email → app).
+  useEffect(() => {
+    const { data } = supabase.auth.onAuthStateChange(event => {
+      if (event === 'PASSWORD_RECOVERY') setPasswordRecovery(true);
+    });
+    return () => data.subscription.unsubscribe();
   }, []);
 
   // Todas las entidades se cargan desde Supabase al iniciar sesión
@@ -312,6 +323,19 @@ export default function App() {
 
   // Wait until auth is checked
   if (!authChecked) return null;
+
+  // Flujo de restablecimiento de contraseña (llegada desde el email).
+  if (passwordRecovery) {
+    return (
+      <LoginScreenReset
+        onDone={() => {
+          setPasswordRecovery(false);
+          setCurrentUser(null);
+          window.history.replaceState(null, '', window.location.pathname);
+        }}
+      />
+    );
+  }
 
   // Show login if no user
   if (!currentUser) {
