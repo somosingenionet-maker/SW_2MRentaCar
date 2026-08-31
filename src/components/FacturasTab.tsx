@@ -1,6 +1,6 @@
 import { useState, useMemo } from 'react';
 import { Plus, Trash2, Edit2, X, Check, Receipt, Import, Printer, MessageCircle, Mail as MailIcon } from 'lucide-react';
-import { Factura, LineaDocumento, Cliente, Vehiculo, Intervencion } from '../types';
+import { Factura, LineaDocumento, Cliente, Vehiculo, OrdenTrabajo } from '../types';
 import { formatDate } from '../utils/dateFormat';
 import { getEmpresaConfig } from '../data/mockData';
 import { genId } from '../utils/id';
@@ -10,10 +10,11 @@ interface FacturasTabProps {
   facturas: Factura[];
   clientes: Cliente[];
   vehiculos: Vehiculo[];
-  intervenciones: Intervencion[];
+  ordenesTrabajo: OrdenTrabajo[];
   onAddFactura: (f: Factura) => void;
   onUpdateFactura: (f: Factura) => void;
   onDeleteFactura: (id: string) => void;
+  onUpdateOT: (ot: OrdenTrabajo) => void;
 }
 
 const ESTADO_FACTURA_LABELS: Record<Factura['estado'], string> = {
@@ -46,13 +47,17 @@ interface FacturaModalProps {
   factura: Factura | null;
   clientes: Cliente[];
   vehiculos: Vehiculo[];
-  intervenciones: Intervencion[];
+  ordenesTrabajo: OrdenTrabajo[];
   nextNumero: string;
-  onSave: (f: Factura) => void;
+  onSave: (f: Factura, otsImportadas: OrdenTrabajo[]) => void;
   onClose: () => void;
 }
 
-function FacturaModal({ factura, clientes, vehiculos, intervenciones, nextNumero, onSave, onClose }: FacturaModalProps) {
+// Estados de OT a partir de los cuales el trabajo ya está terminado y se
+// puede facturar.
+const OT_FACTURABLE = ['listo', 'entregado'];
+
+function FacturaModal({ factura, clientes, vehiculos, ordenesTrabajo, nextNumero, onSave, onClose }: FacturaModalProps) {
   const today = new Date().toISOString().split('T')[0];
   const thirtyDays = new Date(Date.now() + 30 * 86400000).toISOString().split('T')[0];
 
@@ -65,7 +70,11 @@ function FacturaModal({ factura, clientes, vehiculos, intervenciones, nextNumero
   const [ivaPct, setIvaPct] = useState(factura?.ivaPct ?? 21);
   const [notas, setNotas] = useState(factura?.notas ?? '');
   const [importarOpen, setImportarOpen] = useState(false);
-  const [selectedInts, setSelectedInts] = useState<Set<string>>(new Set());
+  const [selectedOTs, setSelectedOTs] = useState<Set<string>>(new Set());
+  // Ids de las OTs ya volcadas a las líneas de esta factura (se van
+  // acumulando aunque se abra el selector de importar varias veces). Al
+  // guardar, esas OTs quedan marcadas como facturadas.
+  const [importedOTIds, setImportedOTIds] = useState<string[]>(factura?.intervencionIds ?? []);
   const [error, setError] = useState('');
 
   const clienteVehiculos = useMemo(() => {
@@ -75,9 +84,11 @@ function FacturaModal({ factura, clientes, vehiculos, intervenciones, nextNumero
     return vehiculos.filter(v => cli.vehiculosAsociados!.includes(v.id));
   }, [clienteId, clientes, vehiculos]);
 
-  const vehIntervenciones = useMemo(
-    () => intervenciones.filter(i => i.vehiculoId === vehiculoId),
-    [vehiculoId, intervenciones]
+  const vehOrdenes = useMemo(
+    () => ordenesTrabajo
+      .filter(ot => ot.vehiculoId === vehiculoId && OT_FACTURABLE.includes(ot.estado))
+      .sort((a, b) => b.fechaActualizacion.localeCompare(a.fechaActualizacion)),
+    [vehiculoId, ordenesTrabajo]
   );
 
   const totals = useMemo(() => calcLineTotals(lineas, ivaPct), [lineas, ivaPct]);
@@ -98,17 +109,19 @@ function FacturaModal({ factura, clientes, vehiculos, intervenciones, nextNumero
   const removeLine = (id: string) => setLineas(prev => prev.filter(l => l.id !== id));
 
   const importarDesdetaller = () => {
-    const nuevas: LineaDocumento[] = vehIntervenciones
-      .filter(i => selectedInts.has(i.id))
-      .map(i => ({
+    const otsSeleccionadas = vehOrdenes.filter(ot => selectedOTs.has(ot.id));
+    const nuevas: LineaDocumento[] = otsSeleccionadas.flatMap(ot =>
+      ot.lineas.map(l => ({
         id: genId('linea'),
-        descripcion: i.items?.join(', ') ?? i.descripcion,
-        cantidad: 1,
-        precioUnitario: i.costo ?? 0,
-        subtotal: i.costo ?? 0,
-      }));
+        descripcion: `${l.descripcion} (${ot.numero})`,
+        cantidad: l.cantidad,
+        precioUnitario: l.precioUnitario,
+        subtotal: l.subtotal,
+      }))
+    );
     setLineas(prev => [...prev, ...nuevas]);
-    setSelectedInts(new Set());
+    setImportedOTIds(prev => Array.from(new Set([...prev, ...selectedOTs])));
+    setSelectedOTs(new Set());
     setImportarOpen(false);
   };
 
@@ -121,7 +134,7 @@ function FacturaModal({ factura, clientes, vehiculos, intervenciones, nextNumero
       numero: factura?.numero ?? nextNumero,
       clienteId,
       vehiculoId: vehiculoId || undefined,
-      intervencionIds: Array.from(selectedInts),
+      intervencionIds: importedOTIds,
       fecha,
       fechaVencimiento,
       estado,
@@ -132,7 +145,8 @@ function FacturaModal({ factura, clientes, vehiculos, intervenciones, nextNumero
       totalIva,
       total,
     };
-    onSave(saved);
+    const otsImportadas = ordenesTrabajo.filter(ot => importedOTIds.includes(ot.id));
+    onSave(saved, otsImportadas);
   };
 
   return (
@@ -197,22 +211,37 @@ function FacturaModal({ factura, clientes, vehiculos, intervenciones, nextNumero
               </div>
             </div>
 
-            {importarOpen && vehIntervenciones.length > 0 && (
+            {importarOpen && (
               <div className="mb-3 bg-slate-50 border border-slate-200 rounded-xl p-3 space-y-2">
-                <p className="text-[11px] font-bold text-slate-600 uppercase">Selecciona intervenciones a importar</p>
-                {vehIntervenciones.map(i => (
-                  <label key={i.id} className="flex items-center gap-2 text-xs text-slate-700 cursor-pointer hover:bg-white rounded px-1 py-0.5">
-                    <input type="checkbox" checked={selectedInts.has(i.id)} onChange={e => {
-                      const s = new Set(selectedInts);
-                      e.target.checked ? s.add(i.id) : s.delete(i.id);
-                      setSelectedInts(s);
-                    }} />
-                    <span>{i.descripcion} — {i.costo ?? 0} €</span>
-                  </label>
-                ))}
-                <button onClick={importarDesdetaller} disabled={selectedInts.size === 0} className="mt-1 px-3 py-1.5 bg-blue-600 text-white text-xs font-bold rounded-lg disabled:opacity-40">
-                  Importar seleccionadas
-                </button>
+                <p className="text-[11px] font-bold text-slate-600 uppercase">Selecciona órdenes de trabajo a facturar</p>
+                {vehOrdenes.length === 0 ? (
+                  <p className="text-xs text-slate-400 italic py-1">
+                    Este vehículo no tiene órdenes de trabajo listas o entregadas todavía.
+                  </p>
+                ) : (
+                  <>
+                    {vehOrdenes.map(ot => (
+                      <label key={ot.id} className="flex items-center gap-2 text-xs text-slate-700 cursor-pointer hover:bg-white rounded px-1.5 py-1">
+                        <input type="checkbox" checked={selectedOTs.has(ot.id)} onChange={e => {
+                          const s = new Set(selectedOTs);
+                          e.target.checked ? s.add(ot.id) : s.delete(ot.id);
+                          setSelectedOTs(s);
+                        }} />
+                        <span className="font-mono font-bold text-slate-800">{ot.numero}</span>
+                        <span className="text-slate-400">
+                          {formatDate(ot.fechaRecepcion)} · {ot.lineas.length} {ot.lineas.length === 1 ? 'línea' : 'líneas'}
+                        </span>
+                        <span className="ml-auto font-semibold text-slate-700">{fmt(ot.total)} €</span>
+                        {ot.facturaId && (
+                          <span className="text-[9px] font-bold text-amber-600 bg-amber-50 px-1.5 py-0.5 rounded-full shrink-0">Ya facturada</span>
+                        )}
+                      </label>
+                    ))}
+                    <button onClick={importarDesdetaller} disabled={selectedOTs.size === 0} className="mt-1 px-3 py-1.5 bg-blue-600 text-white text-xs font-bold rounded-lg disabled:opacity-40">
+                      Importar seleccionadas
+                    </button>
+                  </>
+                )}
               </div>
             )}
 
@@ -263,8 +292,8 @@ function FacturaModal({ factura, clientes, vehiculos, intervenciones, nextNumero
 
 // -------- Main FacturasTab --------
 export default function FacturasTab({
-  facturas, clientes, vehiculos, intervenciones,
-  onAddFactura, onUpdateFactura, onDeleteFactura,
+  facturas, clientes, vehiculos, ordenesTrabajo,
+  onAddFactura, onUpdateFactura, onDeleteFactura, onUpdateOT,
 }: FacturasTabProps) {
   const [facturaModal, setFacturaModal] = useState<{ open: boolean; factura: Factura | null }>({ open: false, factura: null });
   const [viewingDoc, setViewingDoc] = useState<Factura | null>(null);
@@ -293,9 +322,13 @@ export default function FacturasTab({
   const nextFacturaNumero = `FAC-${String(facturas.length + 1).padStart(4, '0')}`;
   const sortedFacturas = [...facturas].sort((a, b) => b.numero.localeCompare(a.numero));
 
-  const handleSaveFactura = (f: Factura) => {
+  const handleSaveFactura = (f: Factura, otsImportadas: OrdenTrabajo[]) => {
     if (facturas.find(x => x.id === f.id)) onUpdateFactura(f);
     else onAddFactura(f);
+    // Marca como facturadas las órdenes de trabajo importadas en esta factura.
+    otsImportadas.forEach(ot => {
+      if (ot.facturaId !== f.id) onUpdateOT({ ...ot, facturaId: f.id });
+    });
     setFacturaModal({ open: false, factura: null });
   };
 
@@ -399,7 +432,7 @@ export default function FacturasTab({
           factura={facturaModal.factura}
           clientes={clientes}
           vehiculos={vehiculos}
-          intervenciones={intervenciones}
+          ordenesTrabajo={ordenesTrabajo}
           nextNumero={nextFacturaNumero}
           onSave={handleSaveFactura}
           onClose={() => setFacturaModal({ open: false, factura: null })}

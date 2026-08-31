@@ -40,7 +40,9 @@ export default function App() {
 
   // States
   const [vehiculos, setVehiculos] = useState<Vehiculo[]>([]);
-  const [intervenciones, setIntervenciones] = useState<Intervencion[]>([]);
+  // Historial de intervenciones automáticas (mantenimiento renovado desde
+  // Alertas). Nada lo lee todavía en pantalla; se guarda para tener registro.
+  const [, setIntervenciones] = useState<Intervencion[]>([]);
   const [clientes, setClientes] = useState<Cliente[]>([]);
   const [reservas, setReservas] = useState<Reserva[]>([]);
   const [alertas, setAlertas] = useState<Alerta[]>([]);
@@ -662,10 +664,11 @@ export default function App() {
             facturas={facturas}
             clientes={clientes}
             vehiculos={vehiculos}
-            intervenciones={intervenciones}
+            ordenesTrabajo={ordenesTrabajo}
             onAddFactura={handleAddFactura}
             onUpdateFactura={handleUpdateFactura}
             onDeleteFactura={handleDeleteFactura}
+            onUpdateOT={handleUpdateOT}
           />
         )}
       </main>

@@ -228,6 +228,7 @@ export interface Factura {
   albaranId?: string;
   clienteId: string;
   vehiculoId?: string;
+  /** Ids de las órdenes de trabajo importadas a esta factura (ver FacturasTab). */
   intervencionIds: string[];
   fecha: string;
   fechaVencimiento: string;
