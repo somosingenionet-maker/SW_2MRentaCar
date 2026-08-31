@@ -15,7 +15,17 @@
 --     en null) — la interfaz ya sabe mostrar "—"/"Eliminado" cuando falta.
 -- ============================================================================
 
--- 1) Limpieza de datos huérfanos ya existentes (de antes de esta migración).
+-- 1) Se relaja NOT NULL primero (hace falta para poder desvincular las filas
+--    huérfanas del siguiente paso sin borrar el historial).
+alter table public.intervenciones alter column vehiculo_id drop not null;
+alter table public.ordenes_trabajo alter column vehiculo_id drop not null;
+alter table public.ordenes_trabajo alter column cliente_id drop not null;
+alter table public.reservas alter column vehiculo_id drop not null;
+alter table public.reservas alter column cliente_id drop not null;
+alter table public.facturas alter column cliente_id drop not null;
+alter table public.notificaciones alter column cliente_id drop not null;
+
+-- 2) Limpieza de datos huérfanos ya existentes (de antes de esta migración).
 delete from public.alertas a
   where not exists (select 1 from public.vehiculos v where v.id = a.vehiculo_id);
 
@@ -41,17 +51,6 @@ update public.notificaciones n set vehiculo_id = null
   where vehiculo_id is not null and not exists (select 1 from public.vehiculos v where v.id = n.vehiculo_id);
 update public.notificaciones n set cliente_id = null
   where cliente_id is not null and not exists (select 1 from public.clientes c where c.id = n.cliente_id);
-
--- 2) Se relaja NOT NULL donde hacía falta, para poder desvincular sin borrar
---    la fila (nunca se borra historial/facturación al eliminar un vehículo
---    o cliente, solo se desvincula la referencia).
-alter table public.intervenciones alter column vehiculo_id drop not null;
-alter table public.ordenes_trabajo alter column vehiculo_id drop not null;
-alter table public.ordenes_trabajo alter column cliente_id drop not null;
-alter table public.reservas alter column vehiculo_id drop not null;
-alter table public.reservas alter column cliente_id drop not null;
-alter table public.facturas alter column cliente_id drop not null;
-alter table public.notificaciones alter column cliente_id drop not null;
 
 -- 3) Restricciones de integridad referencial reales.
 alter table public.alertas
