@@ -127,6 +127,23 @@ function seSolapan(a: [number, number], b: [number, number]): boolean {
   return a[0] < b[1] && b[0] < a[1];
 }
 
+/**
+ * Rango de días [inicio, fin] (YYYY-MM-DD) en que un vehículo ocupa el
+ * taller para una OT: desde que ingresa hasta que se entrega. Si aún no se
+ * ha entregado, el rango sigue creciendo día a día (hasta hoy, o hasta la
+ * fecha estimada si cae más adelante) para que se siga viendo "en curso".
+ */
+function otRangoDias(ot: OrdenTrabajo, hoy: string): [string, string] {
+  if (ot.fechaEntrega) return [ot.fechaRecepcion, ot.fechaEntrega];
+  const fin = ot.fechaEstimadaEntrega && ot.fechaEstimadaEntrega > hoy ? ot.fechaEstimadaEntrega : hoy;
+  return [ot.fechaRecepcion, fin];
+}
+
+function otOcupaDia(ot: OrdenTrabajo, key: string, hoy: string): boolean {
+  const [inicio, fin] = otRangoDias(ot, hoy);
+  return inicio <= key && key <= fin;
+}
+
 export default function AgendaTab({ citas, vehiculos, clientes, tecnicos, ordenes, onAddCita, onUpdateCita, onDeleteCita, onCreateOT }: Props) {
   const [selectedDay, setSelectedDay] = useState(() => new Date());
   const weekStart = useMemo(() => startOfWeek(selectedDay), [selectedDay]);
@@ -156,11 +173,12 @@ export default function AgendaTab({ citas, vehiculos, clientes, tecnicos, ordene
 
   const entriesDelDia = useMemo(() => {
     const key = localKey(selectedDay);
+    const hoy = localKey(new Date());
     const citasEntries: AgendaEntry[] = citas
       .filter((c) => localKey(new Date(c.fechaHora)) === key)
       .map((c) => ({ kind: 'cita', sortKey: c.fechaHora, data: c }));
     const otEntries: AgendaEntry[] = otsSinCita
-      .filter((ot) => ot.fechaRecepcion === key)
+      .filter((ot) => otOcupaDia(ot, key, hoy))
       .map((ot) => ({ kind: 'ot', sortKey: `${key}T00:00:00`, data: ot }));
     return [...citasEntries, ...otEntries].sort((a, b) => a.sortKey.localeCompare(b.sortKey));
   }, [citas, otsSinCita, selectedDay]);
@@ -294,7 +312,7 @@ export default function AgendaTab({ citas, vehiculos, clientes, tecnicos, ordene
           const activo = key === localKey(selectedDay);
           const esHoy = key === hoy;
           const nCitas = citas.filter((c) => localKey(new Date(c.fechaHora)) === key && c.estado !== 'cancelada').length
-            + otsSinCita.filter((ot) => ot.fechaRecepcion === key).length;
+            + otsSinCita.filter((ot) => otOcupaDia(ot, key, hoy)).length;
           return (
             <button
               key={key}
