@@ -146,6 +146,7 @@ function otOcupaDia(ot: OrdenTrabajo, key: string, hoy: string): boolean {
 
 export default function AgendaTab({ citas, vehiculos, clientes, tecnicos, ordenes, onAddCita, onUpdateCita, onDeleteCita, onCreateOT }: Props) {
   const [selectedDay, setSelectedDay] = useState(() => new Date());
+  const [vista, setVista] = useState<'dia' | 'semana'>('dia');
   const weekStart = useMemo(() => startOfWeek(selectedDay), [selectedDay]);
   const weekDays = useMemo(() => Array.from({ length: 7 }, (_, i) => addDays(weekStart, i)), [weekStart]);
 
@@ -171,8 +172,10 @@ export default function AgendaTab({ citas, vehiculos, clientes, tecnicos, ordene
     );
   }, [citas, ordenes]);
 
-  const entriesDelDia = useMemo(() => {
-    const key = localKey(selectedDay);
+  // Entradas (citas + OT) de un día cualquiera — se reutiliza tanto para el
+  // día seleccionado (vista día) como para cada columna de la vista semana.
+  const entriesForDay = (day: Date): AgendaEntry[] => {
+    const key = localKey(day);
     const hoy = localKey(new Date());
     const citasEntries: AgendaEntry[] = citas
       .filter((c) => localKey(new Date(c.fechaHora)) === key)
@@ -181,7 +184,14 @@ export default function AgendaTab({ citas, vehiculos, clientes, tecnicos, ordene
       .filter((ot) => otOcupaDia(ot, key, hoy))
       .map((ot) => ({ kind: 'ot', sortKey: `${key}T00:00:00`, data: ot }));
     return [...citasEntries, ...otEntries].sort((a, b) => a.sortKey.localeCompare(b.sortKey));
-  }, [citas, otsSinCita, selectedDay]);
+  };
+
+  const entriesDelDia = useMemo(() => entriesForDay(selectedDay), [citas, otsSinCita, selectedDay]);
+
+  const irADia = (d: Date) => {
+    setSelectedDay(d);
+    setVista('dia');
+  };
 
   const vehiculoLabel = (id?: string) => {
     if (!id) return null;
@@ -277,7 +287,7 @@ export default function AgendaTab({ citas, vehiculos, clientes, tecnicos, ordene
     <div className="space-y-5">
       {/* Toolbar */}
       <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3">
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 flex-wrap">
           <button
             onClick={() => setSelectedDay((d) => addDays(d, -7))}
             className="p-2 border border-slate-200 rounded-xl text-slate-500 hover:bg-slate-50 transition cursor-pointer"
@@ -296,6 +306,20 @@ export default function AgendaTab({ citas, vehiculos, clientes, tecnicos, ordene
           >
             <ChevronRight className="w-4 h-4" />
           </button>
+          <div className="flex bg-slate-100 rounded-xl p-1 gap-1 ml-1">
+            <button
+              onClick={() => setVista('dia')}
+              className={`px-3 py-1.5 text-xs font-bold rounded-lg transition cursor-pointer ${vista === 'dia' ? 'bg-white text-slate-800 shadow-3xs' : 'text-slate-500 hover:text-slate-700'}`}
+            >
+              Día
+            </button>
+            <button
+              onClick={() => setVista('semana')}
+              className={`px-3 py-1.5 text-xs font-bold rounded-lg transition cursor-pointer ${vista === 'semana' ? 'bg-white text-slate-800 shadow-3xs' : 'text-slate-500 hover:text-slate-700'}`}
+            >
+              Semana
+            </button>
+          </div>
         </div>
         <button
           onClick={openCreate}
@@ -305,6 +329,8 @@ export default function AgendaTab({ citas, vehiculos, clientes, tecnicos, ordene
         </button>
       </div>
 
+      {vista === 'dia' && (
+      <>
       {/* Tira de 7 días */}
       <div className="grid grid-cols-7 gap-2">
         {weekDays.map((d, i) => {
@@ -440,6 +466,64 @@ export default function AgendaTab({ citas, vehiculos, clientes, tecnicos, ordene
           </div>
         )}
       </div>
+      </>
+      )}
+
+      {vista === 'semana' && (
+        <div className="grid grid-cols-7 gap-2">
+          {weekDays.map((d, i) => {
+            const key = localKey(d);
+            const esHoy = key === hoy;
+            const entradas = entriesForDay(d);
+            return (
+              <div key={key} className="bg-white border border-slate-200 rounded-xl overflow-hidden flex flex-col">
+                <button
+                  onClick={() => irADia(d)}
+                  className={`px-2 py-2 text-center border-b border-slate-100 transition cursor-pointer hover:bg-slate-50 ${esHoy ? 'bg-blue-50/60' : ''}`}
+                >
+                  <span className="text-[9px] font-bold uppercase tracking-wider text-slate-400 block">{DIAS_SEMANA[i]}</span>
+                  <span className={`text-sm font-extrabold ${esHoy ? 'text-blue-600' : 'text-slate-800'}`}>{d.getDate()}</span>
+                </button>
+                <div className="flex-1 p-1.5 space-y-1 overflow-y-auto min-h-[120px] max-h-[320px]">
+                  {entradas.length === 0 ? (
+                    <p className="text-[10px] text-slate-300 text-center py-4">—</p>
+                  ) : (
+                    entradas.map((entry) => {
+                      if (entry.kind === 'ot') {
+                        const ot = entry.data;
+                        const meta = OT_BADGE_META[ot.estado];
+                        return (
+                          <button
+                            key={`ot-${ot.id}`}
+                            onClick={() => irADia(d)}
+                            title={`${ot.numero} — ${meta.label}`}
+                            className={`w-full text-left px-1.5 py-1 rounded-lg text-[10px] font-semibold truncate flex items-center gap-1 cursor-pointer hover:opacity-80 transition ${meta.bg} ${meta.color}`}
+                          >
+                            <Wrench className="w-2.5 h-2.5 shrink-0" />
+                            <span className="truncate">{ot.numero}</span>
+                          </button>
+                        );
+                      }
+                      const c = entry.data;
+                      const meta = ESTADO_META[c.estado];
+                      return (
+                        <button
+                          key={c.id}
+                          onClick={() => irADia(d)}
+                          title={c.motivo}
+                          className={`w-full text-left px-1.5 py-1 rounded-lg text-[10px] font-semibold truncate cursor-pointer hover:opacity-80 transition ${meta.bg} ${meta.color}`}
+                        >
+                          {new Date(c.fechaHora).toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' })} {c.motivo}
+                        </button>
+                      );
+                    })
+                  )}
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      )}
 
       {/* Crear / editar cita */}
       {showForm && (
