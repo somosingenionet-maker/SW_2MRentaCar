@@ -6,6 +6,7 @@ import {
 import { Cita, Vehiculo, Cliente, Tecnico, OrdenTrabajo, OTEstado, EventoOT } from '../types';
 import { genId } from '../utils/id';
 import ConfirmDialog from './ConfirmDialog';
+import { FLOTA_CLIENTE_ID } from './OrdenesTrabajoTab';
 
 interface Props {
   citas: Cita[];
@@ -25,6 +26,21 @@ const ESTADO_META: Record<Cita['estado'], { label: string; color: string; bg: st
   cancelada:  { label: 'Cancelada',  color: 'text-rose-600',   bg: 'bg-rose-50' },
   convertida: { label: 'Convertida', color: 'text-slate-500',  bg: 'bg-slate-100' },
 };
+
+const OT_BADGE_META: Record<OTEstado, { label: string; color: string; bg: string }> = {
+  presupuesto:   { label: 'Presupuesto',   color: 'text-violet-700', bg: 'bg-violet-50' },
+  recibido:      { label: 'Recibido',      color: 'text-slate-600',  bg: 'bg-slate-100' },
+  en_reparacion: { label: 'En reparación', color: 'text-orange-700', bg: 'bg-orange-50' },
+  listo:         { label: 'Listo',         color: 'text-cyan-700',   bg: 'bg-cyan-50' },
+  entregado:     { label: 'Entregado',     color: 'text-teal-700',   bg: 'bg-teal-100' },
+  cancelado:     { label: 'Cancelado',     color: 'text-rose-600',   bg: 'bg-rose-50' },
+};
+
+// Entrada del cronograma de la agenda: una cita programada, o una orden de
+// trabajo directa de Taller (ver otsSinCita más abajo).
+type AgendaEntry =
+  | { kind: 'cita'; sortKey: string; data: Cita }
+  | { kind: 'ot'; sortKey: string; data: OrdenTrabajo };
 
 const DIAS_SEMANA = ['Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb', 'Dom'];
 
@@ -123,12 +139,26 @@ export default function AgendaTab({ citas, vehiculos, clientes, tecnicos, ordene
   const [confirmDelete, setConfirmDelete] = useState<Cita | null>(null);
   const [convertirCita, setConvertirCita] = useState<Cita | null>(null);
 
-  const citasDelDia = useMemo(() => {
+  // Órdenes de trabajo creadas directamente en Taller (sin pasar por una cita
+  // de Agenda) — se muestran igualmente en la agenda del día de su recepción,
+  // para que la vista refleje todo lo que hay programado. Las OT que SÍ
+  // vienen de una cita ("Convertir en OT") no se duplican aquí: ya se ven
+  // como esa cita, marcada 'convertida'.
+  const otsSinCita = useMemo(() => {
+    const otIdsConCita = new Set(citas.map((c) => c.otId).filter(Boolean));
+    return ordenes.filter((ot) => !otIdsConCita.has(ot.id));
+  }, [citas, ordenes]);
+
+  const entriesDelDia = useMemo(() => {
     const key = localKey(selectedDay);
-    return citas
+    const citasEntries: AgendaEntry[] = citas
       .filter((c) => localKey(new Date(c.fechaHora)) === key)
-      .sort((a, b) => a.fechaHora.localeCompare(b.fechaHora));
-  }, [citas, selectedDay]);
+      .map((c) => ({ kind: 'cita', sortKey: c.fechaHora, data: c }));
+    const otEntries: AgendaEntry[] = otsSinCita
+      .filter((ot) => ot.fechaRecepcion === key)
+      .map((ot) => ({ kind: 'ot', sortKey: `${key}T00:00:00`, data: ot }));
+    return [...citasEntries, ...otEntries].sort((a, b) => a.sortKey.localeCompare(b.sortKey));
+  }, [citas, otsSinCita, selectedDay]);
 
   const vehiculoLabel = (id?: string) => {
     if (!id) return null;
@@ -258,7 +288,8 @@ export default function AgendaTab({ citas, vehiculos, clientes, tecnicos, ordene
           const key = localKey(d);
           const activo = key === localKey(selectedDay);
           const esHoy = key === hoy;
-          const nCitas = citas.filter((c) => localKey(new Date(c.fechaHora)) === key && c.estado !== 'cancelada').length;
+          const nCitas = citas.filter((c) => localKey(new Date(c.fechaHora)) === key && c.estado !== 'cancelada').length
+            + otsSinCita.filter((ot) => ot.fechaRecepcion === key).length;
           return (
             <button
               key={key}
@@ -285,17 +316,44 @@ export default function AgendaTab({ citas, vehiculos, clientes, tecnicos, ordene
           <p className="text-sm font-bold text-slate-800">
             {selectedDay.toLocaleDateString('es-ES', { weekday: 'long', day: 'numeric', month: 'long' })}
           </p>
-          <span className="text-xs text-slate-400">{citasDelDia.length} cita{citasDelDia.length !== 1 ? 's' : ''}</span>
+          <span className="text-xs text-slate-400">{entriesDelDia.length} programado{entriesDelDia.length !== 1 ? 's' : ''}</span>
         </div>
 
-        {citasDelDia.length === 0 ? (
+        {entriesDelDia.length === 0 ? (
           <div className="py-16 text-center">
             <CalendarClock className="w-8 h-8 text-slate-300 mx-auto mb-2" />
-            <p className="text-sm text-slate-500">No hay citas programadas este día.</p>
+            <p className="text-sm text-slate-500">No hay nada programado este día.</p>
           </div>
         ) : (
           <div className="divide-y divide-slate-50">
-            {citasDelDia.map((c) => {
+            {entriesDelDia.map((entry) => {
+              if (entry.kind === 'ot') {
+                const ot = entry.data;
+                const meta = OT_BADGE_META[ot.estado];
+                const veh = vehiculoLabel(ot.vehiculoId);
+                const cli = ot.clienteId === FLOTA_CLIENTE_ID ? 'Flota propia' : clienteLabel(ot.clienteId);
+                return (
+                  <div key={`ot-${ot.id}`} className="px-5 py-4 flex items-start gap-4 hover:bg-slate-50/60 transition">
+                    <div className="flex flex-col items-center shrink-0 w-14">
+                      <Wrench className="w-3.5 h-3.5 text-slate-300 mb-0.5" />
+                      <span className="text-[10px] text-slate-400 font-bold text-center">Taller</span>
+                    </div>
+                    <div className="min-w-0">
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <p className="text-sm font-semibold text-slate-800 truncate">{ot.numero}</p>
+                        <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full shrink-0 ${meta.bg} ${meta.color}`}>{meta.label}</span>
+                      </div>
+                      <p className="text-xs text-slate-500 truncate mt-0.5">{ot.descripcionProblema}</p>
+                      <div className="flex items-center gap-3 flex-wrap mt-1 text-xs text-slate-500">
+                        {cli && <span className="flex items-center gap-1"><User className="w-3 h-3" /> {cli}</span>}
+                        {veh && <span className="flex items-center gap-1"><Car className="w-3 h-3" /> {veh}</span>}
+                      </div>
+                    </div>
+                  </div>
+                );
+              }
+
+              const c = entry.data;
               const meta = ESTADO_META[c.estado];
               const tecnico = tecnicos.find((t) => t.id === c.tecnicoId);
               const veh = vehiculoLabel(c.vehiculoId) ?? c.vehiculoDescripcion;
