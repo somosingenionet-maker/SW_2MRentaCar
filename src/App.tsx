@@ -112,24 +112,17 @@ export default function App() {
   // Sync utilities
   const handleAddVehiculo = useCallback((nuevo: Vehiculo) => {
     setVehiculos(prev => [...prev, nuevo]);
-    upsertVehiculo(nuevo).catch(err => console.error('Error guardando vehículo', err));
-
-    // Alerta ITV automática (las alertas aún viven en localStorage).
-    const nuevaAlerta: Alerta = {
-      id: genId('al-aut'),
-      vehiculoId: nuevo.id,
-      tipo: 'itv',
-      descripcion: `Inspección Técnica obligatoria (ITV) programada para el vencimiento: ${nuevo.itvVencimiento}.`,
-      estado: 'pendiente',
-      fechaLimite: nuevo.itvVencimiento
-    };
-    setAlertas(prev => [...prev, nuevaAlerta]);
-    upsertOne('alertas', nuevaAlerta).catch(err => console.error('Error guardando alerta', err));
+    // Las alertas (itv/seguro/impuesto/mantenimiento) las crea solo un
+    // trigger en Supabase al insertar el vehículo — ver supabase/schema.sql.
+    // Se recargan tras confirmar el insert para que aparezcan ya en pantalla.
+    upsertVehiculo(nuevo)
+      .then(() => fetchAll<Alerta>('alertas').then(setAlertas))
+      .catch(err => console.error('Error guardando vehículo', err));
   }, []);
 
-  const handleUpdateVehiculo = useCallback((editado: Vehiculo) => {
+  const handleUpdateVehiculo = useCallback((editado: Vehiculo): Promise<void> => {
     setVehiculos(prev => prev.map(v => v.id === editado.id ? editado : v));
-    upsertVehiculo(editado).catch(err => console.error('Error actualizando vehículo', err));
+    return upsertVehiculo(editado).catch(err => console.error('Error actualizando vehículo', err));
   }, []);
 
   const handleDeleteVehiculo = useCallback((id: string) => {
@@ -152,6 +145,21 @@ export default function App() {
         if (afectadas.length) {
           setAlertas(prev => prev.map(a => afectadas.find(u => u.id === a.id) ?? a));
           afectadas.forEach(a => upsertOne('alertas', a).catch(err => console.error('Error actualizando alerta', err)));
+
+          // El mantenimiento por km no lo gestiona ningún trigger (el kilometraje
+          // cambia por muchos motivos): se abre aquí la siguiente alerta a +15.000 km
+          // para que el ciclo no se quede huérfano tras resolver esta.
+          const proximoKm = nueva.kilometrajeEnIntervencion + 15000;
+          const siguiente: Alerta = {
+            id: genId('al-mnt'),
+            vehiculoId: nueva.vehiculoId,
+            tipo: 'mantenimiento',
+            descripcion: `Revisión de mantenimiento preventivo recomendada a los ${proximoKm.toLocaleString()} km.`,
+            estado: 'activa',
+            kilometrajeLimite: proximoKm,
+          };
+          setAlertas(prev => [...prev, siguiente]);
+          upsertOne('alertas', siguiente).catch(err => console.error('Error guardando alerta', err));
         }
       }
     }
@@ -254,8 +262,29 @@ export default function App() {
         notas: 'Servicio realizado tras alerta preventiva. Próxima programada en 15.000 kms.'
       };
       handleAddIntervencion(autoTask, false);
+
+      // El mantenimiento por km no lo gestiona ningún trigger: se abre aquí
+      // la siguiente alerta a +15.000 km para que el ciclo continúe.
+      const proximoKm = Number(nuevaFechaOrKm) + 15000;
+      const siguiente: Alerta = {
+        id: genId('al-mnt'),
+        vehiculoId: vehId,
+        tipo: 'mantenimiento',
+        descripcion: `Revisión de mantenimiento preventivo recomendada a los ${proximoKm.toLocaleString()} km.`,
+        estado: 'activa',
+        kilometrajeLimite: proximoKm,
+      };
+      setAlertas(prev => [...prev, siguiente]);
+      upsertOne('alertas', siguiente).catch(err => console.error('Error guardando alerta', err));
     }
-    handleUpdateVehiculo(updatedVeh);
+
+    const actualizado = handleUpdateVehiculo(updatedVeh);
+    if (tipo !== 'mantenimiento') {
+      // itv/seguro/impuesto: un trigger en Supabase reabre/actualiza la
+      // alerta al guardar la nueva fecha del vehículo; se recarga para
+      // reflejar ese cambio hecho en el servidor.
+      actualizado.then(() => fetchAll<Alerta>('alertas').then(setAlertas));
+    }
   }, [vehiculos, handleUpdateVehiculo, handleAddIntervencion]);
 
   // Factura handlers

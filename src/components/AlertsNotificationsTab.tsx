@@ -139,21 +139,26 @@ export default function AlertsNotificationsTab({
     let message = '';
     let onConfirm = () => {};
 
+    // Para itv/seguro/impuesto NO se llama a onResolveAlerta: al cambiar la
+    // fecha del vehículo, un trigger en la base de datos reabre/actualiza
+    // esta misma alerta con el nuevo vencimiento automáticamente (ver
+    // supabase/schema.sql). Resolverla también desde aquí competiría con esa
+    // actualización del servidor.
     if (alerta.tipo === 'itv') {
       const nuevaFecha = new Date(today.setFullYear(today.getFullYear() + 1)).toISOString().split('T')[0];
       title = 'Confirmar ITV realizada';
-      message = `La fecha de vencimiento técnico de la ITV se actualizará a ${nuevaFecha} (+1 año) y se cerrará esta alerta.`;
-      onConfirm = () => { onTriggerAutoRenew(alerta.vehiculoId, 'itv', nuevaFecha); onResolveAlerta(alerta.id); };
+      message = `La fecha de vencimiento técnico de la ITV se actualizará a ${nuevaFecha} (+1 año) y la alerta se reprogramará automáticamente.`;
+      onConfirm = () => { onTriggerAutoRenew(alerta.vehiculoId, 'itv', nuevaFecha); };
     } else if (alerta.tipo === 'seguro') {
       const nuevaFecha = new Date(today.setFullYear(today.getFullYear() + 1)).toISOString().split('T')[0];
       title = 'Confirmar renovación de seguro';
-      message = `El vencimiento de la póliza de seguro se actualizará a ${nuevaFecha} (+1 año) y se cerrará esta alerta.`;
-      onConfirm = () => { onTriggerAutoRenew(alerta.vehiculoId, 'seguro', nuevaFecha); onResolveAlerta(alerta.id); };
+      message = `El vencimiento de la póliza de seguro se actualizará a ${nuevaFecha} (+1 año) y la alerta se reprogramará automáticamente.`;
+      onConfirm = () => { onTriggerAutoRenew(alerta.vehiculoId, 'seguro', nuevaFecha); };
     } else if (alerta.tipo === 'impuesto') {
       const nuevaFecha = new Date(today.setFullYear(today.getFullYear() + 1)).toISOString().split('T')[0];
       title = 'Confirmar pago de impuesto de circulación';
-      message = `La fecha del impuesto de circulación se actualizará a ${nuevaFecha} (+1 año) y se cerrará esta alerta.`;
-      onConfirm = () => { onTriggerAutoRenew(alerta.vehiculoId, 'impuesto', nuevaFecha); onResolveAlerta(alerta.id); };
+      message = `La fecha del impuesto de circulación se actualizará a ${nuevaFecha} (+1 año) y la alerta se reprogramará automáticamente.`;
+      onConfirm = () => { onTriggerAutoRenew(alerta.vehiculoId, 'impuesto', nuevaFecha); };
     } else if (alerta.tipo === 'mantenimiento') {
       const targetVeh = vehiculos.find(v => v.id === alerta.vehiculoId);
       const nextMaintKm = (targetVeh ? targetVeh.kilometraje : 0) + 15000;
