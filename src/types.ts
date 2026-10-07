@@ -169,7 +169,8 @@ export interface SolicitudReserva {
   referenciaExterna: string;
   /** Estado del pedido en la web (on-hold, processing, cancelled...). */
   estadoExterno: string;
-  estadoGestion: 'pendiente' | 'convertida' | 'descartada';
+  /** historica: pedido anterior a la app o ya cumplido; no es trabajo pendiente pero sí historial del cliente. */
+  estadoGestion: 'pendiente' | 'convertida' | 'descartada' | 'historica';
   clienteNombre: string;
   clienteApellidos: string;
   clienteEmail: string;

@@ -781,6 +781,7 @@ export default function App() {
             ordenesTrabajo={ordenesTrabajo}
             facturas={facturas}
             hasAlquileres={hasAlquileres}
+            solicitudes={solicitudes}
             invitaciones={invitaciones}
             onCrearInvitacion={handleCrearInvitacion}
             onAplicarInvitacion={handleAplicarInvitacion}

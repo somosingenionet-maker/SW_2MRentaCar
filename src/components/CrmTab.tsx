@@ -1,5 +1,6 @@
 import { useState, useMemo } from 'react';
-import { Cliente, Reserva, InteraccionCliente, Vehiculo, OrdenTrabajo, Factura, OTEstado, InvitacionCliente } from '../types';
+import { Cliente, Reserva, InteraccionCliente, Vehiculo, OrdenTrabajo, Factura, OTEstado, InvitacionCliente, SolicitudReserva } from '../types';
+import { canceladaEnWeb, estadoWebMeta, soloFecha } from '../utils/solicitudes';
 import { getEmpresaConfig } from '../data/mockData';
 import {
   Users, UserPlus, Search, Mail, Phone, MapPin, CreditCard, Clock, MessageSquare, Plus, Trash2, X, Check, Save, Download, PenTool, Car, Wrench, Receipt, ChevronDown, ChevronRight, Link2
@@ -19,6 +20,8 @@ interface CrmTabProps {
   ordenesTrabajo: OrdenTrabajo[];
   facturas: Factura[];
   hasAlquileres?: boolean;
+  /** Pedidos de la web: los pendientes o históricos de cada cliente forman parte de su historial de alquileres. */
+  solicitudes: SolicitudReserva[];
   invitaciones: InvitacionCliente[];
   /** Genera el enlace de autorregistro (el token solo existe en este valor devuelto). */
   onCrearInvitacion: (clienteId: string | null, idioma: 'es' | 'en') => Promise<string>;
@@ -54,6 +57,7 @@ export default function CrmTab({
   ordenesTrabajo,
   facturas,
   hasAlquileres = false,
+  solicitudes,
   invitaciones,
   onCrearInvitacion,
   onAplicarInvitacion,
@@ -222,8 +226,20 @@ export default function CrmTab({
   };
 
   // Get rentals associated with client
-  const getClientReservas = (cliId: string) => {
-    return reservas.filter(res => res.clienteId === cliId);
+  // Alquileres del cliente: reservas ya asignadas + pedidos de la web que aún no
+  // son reserva (pendientes de asignar o históricos). Los ya convertidos no se
+  // repiten: los representa su reserva. Los descartados a mano no se muestran.
+  type AlquilerCliente =
+    | { kind: 'reserva'; clave: string; fecha: string; res: Reserva }
+    | { kind: 'web'; clave: string; fecha: string; sol: SolicitudReserva };
+  const getClientAlquileres = (cliId: string): AlquilerCliente[] => {
+    const items: AlquilerCliente[] = [
+      ...reservas.filter(r => r.clienteId === cliId).map(res => ({ kind: 'reserva' as const, clave: res.id, fecha: res.fechaInicio, res })),
+      ...solicitudes
+        .filter(s => s.clienteId === cliId && (s.estadoGestion === 'pendiente' || s.estadoGestion === 'historica'))
+        .map(sol => ({ kind: 'web' as const, clave: sol.id, fecha: soloFecha(sol.fechaRecogida) || soloFecha(sol.fechaPedido), sol })),
+    ];
+    return items.sort((a, b) => b.fecha.localeCompare(a.fecha));
   };
 
   // Historial de taller y facturación del cliente (para la ficha del CRM).
@@ -666,33 +682,61 @@ export default function CrmTab({
               <div className="pt-4 border-t border-slate-100">
                 <h4 className="text-xs font-bold text-slate-700 uppercase tracking-wider flex items-center gap-1.5 mb-2 font-display">
                   <Clock className="w-4 h-4 text-blue-600" />
-                  Alquileres y Contratos Realizados
+                  Alquileres (reservas y pedidos de la web)
                 </h4>
 
-                <div className="space-y-2 max-h-[140px] overflow-y-auto">
-                  {getClientReservas(selectedCliente.id).length === 0 ? (
+                <div className="space-y-2 max-h-[220px] overflow-y-auto">
+                  {getClientAlquileres(selectedCliente.id).length === 0 ? (
                     <div className="text-center py-4 text-slate-400 text-xs font-sans">
                       Este cliente no registra alquileres de coches en nuestro sistema.
                     </div>
                   ) : (
-                    getClientReservas(selectedCliente.id).map(res => (
-                      <div key={res.id} className="p-2.5 bg-slate-50 border border-slate-100 rounded-xl flex justify-between items-center text-xs font-sans">
-                        <div>
-                          <div className="font-bold text-slate-800">
-                            ID Reserva: {res.id.slice(-6)}
+                    getClientAlquileres(selectedCliente.id).map(item => {
+                      if (item.kind === 'reserva') {
+                        const res = item.res;
+                        const veh = vehiculos.find(v => v.id === res.vehiculoId);
+                        return (
+                          <div key={item.clave} className="p-2.5 bg-slate-50 border border-slate-100 rounded-xl flex justify-between items-center gap-2 text-xs font-sans">
+                            <div className="min-w-0">
+                              <div className="font-bold text-slate-800 truncate">
+                                {veh ? `${veh.marca} ${veh.modelo} · ${veh.matricula}` : 'Vehículo no disponible'}
+                                {res.origen === 'web' && <span className="ml-1.5 text-[9px] font-bold uppercase rounded px-1.5 py-0.5 bg-blue-50 text-blue-600">Web</span>}
+                              </div>
+                              <div className="text-[10px] text-slate-500">
+                                {formatDate(res.fechaInicio)} — {formatDate(res.fechaFin)} · Reserva {res.id.slice(-6)}
+                              </div>
+                            </div>
+                            <div className="text-right shrink-0">
+                              <span className="font-bold text-slate-900 block font-mono">{res.totalCobrado.toFixed(2)} €</span>
+                              <span className={`inline-block text-[9px] font-bold uppercase rounded px-1.5 ${
+                                res.estado === 'cancelada' ? 'bg-rose-50 text-rose-600' : 'bg-emerald-50 text-emerald-700'
+                              }`}>{res.estado === 'cancelada' ? 'Anulado' : 'Activo'}</span>
+                            </div>
                           </div>
-                          <div className="text-[10px] text-slate-500">
-                            {formatDate(res.fechaInicio)} — {formatDate(res.fechaFin)}
+                        );
+                      }
+                      const sol = item.sol;
+                      const web = estadoWebMeta(sol);
+                      return (
+                        <div key={item.clave} className="p-2.5 bg-slate-50 border border-slate-100 rounded-xl flex justify-between items-center gap-2 text-xs font-sans">
+                          <div className="min-w-0">
+                            <div className="font-bold text-slate-800 truncate">
+                              {sol.vehiculoNombre || 'Vehículo sin identificar'}
+                              <span className="ml-1.5 text-[9px] font-bold uppercase rounded px-1.5 py-0.5 bg-blue-50 text-blue-600">Web</span>
+                            </div>
+                            <div className="text-[10px] text-slate-500">
+                              {formatDate(soloFecha(sol.fechaRecogida))} — {formatDate(soloFecha(sol.fechaDevolucion))} · Pedido #{sol.referenciaExterna}
+                            </div>
+                          </div>
+                          <div className="text-right shrink-0">
+                            <span className="font-bold text-slate-900 block font-mono">{sol.total.toFixed(2)} €</span>
+                            <span className={`inline-block text-[9px] font-bold uppercase rounded px-1.5 ${canceladaEnWeb(sol) ? web.cls : sol.estadoGestion === 'pendiente' ? 'bg-amber-50 text-amber-700' : 'bg-slate-100 text-slate-500'}`}>
+                              {canceladaEnWeb(sol) ? web.label : sol.estadoGestion === 'pendiente' ? 'Por asignar' : 'Histórico'}
+                            </span>
                           </div>
                         </div>
-                        <div className="text-right">
-                          <span className="font-bold text-slate-900 block font-mono">{res.totalCobrado.toFixed(2)} €</span>
-                          <span className={`inline-block text-[9px] font-bold uppercase rounded px-1.5 ${
-                            res.estado === 'cancelada' ? 'bg-rose-50 text-rose-600' : 'bg-emerald-50 text-emerald-700'
-                          }`}>{res.estado === 'cancelada' ? 'Anulado' : 'Activo'}</span>
-                        </div>
-                      </div>
-                    ))
+                      );
+                    })
                   )}
                 </div>
               </div>
