@@ -124,8 +124,21 @@ Deno.serve(async (req: Request) => {
 
   const meta = (k: string): unknown => (order.meta_data as Meta[] | undefined)?.find(m => m.key === k)?.value;
   const billing = (order.billing ?? {}) as Record<string, string>;
-  const [vehiculo, ...extras] = order.line_items as LineItem[];
   const referencia = String(order.id);
+
+  // El vehículo NO siempre es el primer artículo del pedido. Se distingue con el
+  // catálogo `web_productos`; si el producto no está, se considera vehículo solo
+  // si su nombre lleva "o similar" (convención de la web).
+  const admin = createClient(Deno.env.get('SUPABASE_URL')!, Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!);
+  const { data: catalogo } = await admin.from('web_productos').select('id,tipo');
+  const tipoDe = new Map((catalogo ?? []).map((p: { id: string; tipo: string }) => [p.id, p.tipo]));
+  const esVehiculo = (i: LineItem): boolean => {
+    const tipo = i.product_id != null ? tipoDe.get(String(i.product_id)) : undefined;
+    return tipo ? tipo === 'vehiculo' : /o similar/i.test(i.name ?? '');
+  };
+  const items = order.line_items as LineItem[];
+  const vehiculo = items.find(esVehiculo);
+  const extras = items.filter(i => i !== vehiculo);
 
   // Solo columnas de datos del pedido: estado_gestion, cliente_id y reserva_id
   // no se envían, así que una actualización desde la web nunca pisa lo que ya
@@ -160,7 +173,6 @@ Deno.serve(async (req: Request) => {
     actualizado_en: new Date().toISOString(),
   };
 
-  const admin = createClient(Deno.env.get('SUPABASE_URL')!, Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!);
   const { error } = await admin.from('solicitudes_reserva').upsert(fila, { onConflict: 'origen,referencia_externa' });
   if (error) {
     console.error('Error guardando solicitud', referencia, error.message);
