@@ -18,5 +18,8 @@
       "Bash(npm config *)",
       "Bash(xargs cat)"
     ]
-  }
+  },
+  "enabledMcpjsonServers": [
+    "supabase"
+  ]
 }
