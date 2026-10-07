@@ -940,6 +940,16 @@ export default function RentalsTab({
                       emptyMessage="No hay vehículos de alquiler disponibles"
                       required
                     />
+                    {solicitudActiva && compatiblesIds.size === 0 && (
+                      <p className="text-[10px] text-amber-700 mt-1">
+                        No hay ningún coche de la flota de alquiler del modelo pedido ({descripcionVehiculoWeb(solicitudActiva)}). Elige otro manualmente, o márcalo como «flota de alquiler» en Vehículos si ya lo tienes registrado.
+                      </p>
+                    )}
+                    {solicitudActiva && compatiblesIds.size > 0 && !formVehiculoId && (
+                      <p className="text-[10px] text-amber-700 mt-1">
+                        Los coches de este modelo están ocupados en esas fechas. Revisa la lista: los ocupados aparecen marcados.
+                      </p>
+                    )}
                   </div>
 
                   {/* Cliente CRM selector */}
