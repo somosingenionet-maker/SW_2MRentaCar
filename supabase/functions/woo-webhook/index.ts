@@ -35,6 +35,16 @@ async function firmaValida(cuerpo: string, recibida: string | null, secreto: str
   return diff === 0;
 }
 
+function esPing(cuerpo: string): boolean {
+  if (/^webhook_id=\d+$/.test(cuerpo.trim())) return true;
+  try {
+    const o = JSON.parse(cuerpo);
+    return !!o && typeof o === 'object' && Object.keys(o).length === 1 && 'webhook_id' in o;
+  } catch {
+    return false;
+  }
+}
+
 const MESES: Record<string, number> = {
   january: 1, february: 2, march: 3, april: 4, may: 5, june: 6, july: 7, august: 8,
   september: 9, october: 10, november: 11, december: 12,
@@ -88,16 +98,22 @@ Deno.serve(async (req: Request) => {
   if (!secreto) return json({ error: 'Falta el secreto WOO_WEBHOOK_SECRET' }, 500);
 
   const cuerpo = await req.text();
+
+  // El "ping" que WooCommerce manda al guardar el webhook NO va firmado y solo
+  // trae el id del webhook ({"webhook_id":N}): no contiene datos ni hace nada,
+  // así que se contesta 200 antes de exigir firma (si no, WooCommerce se niega
+  // a guardar el webhook). Cualquier otra petición debe venir firmada.
+  if (esPing(cuerpo)) return json({ ok: true, ping: true });
+
   if (!(await firmaValida(cuerpo, req.headers.get('x-wc-webhook-signature'), secreto))) {
     return json({ error: 'Firma no válida' }, 401);
   }
 
-  // Al crear el webhook, WooCommerce manda un "ping" que no es JSON.
   let order: Record<string, any>;
   try {
     order = JSON.parse(cuerpo);
   } catch {
-    return json({ ok: true, ping: true });
+    return json({ error: 'Cuerpo no válido' }, 400);
   }
   if (!order || typeof order !== 'object' || !order.id || !Array.isArray(order.line_items)) {
     return json({ ok: true, ignorado: 'sin datos de pedido' });
