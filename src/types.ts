@@ -147,6 +147,54 @@ export interface Reserva {
   totalCobrado: number;
   estado: 'confirmada' | 'cancelada';
   incluyeSeguroTodoRiesgo: boolean;
+  /** De dónde viene: creada a mano o asignada desde una solicitud de la web. */
+  origen?: 'manual' | 'web';
+}
+
+/** Extra contratado junto al vehículo en una solicitud (sillita, cobertura...). */
+export interface SolicitudExtra {
+  nombre: string;
+  cantidad: number;
+  total: number;
+}
+
+/**
+ * Pedido de alquiler llegado de un canal externo (hoy la web). Es una bandeja
+ * de entrada: la web reserva un MODELO ("Fiat Doblo o similar"), no un coche
+ * concreto, así que no se crea la Reserva hasta que alguien asigna el vehículo.
+ */
+export interface SolicitudReserva {
+  id: string;
+  origen: string;
+  referenciaExterna: string;
+  /** Estado del pedido en la web (on-hold, processing, cancelled...). */
+  estadoExterno: string;
+  estadoGestion: 'pendiente' | 'convertida' | 'descartada';
+  clienteNombre: string;
+  clienteApellidos: string;
+  clienteEmail: string;
+  clienteTelefono: string;
+  clienteDireccion?: string;
+  clienteCiudad?: string;
+  clientePais?: string;
+  carnetCategoria?: string;
+  /** Fecha y hora local 'YYYY-MM-DDTHH:mm'. Null si la web mandó un formato no reconocido. */
+  fechaRecogida?: string | null;
+  fechaDevolucion?: string | null;
+  lugarRecogida?: string;
+  lugarDevolucion?: string;
+  vehiculoNombre: string;
+  vehiculoWebId?: string;
+  /** Lo que se cobra por el vehículo solo, ya con descuento. */
+  vehiculoTotal: number;
+  extras: SolicitudExtra[];
+  descuento: number;
+  total: number;
+  metodoPago?: string;
+  pagado: boolean;
+  fechaPedido?: string;
+  clienteId?: string;
+  reservaId?: string;
 }
 
 export type AlertaTipo = 'itv' | 'mantenimiento' | 'seguro' | 'impuesto';

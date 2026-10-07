@@ -1,12 +1,13 @@
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { contrastText } from './utils/color';
 import { genId } from './utils/id';
-import { Vehiculo, Intervencion, Cliente, Reserva, Alerta, NotificacionCliente, InteraccionCliente, AlertaTipo, Usuario, Factura, ModuloId, OrdenTrabajo, Tecnico, Cita } from './types';
+import { Vehiculo, Intervencion, Cliente, Reserva, Alerta, NotificacionCliente, InteraccionCliente, AlertaTipo, Usuario, Factura, ModuloId, OrdenTrabajo, Tecnico, Cita, SolicitudReserva } from './types';
 import { getSessionUsuario, signOut } from './lib/auth';
 import { supabase } from './lib/supabase';
 import LoginScreenReset from './components/ResetPasswordScreen';
 import { fetchVehiculos, upsertVehiculo, deleteVehiculoDb } from './data/vehiculosDb';
 import { fetchAll, upsertOne, deleteOne } from './data/db';
+import { fetchSolicitudes, updateGestionSolicitud } from './data/solicitudesDb';
 import VehiclesTab from './components/VehiclesTab';
 import OrdenesTrabajoTab from './components/OrdenesTrabajoTab';
 import CrmTab from './components/CrmTab';
@@ -52,6 +53,7 @@ export default function App() {
   const [ordenesTrabajo, setOrdenesTrabajo] = useState<OrdenTrabajo[]>([]);
   const [tecnicos, setTecnicos] = useState<Tecnico[]>([]);
   const [citas, setCitas] = useState<Cita[]>([]);
+  const [solicitudes, setSolicitudes] = useState<SolicitudReserva[]>([]);
 
   // Check session on mount (Supabase)
   useEffect(() => {
@@ -73,7 +75,7 @@ export default function App() {
   useEffect(() => {
     if (!currentUser) {
       setVehiculos([]); setIntervenciones([]); setClientes([]); setReservas([]);
-      setAlertas([]); setNotificaciones([]); setFacturas([]); setOrdenesTrabajo([]); setTecnicos([]); setCitas([]);
+      setAlertas([]); setNotificaciones([]); setFacturas([]); setOrdenesTrabajo([]); setTecnicos([]); setCitas([]); setSolicitudes([]);
       return;
     }
     const log = (e: string) => (err: unknown) => console.error(`Error cargando ${e}`, err);
@@ -87,7 +89,22 @@ export default function App() {
     fetchAll<OrdenTrabajo>('ordenes_trabajo').then(setOrdenesTrabajo).catch(log('órdenes de trabajo'));
     fetchAll<Tecnico>('tecnicos').then(setTecnicos).catch(log('técnicos'));
     fetchAll<Cita>('citas').then(setCitas).catch(log('citas'));
+    fetchSolicitudes().then(setSolicitudes).catch(log('solicitudes de reserva'));
     loadEmpresaConfig().then(setEmpresaConfig).catch(log('configuración de empresa'));
+  }, [currentUser]);
+
+  // Solicitudes de la web en tiempo real: cuando entra o cambia un pedido, se
+  // recarga la bandeja (es una tabla pequeña, no merece la pena parchear fila a fila).
+  useEffect(() => {
+    if (!currentUser) return;
+    const recargar = () => {
+      fetchSolicitudes().then(setSolicitudes).catch(err => console.error('Error recargando solicitudes', err));
+    };
+    const canal = supabase
+      .channel('solicitudes-reserva')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'solicitudes_reserva' }, recargar)
+      .subscribe();
+    return () => { supabase.removeChannel(canal); };
   }, [currentUser]);
 
   // Set default tab based on user modules
@@ -206,6 +223,41 @@ export default function App() {
   const handleUpdateReserva = useCallback((editada: Reserva) => {
     setReservas(prev => prev.map(r => r.id === editada.id ? editada : r));
     upsertOne('reservas', editada).catch(err => console.error('Error actualizando reserva', err));
+  }, []);
+
+  // Convierte una solicitud de la web en reserva real. Se encadena en orden
+  // (cliente → reserva → solicitud) y se espera cada paso: la reserva tiene
+  // clave foránea al cliente, y si algo falla debe verse en pantalla en vez de
+  // quedar a medias en silencio.
+  const handleConvertirSolicitud = useCallback(async (
+    sol: SolicitudReserva, reserva: Reserva, clienteNuevo: Cliente | null,
+  ) => {
+    const veh = vehiculos.find(v => v.id === reserva.vehiculoId);
+    const interaccion: InteraccionCliente = {
+      id: genId('int-cli-aut-res'),
+      fecha: new Date().toISOString().split('T')[0],
+      tipo: 'registro_contrato',
+      notas: `Reserva recibida por la web y asignada al coche ${veh ? `${veh.marca} ${veh.modelo} (${veh.matricula})` : ''}. Rango: ${reserva.fechaInicio} al ${reserva.fechaFin}. Total: ${reserva.totalCobrado.toFixed(2)} €.`,
+    };
+    const existente = clienteNuevo ? null : clientes.find(c => c.id === reserva.clienteId) ?? null;
+    const cliente: Cliente | null = clienteNuevo
+      ? { ...clienteNuevo, interacciones: [interaccion] }
+      : existente ? { ...existente, interacciones: [interaccion, ...existente.interacciones] } : null;
+
+    if (cliente) {
+      await upsertOne('clientes', cliente);
+      setClientes(prev => prev.some(c => c.id === cliente.id) ? prev.map(c => c.id === cliente.id ? cliente : c) : [...prev, cliente]);
+    }
+    await upsertOne('reservas', reserva);
+    setReservas(prev => [...prev, reserva]);
+    await updateGestionSolicitud(sol.id, { estadoGestion: 'convertida', clienteId: reserva.clienteId, reservaId: reserva.id });
+    setSolicitudes(prev => prev.map(s => s.id === sol.id
+      ? { ...s, estadoGestion: 'convertida', clienteId: reserva.clienteId, reservaId: reserva.id } : s));
+  }, [clientes, vehiculos]);
+
+  const handleDescartarSolicitud = useCallback(async (sol: SolicitudReserva) => {
+    await updateGestionSolicitud(sol.id, { estadoGestion: 'descartada' });
+    setSolicitudes(prev => prev.map(s => s.id === sol.id ? { ...s, estadoGestion: 'descartada' } : s));
   }, []);
 
   const handleAddInteraccion = useCallback((cliId: string, interaccion: InteraccionCliente) => {
@@ -360,6 +412,8 @@ export default function App() {
   }, []);
 
   const activeAlertsCount = useMemo(() => alertas.filter(a => a.estado === 'activa').length, [alertas]);
+  // Solicitudes de la web esperando que alguien asigne el coche.
+  const solicitudesPendientes = useMemo(() => solicitudes.filter(x => x.estadoGestion === 'pendiente').length, [solicitudes]);
 
   const brandColor = empresaConfig.brandColor;
   const brandText = contrastText(brandColor);
@@ -535,6 +589,11 @@ export default function App() {
                       {activeAlertsCount}
                     </span>
                   )}
+                  {tab.id === 'alquileres' && solicitudesPendientes > 0 && (
+                    <span className="absolute top-1 right-2 px-1.5 py-0.5 text-[8px] bg-rose-500 text-white font-extrabold rounded-full leading-none animate-pulse">
+                      {solicitudesPendientes}
+                    </span>
+                  )}
                 </button>
               ))}
             </div>
@@ -589,6 +648,9 @@ export default function App() {
                 <span>{tab.emoji} {tab.label}</span>
                 {tab.id === 'alertas' && activeAlertsCount > 0 && (
                   <span className="px-2 py-0.5 bg-rose-500 text-white font-bold text-[9px] rounded-full">{activeAlertsCount}</span>
+                )}
+                {tab.id === 'alquileres' && solicitudesPendientes > 0 && (
+                  <span className="px-2 py-0.5 bg-rose-500 text-white font-bold text-[9px] rounded-full">{solicitudesPendientes}</span>
                 )}
               </button>
             ))}
@@ -670,8 +732,11 @@ export default function App() {
             reservas={reservas}
             vehiculos={vehiculos}
             clientes={clientes}
+            solicitudes={solicitudes}
             onAddReserva={handleAddReserva}
             onUpdateReserva={handleUpdateReserva}
+            onConvertirSolicitud={handleConvertirSolicitud}
+            onDescartarSolicitud={handleDescartarSolicitud}
           />
         )}
 

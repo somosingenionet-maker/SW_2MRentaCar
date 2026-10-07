@@ -1,8 +1,8 @@
 import { useState } from 'react';
-import { Reserva, Vehiculo, Cliente } from '../types';
+import { Reserva, Vehiculo, Cliente, SolicitudReserva } from '../types';
 import SearchableSelect from './SearchableSelect';
 import {
-  Calendar, Plus, User, Car, FileText, Check, X, Printer, Download, ChevronLeft, ChevronRight, MessageCircle, Mail as MailIcon
+  Calendar, Plus, User, Car, FileText, Check, X, Printer, Download, ChevronLeft, ChevronRight, MessageCircle, Mail as MailIcon, Globe, AlertTriangle
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import ConfirmDialog from './ConfirmDialog';
@@ -11,21 +11,40 @@ import { formatDate } from '../utils/dateFormat';
 import { downloadCsv, slugify } from '../utils/csvExport';
 import { genId } from '../utils/id';
 import { getEmpresaConfig } from '../data/mockData';
+import {
+  diasAlquiler, reservasSolapadas, vehiculosCompatibles, canceladaEnWeb, incluyeCobertura,
+  estadoWebMeta, soloFecha, soloHora,
+} from '../utils/solicitudes';
+
+// Código ISO de país ("ES") → nombre en español ("España") para la ficha del cliente.
+function nombrePais(codigo?: string): string | undefined {
+  if (!codigo) return undefined;
+  try { return new Intl.DisplayNames(['es'], { type: 'region' }).of(codigo.toUpperCase()) ?? codigo; }
+  catch { return codigo; }
+}
+const soloDigitos = (t: string) => t.replace(/\D/g, '');
 
 interface RentalsTabProps {
   reservas: Reserva[];
   vehiculos: Vehiculo[];
   clientes: Cliente[];
+  solicitudes: SolicitudReserva[];
   onAddReserva: (reserva: Reserva) => void;
   onUpdateReserva: (reserva: Reserva) => void;
+  /** Crea la reserva (y el cliente si es nuevo) y marca la solicitud como convertida. Rechaza si algo falla. */
+  onConvertirSolicitud: (sol: SolicitudReserva, reserva: Reserva, clienteNuevo: Cliente | null) => Promise<void>;
+  onDescartarSolicitud: (sol: SolicitudReserva) => Promise<void>;
 }
 
 export default function RentalsTab({
   reservas,
   vehiculos,
   clientes,
+  solicitudes,
   onAddReserva,
-  onUpdateReserva
+  onUpdateReserva,
+  onConvertirSolicitud,
+  onDescartarSolicitud
 }: RentalsTabProps) {
   const [selectedReserva, setSelectedReserva] = useState<Reserva | null>(null);
   const [isAddingOpen, setIsAddingOpen] = useState(false);
@@ -42,6 +61,12 @@ export default function RentalsTab({
   const [formError, setFormError] = useState('');
   const [confirmOverlap, setConfirmOverlap] = useState<{ isOpen: boolean; pendingReserva: Reserva | null }>({ isOpen: false, pendingReserva: null });
   const [confirmAnular, setConfirmAnular] = useState<{ isOpen: boolean; resId: string }>({ isOpen: false, resId: '' });
+  // Solicitud de la web que se está asignando (null = alta manual) y el cliente
+  // que se creará con sus datos si no existe ya en el CRM.
+  const [solicitudActiva, setSolicitudActiva] = useState<SolicitudReserva | null>(null);
+  const [clienteNuevo, setClienteNuevo] = useState<Cliente | null>(null);
+  const [guardando, setGuardando] = useState(false);
+  const [confirmDescartar, setConfirmDescartar] = useState<SolicitudReserva | null>(null);
   const [currentPage, setCurrentPage] = useState(1);
   const PAGE_SIZE = 10;
   // Vista de la tabla de reservas: activas/próximas vs historial (finalizadas o anuladas).
@@ -52,20 +77,14 @@ export default function RentalsTab({
     return new Date(d.getFullYear(), d.getMonth(), 1);
   });
 
-  // Helper calculation of days between dates
-  const calculateDays = (start: string, end: string): number => {
-    if (!start || !end) return 1;
-    const date1 = new Date(start);
-    const date2 = new Date(end);
-    const diffTime = Math.abs(date2.getTime() - date1.getTime());
-    const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
-    return diffDays || 1;
-  };
+  const calculateDays = diasAlquiler;
 
   const currentDuration = calculateDays(formFechaInicio, formFechaFin);
   const calculatedTotal = currentDuration * formTarifa + (formSeguro ? currentDuration * 15 : 0);
 
   const handleOpenAdd = () => {
+    setSolicitudActiva(null);
+    setClienteNuevo(null);
     setFormVehiculoId(vehiculos[0]?.id || '');
     setFormClienteId(clientes[0]?.id || '');
     setFormFechaInicio(new Date().toISOString().split('T')[0]);
@@ -78,6 +97,22 @@ export default function RentalsTab({
 
   const buildReserva = (): Reserva => {
     const duration = calculateDays(formFechaInicio, formFechaFin);
+    if (solicitudActiva) {
+      // Reserva de la web: se respeta lo que la web cobró (total con extras y descuentos).
+      return {
+        id: genId('res'),
+        vehiculoId: formVehiculoId,
+        clienteId: formClienteId,
+        fechaInicio: formFechaInicio,
+        fechaFin: formFechaFin,
+        temporada: formTemporada,
+        tarifaDiaria: Math.round((solicitudActiva.vehiculoTotal / duration) * 100) / 100,
+        totalCobrado: solicitudActiva.total,
+        estado: 'confirmada',
+        incluyeSeguroTodoRiesgo: incluyeCobertura(solicitudActiva.extras),
+        origen: 'web',
+      };
+    }
     const total = duration * Number(formTarifa) + (formSeguro ? duration * 15 : 0);
     return {
       id: genId('res'),
@@ -105,30 +140,88 @@ export default function RentalsTab({
     }
     setFormError('');
 
-    const overlaps = reservas.filter(res => {
-      if (res.vehiculoId !== formVehiculoId || res.estado === 'cancelada') return false;
-      const startA = new Date(res.fechaInicio).getTime();
-      const endA = new Date(res.fechaFin).getTime();
-      const startB = new Date(formFechaInicio).getTime();
-      const endB = new Date(formFechaFin).getTime();
-      return startB <= endA && startA <= endB;
-    });
+    const overlaps = reservasSolapadas(reservas, formVehiculoId, formFechaInicio, formFechaFin);
 
     if (overlaps.length > 0) {
       setConfirmOverlap({ isOpen: true, pendingReserva: buildReserva() });
       return;
     }
 
-    onAddReserva(buildReserva());
+    finalizarReserva(buildReserva());
+  };
+
+  const cerrarModal = () => {
     setIsAddingOpen(false);
+    setSolicitudActiva(null);
+    setClienteNuevo(null);
+    setFormError('');
+  };
+
+  const finalizarReserva = async (reserva: Reserva) => {
+    if (!solicitudActiva) {
+      onAddReserva(reserva);
+      cerrarModal();
+      return;
+    }
+    setGuardando(true);
+    try {
+      await onConvertirSolicitud(solicitudActiva, reserva, clienteNuevo && reserva.clienteId === clienteNuevo.id ? clienteNuevo : null);
+      cerrarModal();
+    } catch (err) {
+      console.error('Error asignando solicitud de la web', err);
+      setFormError('No se pudo guardar la reserva. Revisa la conexión e inténtalo de nuevo.');
+    } finally {
+      setGuardando(false);
+    }
   };
 
   const handleOverlapConfirm = () => {
-    if (confirmOverlap.pendingReserva) {
-      onAddReserva(confirmOverlap.pendingReserva);
-      setIsAddingOpen(false);
-    }
+    if (confirmOverlap.pendingReserva) finalizarReserva(confirmOverlap.pendingReserva);
     setConfirmOverlap({ isOpen: false, pendingReserva: null });
+  };
+
+  // Abre el modal de reserva con los datos del pedido de la web ya rellenados.
+  const handleOpenAsignar = (sol: SolicitudReserva) => {
+    const email = sol.clienteEmail.trim().toLowerCase();
+    const tel = soloDigitos(sol.clienteTelefono);
+    const existente = clientes.find(c => (email && c.correo.trim().toLowerCase() === email))
+      ?? clientes.find(c => tel.length >= 7 && soloDigitos(c.telefono) === tel);
+
+    let nuevo: Cliente | null = null;
+    if (!existente) {
+      nuevo = {
+        id: genId('cli'),
+        nombre: sol.clienteNombre,
+        apellidos: sol.clienteApellidos,
+        nifNiePasaporte: '',
+        correo: sol.clienteEmail,
+        telefono: sol.clienteTelefono,
+        direccion: sol.clienteDireccion ?? '',
+        ciudad: sol.clienteCiudad,
+        pais: nombrePais(sol.clientePais),
+        esClienteAlquiler: true,
+        interacciones: [],
+        fechaRegistro: new Date().toISOString().split('T')[0],
+        vehiculosAsociados: [],
+      };
+    }
+
+    const ini = soloFecha(sol.fechaRecogida) || new Date().toISOString().split('T')[0];
+    const fin = soloFecha(sol.fechaDevolucion) || ini;
+    // Primer coche del modelo pedido que esté libre en esas fechas.
+    const compatibles = vehiculosCompatibles(sol, vehiculos);
+    const libre = compatibles.find(v => reservasSolapadas(reservas, v.id, ini, fin).length === 0);
+
+    setSolicitudActiva(sol);
+    setClienteNuevo(nuevo);
+    setFormVehiculoId(libre?.id ?? '');
+    setFormClienteId(existente?.id ?? nuevo!.id);
+    setFormFechaInicio(ini);
+    setFormFechaFin(fin);
+    setFormTemporada('media');
+    setFormSeguro(incluyeCobertura(sol.extras));
+    setFormError('');
+    setIsAddingOpen(true);
   };
 
   const handleStatusChange = (resId: string, nuevoEstado: Reserva['estado']) => {
@@ -231,9 +324,123 @@ export default function RentalsTab({
   });
   // ─────────────────────────────────────────────────────────────────
 
+  // Bandeja de la web: pedidos sin asignar + reservas ya asignadas cuyo pedido
+  // se canceló después en la web (el equipo debe decidir si anularlas aquí).
+  const compatiblesIds = new Set(solicitudActiva ? vehiculosCompatibles(solicitudActiva, vehiculos).map(v => v.id) : []);
+  const opcionesVehiculo = [...vehiculosAlquiler]
+    .sort((a, b) => Number(compatiblesIds.has(b.id)) - Number(compatiblesIds.has(a.id)))
+    .map(v => {
+      const ocupado = !!formFechaInicio && !!formFechaFin && reservasSolapadas(reservas, v.id, formFechaInicio, formFechaFin).length > 0;
+      return {
+        value: v.id,
+        label: `${v.marca} ${v.modelo}`,
+        sublabel: `Matrícula: ${v.matricula}${compatiblesIds.has(v.id) ? ' · Modelo pedido' : ''}${ocupado ? ' · Ocupado en esas fechas' : ''}`,
+      };
+    });
+  const opcionesCliente = [
+    ...(clienteNuevo ? [{ value: clienteNuevo.id, label: `${clienteNuevo.nombre} ${clienteNuevo.apellidos} (cliente nuevo)`, sublabel: 'Se creará con los datos de la web' }] : []),
+    ...clientes.map(c => ({ value: c.id, label: `${c.nombre} ${c.apellidos}`, sublabel: c.nifNiePasaporte })),
+  ];
+
+  const solicitudesVisibles = solicitudes
+    .filter(sol => {
+      if (sol.estadoGestion === 'pendiente') return true;
+      if (sol.estadoGestion !== 'convertida' || !canceladaEnWeb(sol)) return false;
+      return reservas.find(r => r.id === sol.reservaId)?.estado === 'confirmada';
+    })
+    .sort((a, b) => {
+      const ca = canceladaEnWeb(a) ? 1 : 0, cb = canceladaEnWeb(b) ? 1 : 0;
+      if (ca !== cb) return ca - cb;
+      return (a.fechaRecogida ?? '9999').localeCompare(b.fechaRecogida ?? '9999');
+    });
+  const pendientesWeb = solicitudesVisibles.filter(x => x.estadoGestion === 'pendiente' && !canceladaEnWeb(x)).length;
+
+  const descripcionVehiculoWeb = (sol: SolicitudReserva) => sol.vehiculoNombre || 'Vehículo sin identificar';
+  const fechaHoraWeb = (iso?: string | null) =>
+    iso ? `${formatDate(soloFecha(iso))}${soloHora(iso) ? ' · ' + soloHora(iso) : ''}` : 'Fecha no reconocida';
+
   return (
     <div className="space-y-6 text-slate-700" id="rentals-tab-root">
-      
+
+      {/* ── Reservas recibidas por la web ── */}
+      {solicitudesVisibles.length > 0 && (
+        <div className="bg-white rounded-2xl border border-slate-100 shadow-sm overflow-hidden" id="web-requests-panel">
+          <div className="px-5 py-3.5 border-b border-slate-100 bg-slate-50 flex items-center justify-between gap-3 flex-wrap">
+            <h2 className="text-sm font-bold text-slate-800 flex items-center gap-2">
+              <Globe className="w-4 h-4 text-blue-600" />
+              Reservas de la web
+              {pendientesWeb > 0 && (
+                <span className="px-2 py-0.5 bg-rose-500 text-white text-[10px] font-extrabold rounded-full">{pendientesWeb} por asignar</span>
+              )}
+            </h2>
+            <p className="text-[11px] text-slate-400">La web reserva un modelo, no un coche concreto: asigna el vehículo para crear la reserva.</p>
+          </div>
+          <div className="divide-y divide-slate-50">
+            {solicitudesVisibles.map(sol => {
+              const estadoWeb = estadoWebMeta(sol);
+              const cancelada = canceladaEnWeb(sol);
+              const reservaAsignada = sol.estadoGestion === 'convertida' ? reservas.find(r => r.id === sol.reservaId) : undefined;
+              return (
+                <div key={sol.id} className={`px-5 py-3.5 flex flex-col lg:flex-row lg:items-center gap-3 ${cancelada ? 'bg-rose-50/30' : ''}`}>
+                  <div className="lg:w-1/4 min-w-0">
+                    <div className="text-xs font-bold text-slate-800 truncate">{sol.clienteNombre} {sol.clienteApellidos}</div>
+                    <div className="text-[10px] text-slate-400 truncate">{sol.clienteEmail}</div>
+                    <div className="text-[10px] text-slate-400">{sol.clienteTelefono}</div>
+                  </div>
+                  <div className="lg:flex-1 min-w-0 text-xs">
+                    <div className="font-bold text-slate-700 flex items-center gap-1.5">
+                      <Car className="w-3.5 h-3.5 text-blue-600 shrink-0" />
+                      <span className="truncate">{descripcionVehiculoWeb(sol)}</span>
+                    </div>
+                    <div className="text-[11px] text-slate-500 mt-0.5">
+                      {fechaHoraWeb(sol.fechaRecogida)} → {fechaHoraWeb(sol.fechaDevolucion)}
+                    </div>
+                    <div className="text-[10px] text-slate-400 truncate">
+                      {sol.lugarRecogida ?? '—'}{sol.lugarDevolucion && sol.lugarDevolucion !== sol.lugarRecogida ? ` → ${sol.lugarDevolucion}` : ''}
+                      {sol.extras.length > 0 && ` · Extras: ${sol.extras.map(e => e.nombre).join(', ')}`}
+                    </div>
+                  </div>
+                  <div className="lg:w-40 text-left lg:text-right">
+                    <div className="font-mono font-extrabold text-sm text-slate-800">{sol.total.toFixed(2)} €</div>
+                    <span className={`px-2 py-0.5 rounded text-[10px] font-bold inline-flex ${estadoWeb.cls}`}>{estadoWeb.label}</span>
+                  </div>
+                  <div className="lg:w-56 flex lg:justify-end gap-2 flex-wrap">
+                    {sol.estadoGestion === 'pendiente' ? (
+                      <>
+                        {!cancelada && (
+                          <button
+                            onClick={() => handleOpenAsignar(sol)}
+                            className="px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold rounded-lg transition cursor-pointer flex items-center gap-1"
+                          >
+                            <Check className="w-3.5 h-3.5" /> Asignar vehículo
+                          </button>
+                        )}
+                        <button
+                          onClick={() => setConfirmDescartar(sol)}
+                          className="px-3 py-1.5 border border-slate-200 text-slate-500 hover:bg-slate-50 text-xs font-bold rounded-lg transition cursor-pointer"
+                        >
+                          Descartar
+                        </button>
+                      </>
+                    ) : (
+                      <div className="text-[11px] text-rose-600 font-semibold flex items-start gap-1.5 lg:max-w-56">
+                        <AlertTriangle className="w-4 h-4 shrink-0" />
+                        <span>
+                          Cancelada en la web, pero la reserva sigue activa aquí.
+                          {reservaAsignada && (
+                            <button onClick={() => setSelectedReserva(reservaAsignada)} className="ml-1 underline cursor-pointer">Ver reserva</button>
+                          )}
+                        </span>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
+
       {/* Visual Calendar Block & List split */}
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
         
@@ -678,21 +885,21 @@ export default function RentalsTab({
               <div className="px-6 py-4 bg-slate-50 border-b border-slate-100 flex justify-between items-center">
                 <h3 className="font-extrabold text-slate-800 flex items-center gap-2 font-display">
                   <Calendar className="w-5 h-5 text-blue-600" />
-                  Alta de Reserva de Alquiler
+                  {solicitudActiva ? 'Asignar reserva de la web' : 'Alta de Reserva de Alquiler'}
                 </h3>
                 <button 
-                  onClick={() => setIsAddingOpen(false)}
+                  onClick={cerrarModal}
                   className="p-1 hover:bg-slate-200 rounded-md transition text-slate-400"
                 >
                   <X className="w-5 h-5" />
                 </button>
               </div>
 
-              {vehiculos.length === 0 || clientes.length === 0 ? (
+              {vehiculos.length === 0 || (clientes.length === 0 && !clienteNuevo) ? (
                 <div className="p-6 text-center text-slate-500 text-xs space-y-3">
                   <p>⚠️ Se necesitan vehículos y clientes registrados en el CRM para poder formalizar reservas.</p>
                   <button
-                    onClick={() => setIsAddingOpen(false)}
+                    onClick={cerrarModal}
                     className="px-4 py-2 bg-slate-800 text-white rounded-lg text-xs font-semibold"
                   >
                     Cerrar
@@ -700,15 +907,28 @@ export default function RentalsTab({
                 </div>
               ) : (
                 <form onSubmit={handleAddSubmit} className="p-6 space-y-4 font-sans">
+                  {solicitudActiva && (
+                    <div className="p-3 bg-blue-50 border border-blue-100 rounded-xl text-xs text-blue-900 space-y-1">
+                      <div className="flex items-center gap-1.5 font-bold text-blue-800">
+                        <Globe className="w-3.5 h-3.5" /> Pedido web #{solicitudActiva.referenciaExterna}
+                        <span className={`ml-auto px-2 py-0.5 rounded text-[10px] font-bold ${estadoWebMeta(solicitudActiva).cls}`}>{estadoWebMeta(solicitudActiva).label}</span>
+                      </div>
+                      <div><strong>{solicitudActiva.clienteNombre} {solicitudActiva.clienteApellidos}</strong> · {solicitudActiva.clienteTelefono}</div>
+                      <div>Pidió: <strong>{descripcionVehiculoWeb(solicitudActiva)}</strong></div>
+                      <div>Recogida: {fechaHoraWeb(solicitudActiva.fechaRecogida)} · {solicitudActiva.lugarRecogida ?? '—'}</div>
+                      <div>Devolución: {fechaHoraWeb(solicitudActiva.fechaDevolucion)} · {solicitudActiva.lugarDevolucion ?? '—'}</div>
+                      {solicitudActiva.extras.length > 0 && (
+                        <div>Extras: {solicitudActiva.extras.map(e => `${e.nombre} (${e.total.toFixed(2)} €)`).join(', ')}</div>
+                      )}
+                      {solicitudActiva.carnetCategoria && <div>Carnet: categoría {solicitudActiva.carnetCategoria}</div>}
+                      {clienteNuevo && <div className="text-amber-700 font-semibold">⚠ La web no pide NIF/NIE: complétalo en Clientes cuando lo tengas.</div>}
+                    </div>
+                  )}
                   {/* Vehiculo selector */}
                   <div>
                     <label className="block text-xs font-bold text-slate-500 uppercase">Vehículo de Flota *</label>
                     <SearchableSelect
-                      options={vehiculosAlquiler.map(v => ({
-                        value: v.id,
-                        label: `${v.marca} ${v.modelo}`,
-                        sublabel: `Matrícula: ${v.matricula}`,
-                      }))}
+                      options={opcionesVehiculo}
                       value={formVehiculoId}
                       onChange={(val) => {
                         setFormVehiculoId(val);
@@ -726,11 +946,7 @@ export default function RentalsTab({
                   <div>
                     <label className="block text-xs font-bold text-slate-500 uppercase">Cliente Beneficiario (CRM) *</label>
                     <SearchableSelect
-                      options={clientes.map(c => ({
-                        value: c.id,
-                        label: `${c.nombre} ${c.apellidos}`,
-                        sublabel: c.nifNiePasaporte,
-                      }))}
+                      options={opcionesCliente}
                       value={formClienteId}
                       onChange={setFormClienteId}
                       placeholder="Buscar cliente..."
@@ -798,6 +1014,8 @@ export default function RentalsTab({
                         </div>
                       );
                     })()}
+                    {!solicitudActiva && (
+                      <>
                     <div className="relative mt-2">
                       <span className="absolute inset-y-0 left-0 pl-3 flex items-center text-slate-400 font-semibold text-xs">€/Día</span>
                       <input
@@ -810,9 +1028,12 @@ export default function RentalsTab({
                       />
                     </div>
                     <p className="text-[10px] text-slate-400 mt-1">La tarifa se autocompleta según la temporada. Puedes editarla manualmente si aplica un precio especial.</p>
+                      </>
+                    )}
                   </div>
 
                   {/* Extra Todo Riesgo Insurance checkbox */}
+                  {!solicitudActiva && (
                   <div className="p-3 bg-slate-50 rounded-lg border border-slate-100 flex items-start gap-2">
                     <input
                       type="checkbox"
@@ -826,15 +1047,22 @@ export default function RentalsTab({
                       <span className="block text-[10px] text-slate-400">Surcharge de +15.00 €/día. Protege el vehículo contra accidentes, fuegos o colisiones en via pública.</span>
                     </label>
                   </div>
+                  )}
 
                   {/* Temporary total preview */}
                   <div className="p-3.5 bg-blue-50 font-sans text-blue-800 rounded-xl border border-blue-100 flex justify-between items-center text-xs">
                     <div>
-                      <span className="font-bold uppercase tracking-wider block text-[9px] text-blue-600">PRESUPUESTO ESTIMADO</span>
-                      <span>Alquiler: {currentDuration} días a {formTarifa}€ / día</span>
+                      <span className="font-bold uppercase tracking-wider block text-[9px] text-blue-600">
+                        {solicitudActiva ? 'TOTAL COBRADO EN LA WEB' : 'PRESUPUESTO ESTIMADO'}
+                      </span>
+                      <span>
+                        {solicitudActiva
+                          ? `${currentDuration} días · vehículo ${solicitudActiva.vehiculoTotal.toFixed(2)} € + extras${solicitudActiva.pagado ? ' · pagado' : ' · pago al recoger'}`
+                          : `Alquiler: ${currentDuration} días a ${formTarifa}€ / día`}
+                      </span>
                     </div>
                     <div className="text-right font-mono text-base font-extrabold text-blue-900">
-                      {calculatedTotal.toFixed(2)} €
+                      {(solicitudActiva ? solicitudActiva.total : calculatedTotal).toFixed(2)} €
                     </div>
                   </div>
 
@@ -845,16 +1073,17 @@ export default function RentalsTab({
                   <div className="border-t border-slate-100 pt-4 flex justify-end gap-2 text-sm font-medium">
                     <button
                       type="button"
-                      onClick={() => { setIsAddingOpen(false); setFormError(''); }}
+                      onClick={cerrarModal}
                       className="px-4 py-2 border border-slate-200 rounded-xl hover:bg-slate-50 transition text-slate-500"
                     >
                       Cancelar
                     </button>
                     <button
                       type="submit"
-                      className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-xl transition flex items-center gap-1 cursor-pointer"
+                      disabled={guardando}
+                      className="px-4 py-2 bg-blue-600 hover:bg-blue-700 disabled:opacity-60 disabled:cursor-wait text-white rounded-xl transition flex items-center gap-1 cursor-pointer"
                     >
-                      <Check className="w-4 h-4" /> Registrar Alquiler
+                      <Check className="w-4 h-4" /> {guardando ? 'Guardando...' : solicitudActiva ? 'Crear reserva' : 'Registrar Alquiler'}
                     </button>
                   </div>
                 </form>
@@ -872,6 +1101,21 @@ export default function RentalsTab({
         variant="warning"
         onConfirm={handleOverlapConfirm}
         onCancel={() => setConfirmOverlap({ isOpen: false, pendingReserva: null })}
+      />
+
+      <ConfirmDialog
+        isOpen={confirmDescartar !== null}
+        title="Descartar solicitud de la web"
+        message={`¿Descartar el pedido de ${confirmDescartar?.clienteNombre ?? ''} ${confirmDescartar?.clienteApellidos ?? ''}? Dejará de aparecer en la bandeja. El pedido se conserva en la web.`}
+        confirmLabel="Sí, descartar"
+        cancelLabel="No, mantener"
+        variant="warning"
+        onConfirm={() => {
+          const sol = confirmDescartar;
+          setConfirmDescartar(null);
+          if (sol) onDescartarSolicitud(sol).catch(err => console.error('Error descartando solicitud', err));
+        }}
+        onCancel={() => setConfirmDescartar(null)}
       />
 
       <ConfirmDialog
