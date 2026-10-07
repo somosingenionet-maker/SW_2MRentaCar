@@ -126,6 +126,12 @@ Deno.serve(async (req: Request) => {
   const billing = (order.billing ?? {}) as Record<string, string>;
   const referencia = String(order.id);
 
+  // NIF/NIE/pasaporte: lo pide el campo `billing_nif` del pago (se guarda como
+  // `_billing_nif`). Se aceptan alias por si el campo se llama distinto.
+  const documentoMeta = ['_billing_nif', 'billing_nif', '_billing_dni', '_billing_documento']
+    .map(k => meta(k)).find(v => typeof v === 'string' && v.trim() !== '') as string | undefined;
+  const documento = documentoMeta ? documentoMeta.trim().toUpperCase().replace(/[\s.-]+/g, '') : null;
+
   // El vehículo NO siempre es el primer artículo del pedido. Se distingue con el
   // catálogo `web_productos`; si el producto no está, se considera vehículo solo
   // si su nombre lleva "o similar" (convención de la web).
@@ -156,6 +162,7 @@ Deno.serve(async (req: Request) => {
     cliente_ciudad: billing.city || null,
     cliente_pais: billing.country || null,
     carnet_categoria: (meta('_billing_driver_license') as string) || null,
+    cliente_documento: documento,
     fecha_recogida: parseFecha(meta('order_pickup_date')),
     fecha_devolucion: parseFecha(meta('order_drop_date')),
     lugar_recogida: (meta('order_pickup_location') as string) || null,

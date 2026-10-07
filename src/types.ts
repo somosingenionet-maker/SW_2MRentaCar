@@ -178,6 +178,8 @@ export interface SolicitudReserva {
   clienteCiudad?: string;
   clientePais?: string;
   carnetCategoria?: string;
+  /** NIF/NIE/pasaporte, si la web ya lo pide en el pago. */
+  clienteDocumento?: string;
   /** Fecha y hora local 'YYYY-MM-DDTHH:mm'. Null si la web mandó un formato no reconocido. */
   fechaRecogida?: string | null;
   fechaDevolucion?: string | null;
@@ -250,6 +252,36 @@ export interface Cita {
   estado: 'pendiente' | 'confirmada' | 'cancelada' | 'convertida';
   notas?: string;
   otId?: string;
+}
+
+/** Datos que el cliente envía desde el formulario público de autorregistro. */
+export interface DatosRegistro {
+  nombre: string;
+  apellidos: string;
+  tipoDocumento: 'dni' | 'nie' | 'pasaporte';
+  documento: string;
+  correo: string;
+  telefono: string;
+  direccion: string;
+  ciudad: string;
+  pais: string;
+  consentimientoEn: string;
+}
+
+/**
+ * Enlace de autorregistro enviado a un cliente (o a una persona nueva si no
+ * lleva clienteId). Lo que el cliente envíe queda en `datos` hasta que el
+ * personal lo revise y lo aplique a la ficha.
+ */
+export interface InvitacionCliente {
+  id: string;
+  clienteId?: string;
+  estado: 'pendiente' | 'completada' | 'aplicada' | 'cancelada';
+  expiraEn: string;
+  datos?: DatosRegistro;
+  idioma?: 'es' | 'en';
+  completadaEn?: string;
+  creadaEn: string;
 }
 
 /** Identificador de módulo funcional. Controla qué pestañas ve cada usuario. */

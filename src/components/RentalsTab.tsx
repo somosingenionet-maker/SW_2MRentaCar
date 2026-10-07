@@ -193,7 +193,7 @@ export default function RentalsTab({
         id: genId('cli'),
         nombre: sol.clienteNombre,
         apellidos: sol.clienteApellidos,
-        nifNiePasaporte: '',
+        nifNiePasaporte: sol.clienteDocumento ?? '',
         correo: sol.clienteEmail,
         telefono: sol.clienteTelefono,
         direccion: sol.clienteDireccion ?? '',
@@ -921,7 +921,10 @@ export default function RentalsTab({
                         <div>Extras: {solicitudActiva.extras.map(e => `${e.nombre} (${e.total.toFixed(2)} €)`).join(', ')}</div>
                       )}
                       {solicitudActiva.carnetCategoria && <div>Carnet: categoría {solicitudActiva.carnetCategoria}</div>}
-                      {clienteNuevo && <div className="text-amber-700 font-semibold">⚠ La web no pide NIF/NIE: complétalo en Clientes cuando lo tengas.</div>}
+                      {solicitudActiva.clienteDocumento && <div>Documento: <strong>{solicitudActiva.clienteDocumento}</strong></div>}
+                      {!solicitudActiva.clienteDocumento && (clienteNuevo || !clientes.find(c => c.id === formClienteId)?.nifNiePasaporte) && (
+                        <div className="text-amber-700 font-semibold">⚠ Falta el NIF/NIE/pasaporte: pídelo al cliente (botón «Pedir datos» en Clientes) o complétalo en su ficha.</div>
+                      )}
                     </div>
                   )}
                   {/* Vehiculo selector */}

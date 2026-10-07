@@ -1,8 +1,8 @@
 import { useState, useMemo } from 'react';
-import { Cliente, Reserva, InteraccionCliente, Vehiculo, OrdenTrabajo, Factura, OTEstado } from '../types';
+import { Cliente, Reserva, InteraccionCliente, Vehiculo, OrdenTrabajo, Factura, OTEstado, InvitacionCliente } from '../types';
 import { getEmpresaConfig } from '../data/mockData';
 import {
-  Users, UserPlus, Search, Mail, Phone, MapPin, CreditCard, Clock, MessageSquare, Plus, Trash2, X, Check, Save, Download, PenTool, Car, Wrench, Receipt, ChevronDown, ChevronRight
+  Users, UserPlus, Search, Mail, Phone, MapPin, CreditCard, Clock, MessageSquare, Plus, Trash2, X, Check, Save, Download, PenTool, Car, Wrench, Receipt, ChevronDown, ChevronRight, Link2
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import ConfirmDialog from './ConfirmDialog';
@@ -10,6 +10,7 @@ import Pagination from './Pagination';
 import { formatDate } from '../utils/dateFormat';
 import { downloadCsv, slugify } from '../utils/csvExport';
 import { genId } from '../utils/id';
+import { PedirDatosModal, RevisarDatosModal, PanelDatosRecibidos } from './DatosClientePanel';
 
 interface CrmTabProps {
   clientes: Cliente[];
@@ -18,6 +19,11 @@ interface CrmTabProps {
   ordenesTrabajo: OrdenTrabajo[];
   facturas: Factura[];
   hasAlquileres?: boolean;
+  invitaciones: InvitacionCliente[];
+  /** Genera el enlace de autorregistro (el token solo existe en este valor devuelto). */
+  onCrearInvitacion: (clienteId: string | null, idioma: 'es' | 'en') => Promise<string>;
+  onAplicarInvitacion: (inv: InvitacionCliente) => Promise<void>;
+  onCancelarInvitacion: (inv: InvitacionCliente) => Promise<void>;
   onAddCliente: (cliente: Cliente) => void;
   onUpdateCliente: (cliente: Cliente) => void;
   onDeleteCliente: (id: string) => void;
@@ -48,6 +54,10 @@ export default function CrmTab({
   ordenesTrabajo,
   facturas,
   hasAlquileres = false,
+  invitaciones,
+  onCrearInvitacion,
+  onAplicarInvitacion,
+  onCancelarInvitacion,
   onAddCliente,
   onUpdateCliente,
   onDeleteCliente,
@@ -55,6 +65,10 @@ export default function CrmTab({
 }: CrmTabProps) {
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedCliente, setSelectedCliente] = useState<Cliente | null>(null);
+  // Autorregistro: modal para generar el enlace (cliente null = persona nueva) y revisión de lo recibido.
+  const [pedirDatos, setPedirDatos] = useState<{ cliente: Cliente | null } | null>(null);
+  const [revisando, setRevisando] = useState<InvitacionCliente | null>(null);
+  const empresaNombreCrm = getEmpresaConfig().nombre;
 
   // IDs de vehículos ya asignados a algún cliente
   const vehiculosAsignadosGlobal = useMemo(
@@ -302,6 +316,13 @@ export default function CrmTab({
                 <Download className="w-4 h-4" /> CSV
               </button>
               <button
+                onClick={() => setPedirDatos({ cliente: null })}
+                className="px-3 py-2 border border-slate-200 text-slate-600 hover:bg-slate-50 font-medium text-sm rounded-xl transition flex items-center gap-1.5 cursor-pointer"
+                title="Enviar un formulario para que una persona nueva rellene sus datos"
+              >
+                <Link2 className="w-4 h-4" /> Pedir datos
+              </button>
+              <button
                 onClick={handleOpenAdd}
                 id="btn-add-cliente"
                 className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white font-medium text-sm rounded-xl transition duration-150 flex items-center gap-1.5 focus:outline-none cursor-pointer font-sans"
@@ -311,6 +332,13 @@ export default function CrmTab({
               </button>
             </div>
           </div>
+
+          <PanelDatosRecibidos
+            invitaciones={invitaciones}
+            clientes={clientes}
+            onRevisar={setRevisando}
+            onCancelar={onCancelarInvitacion}
+          />
 
           {/* Search bar */}
           <div className="relative">
@@ -407,6 +435,13 @@ export default function CrmTab({
                   <p className="text-xs font-mono text-slate-400 mt-0.5">ID Cliente: {selectedCliente.id}</p>
                 </div>
                 <div className="flex items-center gap-1">
+                  <button
+                    onClick={() => setPedirDatos({ cliente: selectedCliente })}
+                    title="Pedir datos al cliente (NIF/NIE, contacto…) con un enlace"
+                    className="p-1.5 hover:bg-blue-50 text-slate-400 hover:text-blue-600 rounded-lg transition"
+                  >
+                    <Link2 className="w-4 h-4" />
+                  </button>
                   <button
                     onClick={() => handleEditClick(selectedCliente)}
                     title="Editar ficha"
@@ -1112,6 +1147,24 @@ export default function CrmTab({
           </div>
         )}
       </AnimatePresence>
+
+      {pedirDatos && (
+        <PedirDatosModal
+          cliente={pedirDatos.cliente}
+          empresaNombre={empresaNombreCrm}
+          onCrear={onCrearInvitacion}
+          onClose={() => setPedirDatos(null)}
+        />
+      )}
+      {revisando && (
+        <RevisarDatosModal
+          invitacion={revisando}
+          cliente={clientes.find(c => c.id === revisando.clienteId) ?? null}
+          onAplicar={onAplicarInvitacion}
+          onDescartar={onCancelarInvitacion}
+          onClose={() => setRevisando(null)}
+        />
+      )}
     </div>
   );
 }

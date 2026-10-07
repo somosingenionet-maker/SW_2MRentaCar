@@ -1,13 +1,14 @@
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { contrastText } from './utils/color';
 import { genId } from './utils/id';
-import { Vehiculo, Intervencion, Cliente, Reserva, Alerta, NotificacionCliente, InteraccionCliente, AlertaTipo, Usuario, Factura, ModuloId, OrdenTrabajo, Tecnico, Cita, SolicitudReserva } from './types';
+import { Vehiculo, Intervencion, Cliente, Reserva, Alerta, NotificacionCliente, InteraccionCliente, AlertaTipo, Usuario, Factura, ModuloId, OrdenTrabajo, Tecnico, Cita, SolicitudReserva, InvitacionCliente } from './types';
 import { getSessionUsuario, signOut } from './lib/auth';
 import { supabase } from './lib/supabase';
 import LoginScreenReset from './components/ResetPasswordScreen';
 import { fetchVehiculos, upsertVehiculo, deleteVehiculoDb } from './data/vehiculosDb';
 import { fetchAll, upsertOne, deleteOne } from './data/db';
 import { fetchSolicitudes, updateGestionSolicitud } from './data/solicitudesDb';
+import { fetchInvitaciones, crearInvitacion, updateEstadoInvitacion } from './data/invitacionesDb';
 import VehiclesTab from './components/VehiclesTab';
 import OrdenesTrabajoTab from './components/OrdenesTrabajoTab';
 import CrmTab from './components/CrmTab';
@@ -54,6 +55,7 @@ export default function App() {
   const [tecnicos, setTecnicos] = useState<Tecnico[]>([]);
   const [citas, setCitas] = useState<Cita[]>([]);
   const [solicitudes, setSolicitudes] = useState<SolicitudReserva[]>([]);
+  const [invitaciones, setInvitaciones] = useState<InvitacionCliente[]>([]);
 
   // Check session on mount (Supabase)
   useEffect(() => {
@@ -75,7 +77,7 @@ export default function App() {
   useEffect(() => {
     if (!currentUser) {
       setVehiculos([]); setIntervenciones([]); setClientes([]); setReservas([]);
-      setAlertas([]); setNotificaciones([]); setFacturas([]); setOrdenesTrabajo([]); setTecnicos([]); setCitas([]); setSolicitudes([]);
+      setAlertas([]); setNotificaciones([]); setFacturas([]); setOrdenesTrabajo([]); setTecnicos([]); setCitas([]); setSolicitudes([]); setInvitaciones([]);
       return;
     }
     const log = (e: string) => (err: unknown) => console.error(`Error cargando ${e}`, err);
@@ -90,6 +92,7 @@ export default function App() {
     fetchAll<Tecnico>('tecnicos').then(setTecnicos).catch(log('técnicos'));
     fetchAll<Cita>('citas').then(setCitas).catch(log('citas'));
     fetchSolicitudes().then(setSolicitudes).catch(log('solicitudes de reserva'));
+    fetchInvitaciones().then(setInvitaciones).catch(log('invitaciones de clientes'));
     loadEmpresaConfig().then(setEmpresaConfig).catch(log('configuración de empresa'));
   }, [currentUser]);
 
@@ -104,7 +107,14 @@ export default function App() {
       .channel('solicitudes-reserva')
       .on('postgres_changes', { event: '*', schema: 'public', table: 'solicitudes_reserva' }, recargar)
       .subscribe();
-    return () => { supabase.removeChannel(canal); };
+    const recargarInv = () => {
+      fetchInvitaciones().then(setInvitaciones).catch(err => console.error('Error recargando invitaciones', err));
+    };
+    const canalInv = supabase
+      .channel('invitaciones-cliente')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'invitaciones_cliente' }, recargarInv)
+      .subscribe();
+    return () => { supabase.removeChannel(canal); supabase.removeChannel(canalInv); };
   }, [currentUser]);
 
   // Set default tab based on user modules
@@ -240,9 +250,13 @@ export default function App() {
       notas: `Reserva recibida por la web y asignada al coche ${veh ? `${veh.marca} ${veh.modelo} (${veh.matricula})` : ''}. Rango: ${reserva.fechaInicio} al ${reserva.fechaFin}. Total: ${reserva.totalCobrado.toFixed(2)} €.`,
     };
     const existente = clienteNuevo ? null : clientes.find(c => c.id === reserva.clienteId) ?? null;
+    // Si la web ya trajo el documento y la ficha existente lo tiene vacío, se completa.
+    const documento = existente && !existente.nifNiePasaporte && sol.clienteDocumento ? sol.clienteDocumento : null;
     const cliente: Cliente | null = clienteNuevo
       ? { ...clienteNuevo, interacciones: [interaccion] }
-      : existente ? { ...existente, interacciones: [interaccion, ...existente.interacciones] } : null;
+      : existente
+        ? { ...existente, nifNiePasaporte: documento ?? existente.nifNiePasaporte, interacciones: [interaccion, ...existente.interacciones] }
+        : null;
 
     if (cliente) {
       await upsertOne('clientes', cliente);
@@ -254,6 +268,42 @@ export default function App() {
     setSolicitudes(prev => prev.map(s => s.id === sol.id
       ? { ...s, estadoGestion: 'convertida', clienteId: reserva.clienteId, reservaId: reserva.id } : s));
   }, [clientes, vehiculos]);
+
+  // Autorregistro de clientes: el enlace lleva un token de un solo uso que solo
+  // existe en el valor devuelto aquí (la base de datos guarda su hash).
+  const handleCrearInvitacion = useCallback(async (clienteId: string | null, idioma: 'es' | 'en') => {
+    const { invitacion, token } = await crearInvitacion(genId('inv'), clienteId);
+    setInvitaciones(prev => [...prev, invitacion]);
+    return `${window.location.origin}/?registro=${token}&lang=${idioma}`;
+  }, []);
+
+  // Aplica lo que el cliente envió: actualiza su ficha, o crea una nueva si el
+  // enlace era para una persona sin ficha. Va en orden y esperando cada paso.
+  const handleAplicarInvitacion = useCallback(async (inv: InvitacionCliente) => {
+    const d = inv.datos;
+    if (!d) throw new Error('La invitación no tiene datos');
+    const existente = inv.clienteId ? clientes.find(c => c.id === inv.clienteId) : undefined;
+    const campos = {
+      nombre: d.nombre, apellidos: d.apellidos, nifNiePasaporte: d.documento, correo: d.correo,
+      telefono: d.telefono, direccion: d.direccion, ciudad: d.ciudad, pais: d.pais,
+    };
+    const cliente: Cliente = existente
+      ? { ...existente, ...campos }
+      : {
+          id: genId('cli'), ...campos, esClienteAlquiler: true, interacciones: [],
+          fechaRegistro: new Date().toISOString().split('T')[0], vehiculosAsociados: [],
+        };
+    await upsertOne('clientes', cliente);
+    setClientes(prev => prev.some(c => c.id === cliente.id) ? prev.map(c => c.id === cliente.id ? cliente : c) : [...prev, cliente]);
+    await updateEstadoInvitacion(inv.id, 'aplicada');
+    setInvitaciones(prev => prev.map(i => i.id === inv.id ? { ...i, estado: 'aplicada' } : i));
+  }, [clientes]);
+
+  // Anula un enlace pendiente o descarta lo recibido sin aplicarlo.
+  const handleCancelarInvitacion = useCallback(async (inv: InvitacionCliente) => {
+    await updateEstadoInvitacion(inv.id, 'cancelada');
+    setInvitaciones(prev => prev.map(i => i.id === inv.id ? { ...i, estado: 'cancelada' } : i));
+  }, []);
 
   const handleDescartarSolicitud = useCallback(async (sol: SolicitudReserva) => {
     await updateGestionSolicitud(sol.id, { estadoGestion: 'descartada' });
@@ -413,6 +463,7 @@ export default function App() {
 
   const activeAlertsCount = useMemo(() => alertas.filter(a => a.estado === 'activa').length, [alertas]);
   // Solicitudes de la web esperando que alguien asigne el coche.
+  const datosRecibidos = useMemo(() => invitaciones.filter(i => i.estado === 'completada').length, [invitaciones]);
   const solicitudesPendientes = useMemo(() => solicitudes.filter(x => x.estadoGestion === 'pendiente').length, [solicitudes]);
 
   const brandColor = empresaConfig.brandColor;
@@ -594,6 +645,11 @@ export default function App() {
                       {solicitudesPendientes}
                     </span>
                   )}
+                  {tab.id === 'clientes' && datosRecibidos > 0 && (
+                    <span className="absolute top-1 right-2 px-1.5 py-0.5 text-[8px] bg-rose-500 text-white font-extrabold rounded-full leading-none animate-pulse">
+                      {datosRecibidos}
+                    </span>
+                  )}
                 </button>
               ))}
             </div>
@@ -651,6 +707,9 @@ export default function App() {
                 )}
                 {tab.id === 'alquileres' && solicitudesPendientes > 0 && (
                   <span className="px-2 py-0.5 bg-rose-500 text-white font-bold text-[9px] rounded-full">{solicitudesPendientes}</span>
+                )}
+                {tab.id === 'clientes' && datosRecibidos > 0 && (
+                  <span className="px-2 py-0.5 bg-rose-500 text-white font-bold text-[9px] rounded-full">{datosRecibidos}</span>
                 )}
               </button>
             ))}
@@ -720,6 +779,10 @@ export default function App() {
             ordenesTrabajo={ordenesTrabajo}
             facturas={facturas}
             hasAlquileres={hasAlquileres}
+            invitaciones={invitaciones}
+            onCrearInvitacion={handleCrearInvitacion}
+            onAplicarInvitacion={handleAplicarInvitacion}
+            onCancelarInvitacion={handleCancelarInvitacion}
             onAddCliente={handleAddCliente}
             onUpdateCliente={handleUpdateCliente}
             onDeleteCliente={handleDeleteCliente}

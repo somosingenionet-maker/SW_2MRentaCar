@@ -6,7 +6,7 @@ import { SolicitudReserva } from '../types';
 const COLUMNAS = [
   'id', 'origen', 'referencia_externa', 'estado_externo', 'estado_gestion',
   'cliente_nombre', 'cliente_apellidos', 'cliente_email', 'cliente_telefono',
-  'cliente_direccion', 'cliente_ciudad', 'cliente_pais', 'carnet_categoria',
+  'cliente_direccion', 'cliente_ciudad', 'cliente_pais', 'carnet_categoria', 'cliente_documento',
   'fecha_recogida', 'fecha_devolucion', 'lugar_recogida', 'lugar_devolucion',
   'vehiculo_nombre', 'vehiculo_web_id', 'vehiculo_total', 'extras', 'descuento',
   'total', 'metodo_pago', 'pagado', 'fecha_pedido', 'cliente_id', 'reserva_id',
