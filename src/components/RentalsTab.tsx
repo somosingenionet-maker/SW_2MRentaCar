@@ -184,7 +184,8 @@ export default function RentalsTab({
   const handleOpenAsignar = (sol: SolicitudReserva) => {
     const email = sol.clienteEmail.trim().toLowerCase();
     const tel = soloDigitos(sol.clienteTelefono);
-    const existente = clientes.find(c => (email && c.correo.trim().toLowerCase() === email))
+    const existente = (sol.clienteId ? clientes.find(c => c.id === sol.clienteId) : undefined)
+      ?? clientes.find(c => (email && c.correo.trim().toLowerCase() === email))
       ?? clientes.find(c => tel.length >= 7 && soloDigitos(c.telefono) === tel);
 
     let nuevo: Cliente | null = null;

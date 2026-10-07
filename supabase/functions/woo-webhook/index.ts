@@ -90,6 +90,102 @@ function sanear(order: Record<string, unknown>): Record<string, unknown> {
 }
 
 const ESTADOS_IGNORADOS = new Set(['auto-draft', 'checkout-draft', 'trash']);
+// Solo un pedido que sea una reserva real da de alta al cliente en el CRM.
+const ESTADOS_CLIENTE = new Set(['on-hold', 'processing', 'completed']);
+
+const PAISES: Record<string, string> = {
+  ES: 'España', LT: 'Lituania', GB: 'Reino Unido', DE: 'Alemania', RO: 'Rumanía', HR: 'Croacia', EE: 'Estonia',
+  PT: 'Portugal', PL: 'Polonia', BE: 'Bélgica', DK: 'Dinamarca', FR: 'Francia', AU: 'Australia', IT: 'Italia',
+  CY: 'Chipre', PR: 'Puerto Rico', NL: 'Países Bajos', EG: 'Egipto', US: 'Estados Unidos', CZ: 'Chequia', AT: 'Austria',
+  IE: 'Irlanda', SE: 'Suecia', NO: 'Noruega', FI: 'Finlandia', CH: 'Suiza', LU: 'Luxemburgo', GR: 'Grecia', HU: 'Hungría',
+  BG: 'Bulgaria', SK: 'Eslovaquia', SI: 'Eslovenia', LV: 'Letonia', MA: 'Marruecos', UA: 'Ucrania', CA: 'Canadá', MX: 'México',
+  AR: 'Argentina', CO: 'Colombia', BR: 'Brasil', VE: 'Venezuela', RU: 'Rusia', TR: 'Turquía', CN: 'China', JP: 'Japón',
+};
+
+const sinEspacios = (t: unknown): string => (typeof t === 'string' ? t.replace(/\s+/g, ' ').trim() : '');
+// "kayo OZUNO" → "Kayo Ozuno"; si ya viene con mayúsculas y minúsculas mezcladas, se respeta.
+const nombrePropio = (t: unknown): string => {
+  const x = sinEspacios(t);
+  return x && (x === x.toLowerCase() || x === x.toUpperCase())
+    ? x.toLowerCase().replace(/(^|[\s'-])(\S)/g, (_m, a: string, b: string) => a + b.toUpperCase())
+    : x;
+};
+
+async function sha1Hex(texto: string): Promise<string> {
+  const buf = await crypto.subtle.digest('SHA-1', encoder.encode(texto));
+  return [...new Uint8Array(buf)].map(b => b.toString(16).padStart(2, '0')).join('');
+}
+
+// El cliente de Supabase sin esquema tipado (las tablas se consultan por nombre).
+// deno-lint-ignore no-explicit-any
+type Supa = any;
+
+/**
+ * Da de alta (o localiza) al cliente del pedido en el CRM y devuelve su id.
+ * - Se busca por correo; si no existe, se crea con un id estable derivado del
+ *   correo (o del teléfono), así dos avisos simultáneos del mismo pedido no
+ *   duplican al cliente.
+ * - A un cliente que ya existe solo se le rellena el documento si lo tiene
+ *   vacío: lo que haya editado el equipo nunca se pisa.
+ * - No se crean clientes con el correo o el teléfono de la propia empresa
+ *   (reservas de prueba o internas).
+ */
+async function asegurarCliente(
+  admin: Supa, billing: Record<string, string>, documento: string | null, fechaPedido: string | null,
+): Promise<string | null> {
+  const email = sinEspacios(billing.email).toLowerCase();
+  const tel = sinEspacios(billing.phone);
+  const telDig = tel.replace(/\D/g, '');
+  const clave = email ? `e:${email}` : telDig.length >= 7 ? `p:${telDig}` : null;
+  if (!clave) return null;
+
+  const { data: emp } = await admin.from('empresa_config').select('correo, telefono').eq('id', 1).maybeSingle();
+  const empDig = String(emp?.telefono ?? '').replace(/\D/g, '');
+  if ((email && email === String(emp?.correo ?? '').toLowerCase()) ||
+      (telDig.length >= 9 && empDig.length >= 9 && telDig.slice(-9) === empDig.slice(-9))) return null;
+
+  const id = 'cli-web-' + (await sha1Hex(clave)).slice(0, 10);
+  let existente: { id: string; nif_nie_pasaporte: string | null } | null = null;
+  if (email) {
+    // _ y % son comodines de ilike: se escapan para comparar el correo tal cual.
+    const { data } = await admin.from('clientes').select('id, nif_nie_pasaporte')
+      .ilike('correo', email.replace(/[\\_%]/g, m => '\\' + m)).limit(1);
+    existente = data?.[0] ?? null;
+  }
+  if (!existente) {
+    const { data } = await admin.from('clientes').select('id, nif_nie_pasaporte').eq('id', id).maybeSingle();
+    existente = data;
+  }
+  if (existente) {
+    if (documento && !existente.nif_nie_pasaporte) {
+      await admin.from('clientes').update({ nif_nie_pasaporte: documento }).eq('id', existente.id).eq('nif_nie_pasaporte', '');
+    }
+    return existente.id;
+  }
+
+  // La web rellena "España" por defecto: con un teléfono internacional (+49, 0044...) el país no es fiable.
+  const codigo = sinEspacios(billing.country).toUpperCase();
+  const telInternacional = /^(\+|00)/.test(tel) && !/^(\+|00)34/.test(tel);
+  const pais = !codigo ? null : codigo === 'ES' && telInternacional ? null : (PAISES[codigo] ?? codigo);
+
+  const { error } = await admin.from('clientes').upsert({
+    id,
+    nombre: nombrePropio(billing.first_name),
+    apellidos: nombrePropio(billing.last_name),
+    nif_nie_pasaporte: documento ?? '',
+    correo: email,
+    telefono: tel,
+    direccion: nombrePropio(billing.address_1),
+    ciudad: nombrePropio(billing.city) || null,
+    pais,
+    es_cliente_alquiler: true,
+    interacciones: [],
+    fecha_registro: (fechaPedido ?? new Date().toISOString()).slice(0, 10),
+    vehiculos_asociados: [],
+  }, { onConflict: 'id', ignoreDuplicates: true });
+  if (error) throw error;
+  return id;
+}
 
 Deno.serve(async (req: Request) => {
   if (req.method !== 'POST') return json({ error: 'Método no permitido' }, 405);
@@ -180,11 +276,27 @@ Deno.serve(async (req: Request) => {
     actualizado_en: new Date().toISOString(),
   };
 
+  // El cliente se da de alta ANTES de guardar la solicitud: así, cuando la app
+  // se entera de la solicitud nueva (tiempo real), el cliente ya existe. Si
+  // falla, el pedido se guarda igualmente (el cliente se puede crear al asignar).
+  let clienteId: string | null = null;
+  if (ESTADOS_CLIENTE.has(String(order.status))) {
+    try {
+      clienteId = await asegurarCliente(admin, billing, documento, fila.fecha_pedido);
+    } catch (e) {
+      console.error('No se pudo dar de alta al cliente', referencia, e instanceof Error ? e.message : e);
+    }
+  }
+
   const { error } = await admin.from('solicitudes_reserva').upsert(fila, { onConflict: 'origen,referencia_externa' });
   if (error) {
     console.error('Error guardando solicitud', referencia, error.message);
     // 500 para que WooCommerce reintente el aviso más tarde.
     return json({ error: 'No se pudo guardar' }, 500);
   }
-  return json({ ok: true, id: fila.id });
+  // Vincula la solicitud con su cliente solo si aún no tenía uno (no pisa decisiones del equipo).
+  if (clienteId) {
+    await admin.from('solicitudes_reserva').update({ cliente_id: clienteId }).eq('id', fila.id).is('cliente_id', null);
+  }
+  return json({ ok: true, id: fila.id, cliente: clienteId });
 });

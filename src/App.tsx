@@ -102,6 +102,8 @@ export default function App() {
     if (!currentUser) return;
     const recargar = () => {
       fetchSolicitudes().then(setSolicitudes).catch(err => console.error('Error recargando solicitudes', err));
+      // La función de la web también da de alta al cliente: se recarga para que aparezca en Clientes.
+      fetchAll<Cliente>('clientes').then(setClientes).catch(err => console.error('Error recargando clientes', err));
     };
     const canal = supabase
       .channel('solicitudes-reserva')
