@@ -1,14 +1,13 @@
 import { supabase } from '../lib/supabase';
 import { rowToObj } from '../lib/caseMap';
+import { fetchPaginado } from './db';
 import { InvitacionCliente } from '../types';
 
 // Nunca se descarga `token_hash`: el personal no lo necesita y no debe circular.
 const COLUMNAS = 'id,cliente_id,estado,expira_en,datos,idioma,completada_en,creada_en';
 
 export async function fetchInvitaciones(): Promise<InvitacionCliente[]> {
-  const { data, error } = await supabase.from('invitaciones_cliente').select(COLUMNAS);
-  if (error) throw error;
-  return (data ?? []).map(r => rowToObj<InvitacionCliente>(r as unknown as Record<string, unknown>));
+  return (await fetchPaginado('invitaciones_cliente', COLUMNAS)).map(r => rowToObj<InvitacionCliente>(r));
 }
 
 const DIAS_VALIDEZ = 7;

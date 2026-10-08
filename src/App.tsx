@@ -1,7 +1,7 @@
-import React, { useState, useEffect, useMemo, useCallback } from 'react';
+import React, { lazy, Suspense, useState, useEffect, useMemo, useCallback } from 'react';
 import { contrastText } from './utils/color';
 import { genId } from './utils/id';
-import { Vehiculo, Intervencion, Cliente, Reserva, Alerta, NotificacionCliente, InteraccionCliente, AlertaTipo, Usuario, Factura, ModuloId, OrdenTrabajo, Tecnico, Cita, SolicitudReserva, InvitacionCliente } from './types';
+import { Vehiculo, Cliente, Reserva, Alerta, NotificacionCliente, InteraccionCliente, AlertaTipo, Usuario, Factura, ModuloId, OrdenTrabajo, Tecnico, Cita, SolicitudReserva, InvitacionCliente } from './types';
 import { getSessionUsuario, signOut } from './lib/auth';
 import { supabase } from './lib/supabase';
 import LoginScreenReset from './components/ResetPasswordScreen';
@@ -9,22 +9,25 @@ import { fetchVehiculos, upsertVehiculo, deleteVehiculoDb } from './data/vehicul
 import { fetchAll, upsertOne, deleteOne } from './data/db';
 import { fetchSolicitudes, updateGestionSolicitud } from './data/solicitudesDb';
 import { fetchInvitaciones, crearInvitacion, updateEstadoInvitacion } from './data/invitacionesDb';
-import VehiclesTab from './components/VehiclesTab';
-import OrdenesTrabajoTab from './components/OrdenesTrabajoTab';
-import CrmTab from './components/CrmTab';
-import RentalsTab from './components/RentalsTab';
-import AnalyticsTab from './components/AnalyticsTab';
-import AlertsNotificationsTab from './components/AlertsNotificationsTab';
-import FacturasTab from './components/FacturasTab';
-import AgendaTab from './components/AgendaTab';
 import LoginScreen from './components/LoginScreen';
-import AdminPanel from './components/AdminPanel';
 import {
   Car, Wrench, Users, Calendar, CalendarClock, BarChart2, Bell, Shield, Phone, Mail, Globe, Menu, X, Settings, FileText, LogOut
 } from 'lucide-react';
-import CompanySettingsPanel from './components/CompanySettingsPanel';
-import { EmpresaConfig, getEmpresaConfig } from './data/mockData';
+import { EmpresaConfig, getEmpresaConfig } from './data/empresaConfig';
 import { loadEmpresaConfig, saveEmpresaConfigDb } from './data/empresaDb';
+
+// Cada pestaña se descarga solo cuando se abre: el primer arranque (sobre todo
+// en el móvil) carga mucho menos código que con todo en un único archivo.
+const VehiclesTab = lazy(() => import('./components/VehiclesTab'));
+const OrdenesTrabajoTab = lazy(() => import('./components/OrdenesTrabajoTab'));
+const CrmTab = lazy(() => import('./components/CrmTab'));
+const RentalsTab = lazy(() => import('./components/RentalsTab'));
+const AnalyticsTab = lazy(() => import('./components/AnalyticsTab'));
+const AlertsNotificationsTab = lazy(() => import('./components/AlertsNotificationsTab'));
+const FacturasTab = lazy(() => import('./components/FacturasTab'));
+const AgendaTab = lazy(() => import('./components/AgendaTab'));
+const AdminPanel = lazy(() => import('./components/AdminPanel'));
+const CompanySettingsPanel = lazy(() => import('./components/CompanySettingsPanel'));
 
 type TabId = ModuloId;
 
@@ -43,9 +46,6 @@ export default function App() {
 
   // States
   const [vehiculos, setVehiculos] = useState<Vehiculo[]>([]);
-  // Historial de intervenciones automáticas (mantenimiento renovado desde
-  // Alertas). Nada lo lee todavía en pantalla; se guarda para tener registro.
-  const [, setIntervenciones] = useState<Intervencion[]>([]);
   const [clientes, setClientes] = useState<Cliente[]>([]);
   const [reservas, setReservas] = useState<Reserva[]>([]);
   const [alertas, setAlertas] = useState<Alerta[]>([]);
@@ -61,6 +61,7 @@ export default function App() {
   useEffect(() => {
     getSessionUsuario()
       .then(user => setCurrentUser(user))
+      .catch(err => { console.error('Error comprobando la sesión', err); setCurrentUser(null); })
       .finally(() => setAuthChecked(true));
   }, []);
 
@@ -76,13 +77,12 @@ export default function App() {
   // (requiere estar autenticado: las reglas RLS exigen sesión válida).
   useEffect(() => {
     if (!currentUser) {
-      setVehiculos([]); setIntervenciones([]); setClientes([]); setReservas([]);
+      setVehiculos([]); setClientes([]); setReservas([]);
       setAlertas([]); setNotificaciones([]); setFacturas([]); setOrdenesTrabajo([]); setTecnicos([]); setCitas([]); setSolicitudes([]); setInvitaciones([]);
       return;
     }
     const log = (e: string) => (err: unknown) => console.error(`Error cargando ${e}`, err);
     fetchVehiculos().then(setVehiculos).catch(log('vehículos'));
-    fetchAll<Intervencion>('intervenciones').then(setIntervenciones).catch(log('intervenciones'));
     fetchAll<Cliente>('clientes').then(setClientes).catch(log('clientes'));
     fetchAll<Reserva>('reservas').then(setReservas).catch(log('reservas'));
     fetchAll<Alerta>('alertas').then(setAlertas).catch(log('alertas'));
@@ -116,7 +116,7 @@ export default function App() {
       .channel('invitaciones-cliente')
       .on('postgres_changes', { event: '*', schema: 'public', table: 'invitaciones_cliente' }, recargarInv)
       .subscribe();
-    return () => { supabase.removeChannel(canal); supabase.removeChannel(canalInv); };
+    return () => { void supabase.removeChannel(canal); void supabase.removeChannel(canalInv); };
   }, [currentUser]);
 
   // Set default tab based on user modules
@@ -136,7 +136,7 @@ export default function App() {
   }, []);
 
   const handleLogout = useCallback(() => {
-    signOut();
+    signOut().catch(err => console.error('Error cerrando sesión', err));
     setCurrentUser(null);
   }, []);
 
@@ -163,41 +163,6 @@ export default function App() {
     setVehiculos(prev => prev.filter(v => v.id !== id));
     deleteVehiculoDb(id).catch(err => console.error('Error eliminando vehículo', err));
   }, []);
-
-  const handleAddIntervencion = useCallback((nueva: Intervencion, updateVehicleMileage: boolean) => {
-    setIntervenciones(prev => [...prev, nueva]);
-    upsertOne('intervenciones', nueva).catch(err => console.error('Error guardando intervención', err));
-
-    if (updateVehicleMileage) {
-      const targetV = vehiculos.find(v => v.id === nueva.vehiculoId);
-      if (targetV && nueva.kilometrajeEnIntervencion > targetV.kilometraje) {
-        handleUpdateVehiculo({ ...targetV, kilometraje: nueva.kilometrajeEnIntervencion });
-
-        const afectadas = alertas
-          .filter(a => a.vehiculoId === nueva.vehiculoId && a.tipo === 'mantenimiento' && a.estado !== 'atendida')
-          .map(a => ({ ...a, estado: 'atendida' as const, descripcion: `${a.descripcion} (Amortizado con éxito en visita ${nueva.fechaIntervencion})` }));
-        if (afectadas.length) {
-          setAlertas(prev => prev.map(a => afectadas.find(u => u.id === a.id) ?? a));
-          afectadas.forEach(a => upsertOne('alertas', a).catch(err => console.error('Error actualizando alerta', err)));
-
-          // El mantenimiento por km no lo gestiona ningún trigger (el kilometraje
-          // cambia por muchos motivos): se abre aquí la siguiente alerta a +15.000 km
-          // para que el ciclo no se quede huérfano tras resolver esta.
-          const proximoKm = nueva.kilometrajeEnIntervencion + 15000;
-          const siguiente: Alerta = {
-            id: genId('al-mnt'),
-            vehiculoId: nueva.vehiculoId,
-            tipo: 'mantenimiento',
-            descripcion: `Revisión de mantenimiento preventivo recomendada a los ${proximoKm.toLocaleString()} km.`,
-            estado: 'activa',
-            kilometrajeLimite: proximoKm,
-          };
-          setAlertas(prev => [...prev, siguiente]);
-          upsertOne('alertas', siguiente).catch(err => console.error('Error guardando alerta', err));
-        }
-      }
-    }
-  }, [vehiculos, alertas, handleUpdateVehiculo]);
 
   const handleAddCliente = useCallback((nuevo: Cliente) => {
     setClientes(prev => [...prev, nuevo]);
@@ -338,7 +303,7 @@ export default function App() {
         id: genId('int-cli-not'),
         fecha: new Date().toISOString().split('T')[0],
         tipo: notif.tipoEnvio === 'whatsapp' ? 'whatsapp' : notif.tipoEnvio === 'email' ? 'email' : 'llamada',
-        notas: `Notificación enviada por [${notif.tipoEnvio.toUpperCase()}]: "${notif.mensaje.slice(0, 85)}..."`
+        notas: `Notificación registrada [${notif.tipoEnvio.toUpperCase()}]: "${notif.mensaje.slice(0, 85)}..."`
       };
       const updatedCli = { ...targetCli, interacciones: [nuevaInteraccion, ...targetCli.interacciones] };
       handleUpdateCliente(updatedCli);
@@ -359,19 +324,6 @@ export default function App() {
     else if (tipo === 'impuesto') updatedVeh.impuestoVencimiento = nuevaFechaOrKm;
     else if (tipo === 'mantenimiento') {
       updatedVeh.kilometraje = Math.max(veh.kilometraje, Number(nuevaFechaOrKm) - 15000);
-      const autoTask: Intervencion = {
-        id: genId('int-auto'),
-        vehiculoId: vehId,
-        tipo: 'preventivo',
-        descripcion: 'Servicio periódico oficial: Sustitución de aceite sintético, juego completo de filtros y corrección de niveles.',
-        tallerRealizador: `Taller Central ${empresaConfig.nombre}`,
-        costo: 190.00,
-        kilometrajeEnIntervencion: veh.kilometraje,
-        fechaIntervencion: new Date().toISOString().split('T')[0],
-        notas: 'Servicio realizado tras alerta preventiva. Próxima programada en 15.000 kms.'
-      };
-      handleAddIntervencion(autoTask, false);
-
       // El mantenimiento por km no lo gestiona ningún trigger: se abre aquí
       // la siguiente alerta a +15.000 km para que el ciclo continúe.
       const proximoKm = Number(nuevaFechaOrKm) + 15000;
@@ -392,9 +344,11 @@ export default function App() {
       // itv/seguro/impuesto: un trigger en Supabase reabre/actualiza la
       // alerta al guardar la nueva fecha del vehículo; se recarga para
       // reflejar ese cambio hecho en el servidor.
-      actualizado.then(() => fetchAll<Alerta>('alertas').then(setAlertas));
+      actualizado
+        .then(() => fetchAll<Alerta>('alertas').then(setAlertas))
+        .catch(err => console.error('Error recargando alertas', err));
     }
-  }, [vehiculos, handleUpdateVehiculo, handleAddIntervencion]);
+  }, [vehiculos, handleUpdateVehiculo]);
 
   // Factura handlers
   const handleAddFactura = useCallback((f: Factura) => {
@@ -736,6 +690,7 @@ export default function App() {
 
       {/* CORE WORKSPACE */}
       <main className="flex-1 w-full max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 overflow-y-auto">
+        <Suspense fallback={<div className="py-24 text-center text-sm text-slate-400" role="status">Cargando…</div>}>
         {activeTab === 'citas' && (
           <AgendaTab
             citas={citas}
@@ -841,8 +796,10 @@ export default function App() {
             onUpdateOT={handleUpdateOT}
           />
         )}
+        </Suspense>
       </main>
 
+      <Suspense fallback={null}>
       {settingsOpen && (
         <CompanySettingsPanel
           config={empresaConfig}
@@ -861,6 +818,7 @@ export default function App() {
           onClose={() => setAdminPanelOpen(false)}
         />
       )}
+      </Suspense>
 
       {/* FOOTER */}
       <footer className="bg-white border-t border-slate-200 py-4 text-xs text-slate-500 print:hidden shrink-0 mt-auto">

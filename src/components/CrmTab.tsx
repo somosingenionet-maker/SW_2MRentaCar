@@ -1,7 +1,7 @@
 import { useState, useMemo } from 'react';
 import { Cliente, Reserva, InteraccionCliente, Vehiculo, OrdenTrabajo, Factura, OTEstado, InvitacionCliente, SolicitudReserva } from '../types';
 import { canceladaEnWeb, estadoWebMeta, soloFecha } from '../utils/solicitudes';
-import { getEmpresaConfig } from '../data/mockData';
+import { getEmpresaConfig } from '../data/empresaConfig';
 import {
   Users, UserPlus, Search, Mail, Phone, MapPin, CreditCard, Clock, MessageSquare, Plus, Trash2, X, Check, Save, Download, PenTool, Car, Wrench, Receipt, ChevronDown, ChevronRight, Link2
 } from 'lucide-react';

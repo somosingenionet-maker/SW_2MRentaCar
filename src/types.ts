@@ -25,20 +25,6 @@ export interface Vehiculo {
   tarifasAlquiler?: TarifasAlquiler;
 }
 
-export interface Intervencion {
-  id: string;
-  vehiculoId: string;
-  tipo: 'reparacion' | 'preventivo';
-  descripcion: string;
-  /** Lista de tareas/ítems realizados. Sustituye a `descripcion` en la UI. */
-  items?: string[];
-  tallerRealizador: string;
-  costo?: number;
-  kilometrajeEnIntervencion: number;
-  fechaIntervencion: string;
-  notas?: string;
-}
-
 // ─── Órdenes de Trabajo ───────────────────────────────────────────────────────
 
 export type OTEstado =
@@ -99,8 +85,6 @@ export interface OrdenTrabajo {
   fechaActualizacion: string;
   /** Registro cronológico de eventos de esta OT. */
   historial: EventoOT[];
-  /** Albarán generado desde esta OT. */
-  albaranId?: string;
   /** Factura generada desde esta OT. */
   facturaId?: string;
 }
@@ -292,8 +276,6 @@ export interface Usuario {
   id: string;
   nombre: string;
   email: string;
-  /** Solo se usaba en el esquema antiguo de localStorage. Con Supabase Auth ya no se almacena. */
-  passwordHash?: string;
   rol: 'super_admin' | 'admin' | 'usuario';
   modulos: ModuloId[];
   activo: boolean;
@@ -311,8 +293,6 @@ export interface LineaDocumento {
 export interface Factura {
   id: string;
   numero: string;
-  /** Presente cuando la factura se generó a partir de un albarán. */
-  albaranId?: string;
   clienteId: string;
   vehiculoId?: string;
   /** Ids de las órdenes de trabajo importadas a esta factura (ver FacturasTab). */

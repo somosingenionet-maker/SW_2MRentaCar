@@ -1,6 +1,6 @@
 import { supabase } from '../lib/supabase';
 import { rowToObj, objToRow } from '../lib/caseMap';
-import { EmpresaConfig, DEFAULT_EMPRESA_CONFIG, setEmpresaConfigCache } from './mockData';
+import { EmpresaConfig, DEFAULT_EMPRESA_CONFIG, setEmpresaConfigCache } from './empresaConfig';
 
 /** Carga la ficha de empresa (fila única id=1) desde Supabase y actualiza la caché. */
 export async function loadEmpresaConfig(): Promise<EmpresaConfig> {

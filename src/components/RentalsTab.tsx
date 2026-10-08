@@ -10,7 +10,7 @@ import Pagination from './Pagination';
 import { formatDate } from '../utils/dateFormat';
 import { downloadCsv, slugify } from '../utils/csvExport';
 import { genId } from '../utils/id';
-import { getEmpresaConfig } from '../data/mockData';
+import { getEmpresaConfig } from '../data/empresaConfig';
 import {
   diasAlquiler, reservasSolapadas, vehiculosCompatibles, canceladaEnWeb, incluyeCobertura,
   estadoWebMeta, soloFecha, soloHora,
@@ -147,7 +147,7 @@ export default function RentalsTab({
       return;
     }
 
-    finalizarReserva(buildReserva());
+    void finalizarReserva(buildReserva());
   };
 
   const cerrarModal = () => {
@@ -176,7 +176,7 @@ export default function RentalsTab({
   };
 
   const handleOverlapConfirm = () => {
-    if (confirmOverlap.pendingReserva) finalizarReserva(confirmOverlap.pendingReserva);
+    if (confirmOverlap.pendingReserva) void finalizarReserva(confirmOverlap.pendingReserva);
     setConfirmOverlap({ isOpen: false, pendingReserva: null });
   };
 

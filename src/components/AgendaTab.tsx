@@ -6,7 +6,7 @@ import {
 import { Cita, Vehiculo, Cliente, Tecnico, OrdenTrabajo, OTEstado, EventoOT } from '../types';
 import { genId } from '../utils/id';
 import ConfirmDialog from './ConfirmDialog';
-import { FLOTA_CLIENTE_ID } from './OrdenesTrabajoTab';
+import { FLOTA_CLIENTE_ID } from '../utils/flota';
 
 interface Props {
   citas: Cita[];
@@ -206,7 +206,9 @@ export default function AgendaTab({ citas, vehiculos, clientes, tecnicos, ordene
     return [...citasEntries, ...otEntries].sort((a, b) => a.sortKey.localeCompare(b.sortKey));
   };
 
-  const entriesDelDia = useMemo(() => entriesForDay(selectedDay), [citas, otsSinCita, selectedDay]);
+  // Sin useMemo a propósito: es barato y depende de la fecha de hoy (una agenda
+  // abierta toda la noche no debe quedarse con el "hoy" de ayer).
+  const entriesDelDia = entriesForDay(selectedDay);
 
   const irADia = (d: Date) => {
     setSelectedDay(d);

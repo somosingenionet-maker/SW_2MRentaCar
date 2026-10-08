@@ -8,7 +8,7 @@ import ConfirmDialog from './ConfirmDialog';
 import Pagination from './Pagination';
 import { formatDate } from '../utils/dateFormat';
 import { downloadCsv, slugify } from '../utils/csvExport';
-import { getEmpresaConfig } from '../data/mockData';
+import { getEmpresaConfig } from '../data/empresaConfig';
 import { genId } from '../utils/id';
 
 interface VehiclesTabProps {

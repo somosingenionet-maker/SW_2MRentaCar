@@ -143,7 +143,7 @@ export default function AdminPanel({ currentUser, onClose }: AdminPanelProps) {
       await updateUsuarioProfile(u.id, { activo: !u.activo });
     } catch (e) {
       setFormError(e instanceof Error ? e.message : 'No se pudo cambiar el estado.');
-      reload();
+      void reload();
     }
   };
 

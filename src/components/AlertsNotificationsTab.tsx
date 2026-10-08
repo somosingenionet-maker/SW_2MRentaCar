@@ -1,11 +1,11 @@
 import { useState, useEffect } from 'react';
 import { Alerta, NotificacionCliente, Cliente, Vehiculo, AlertaTipo } from '../types';
 import {
-  Bell, Check, MessageSquare, AlertTriangle, Send, Mail, Phone, Calendar, Sparkles, RefreshCw, Clock
+  Bell, Check, MessageSquare, AlertTriangle, Send, Mail, Phone, Calendar, Sparkles, Clock
 } from 'lucide-react';
 import ConfirmDialog from './ConfirmDialog';
 import { formatDate } from '../utils/dateFormat';
-import { getEmpresaConfig } from '../data/mockData';
+import { getEmpresaConfig } from '../data/empresaConfig';
 import { genId } from '../utils/id';
 
 interface AlertsNotificationsTabProps {
@@ -63,7 +63,6 @@ export default function AlertsNotificationsTab({
   const [dispatchChannel, setDispatchChannel] = useState<'email' | 'sms' | 'whatsapp'>('email');
   const [customSubject, setCustomSubject] = useState('');
   const [customBody, setCustomBody] = useState('');
-  const [isSendingSimulated, setIsSendingSimulated] = useState(false);
   const [sendingDone, setSendingDone] = useState(false);
 
   // Initialize fields
@@ -105,29 +104,23 @@ export default function AlertsNotificationsTab({
     e.preventDefault();
     if (!targetClienteId || !customBody) return;
 
-    setIsSendingSimulated(true);
+    // Hoy el aviso solo se REGISTRA (queda en el historial del cliente y en la
+    // bandeja de abajo); todavía no hay envío automático por email/SMS/WhatsApp.
+    const nueva: NotificacionCliente = {
+      id: genId('not'),
+      clienteId: targetClienteId,
+      vehiculoId: targetVehiculoId || undefined,
+      tipoEnvio: dispatchChannel,
+      asunto: dispatchChannel === 'email' ? customSubject : undefined,
+      mensaje: customBody,
+      fechaEnvio: new Date().toISOString().replace('T', ' ').slice(0, 16),
+      leido: false,
+      tipoEvento: selectedTemplate
+    };
 
-    setTimeout(() => {
-      const nueva: NotificacionCliente = {
-        id: genId('not'),
-        clienteId: targetClienteId,
-        vehiculoId: targetVehiculoId || undefined,
-        tipoEnvio: dispatchChannel,
-        asunto: dispatchChannel === 'email' ? customSubject : undefined,
-        mensaje: customBody,
-        fechaEnvio: new Date().toISOString().replace('T', ' ').slice(0, 16),
-        leido: false,
-        tipoEvento: selectedTemplate
-      };
-
-      onAddNotificacion(nueva);
-      setIsSendingSimulated(false);
-      setSendingDone(true);
-
-      setTimeout(() => {
-        setSendingDone(false);
-      }, 3000);
-    }, 1200);
+    onAddNotificacion(nueva);
+    setSendingDone(true);
+    setTimeout(() => setSendingDone(false), 3000);
   };
 
   const handleSelectAlerta = (alerta: Alerta) => {
@@ -419,18 +412,9 @@ export default function AlertsNotificationsTab({
               )}
               <button
                 type="submit"
-                disabled={isSendingSimulated}
                 className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-bold transition flex items-center gap-1 cursor-pointer font-sans"
               >
-                {isSendingSimulated ? (
-                  <>
-                    <RefreshCw className="w-3.5 h-3.5 animate-spin" /> Enviando...
-                  </>
-                ) : (
-                  <>
-                    <Send className="w-3.5 h-3.5" /> Enviar Notificación
-                  </>
-                )}
+                <Send className="w-3.5 h-3.5" /> Registrar notificación
               </button>
             </div>
           </form>
@@ -442,14 +426,14 @@ export default function AlertsNotificationsTab({
         <div>
           <h3 className="text-sm font-bold text-slate-800 uppercase tracking-wider flex items-center gap-1.5 font-display">
             <MessageSquare className="w-4 h-4 text-blue-600" />
-            Bandeja de Salida (Registro de Comunicaciones Despachadas)
+            Registro de Comunicaciones con Clientes
           </h3>
-          <p className="text-[11px] text-slate-400">Mensajes enviados a los titulares para recordatorios ITV/mantenimientos</p>
+          <p className="text-[11px] text-slate-400">Avisos registrados para recordatorios de ITV, seguro y mantenimiento. No se envían automáticamente: envíalos tú por email o WhatsApp.</p>
         </div>
 
         <div className="space-y-2 max-h-[220px] overflow-y-auto">
           {notificaciones.length === 0 ? (
-            <div className="text-center py-6 text-slate-400 text-xs">Ninguna notificación despachada registrada.</div>
+            <div className="text-center py-6 text-slate-400 text-xs">Todavía no hay avisos registrados.</div>
           ) : (
             [...notificaciones].reverse().map(not => {
               const cli = clientes.find(c => c.id === not.clienteId);

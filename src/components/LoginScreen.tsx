@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { LogIn, Eye, EyeOff, Mail, Lock } from 'lucide-react';
 import { Usuario } from '../types';
-import { getEmpresaConfig } from '../data/mockData';
+import { getEmpresaConfig } from '../data/empresaConfig';
 import { signIn, resetPassword } from '../lib/auth';
 
 interface LoginScreenProps {

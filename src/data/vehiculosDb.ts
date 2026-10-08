@@ -1,12 +1,11 @@
 import { supabase } from '../lib/supabase';
 import { rowToObj, objToRow } from '../lib/caseMap';
+import { fetchPaginado } from './db';
 import { Vehiculo } from '../types';
 
 /** Carga todos los vehículos desde Supabase. */
 export async function fetchVehiculos(): Promise<Vehiculo[]> {
-  const { data, error } = await supabase.from('vehiculos').select('*');
-  if (error) throw error;
-  return (data ?? []).map(r => rowToObj<Vehiculo>(r as Record<string, unknown>));
+  return (await fetchPaginado('vehiculos')).map(r => rowToObj<Vehiculo>(r));
 }
 
 /** Crea o actualiza un vehículo (upsert por id). */

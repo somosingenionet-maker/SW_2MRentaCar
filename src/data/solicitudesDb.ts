@@ -1,5 +1,6 @@
 import { supabase } from '../lib/supabase';
 import { rowToObj } from '../lib/caseMap';
+import { fetchPaginado } from './db';
 import { SolicitudReserva } from '../types';
 
 // Todas las columnas menos `payload` (el pedido original, pesado e innecesario en pantalla).
@@ -13,9 +14,7 @@ const COLUMNAS = [
 ].join(',');
 
 export async function fetchSolicitudes(): Promise<SolicitudReserva[]> {
-  const { data, error } = await supabase.from('solicitudes_reserva').select(COLUMNAS);
-  if (error) throw error;
-  return (data ?? []).map(r => rowToObj<SolicitudReserva>(r as unknown as Record<string, unknown>));
+  return (await fetchPaginado('solicitudes_reserva', COLUMNAS)).map(r => rowToObj<SolicitudReserva>(r));
 }
 
 /**

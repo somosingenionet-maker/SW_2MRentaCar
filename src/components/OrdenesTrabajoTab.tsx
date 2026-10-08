@@ -6,7 +6,8 @@ import {
   Bell, Printer, Pencil, MessageCircle, Mail
 } from 'lucide-react';
 import { OrdenTrabajo, OTEstado, LineaOT, LineaOTTipo, Vehiculo, Cliente, EventoOT, Tecnico } from '../types';
-import { getEmpresaConfig } from '../data/mockData';
+import { getEmpresaConfig } from '../data/empresaConfig';
+import { FLOTA_CLIENTE_ID } from '../utils/flota';
 import { genId } from '../utils/id';
 
 interface Props {
@@ -38,10 +39,6 @@ const TIPO_META: Record<LineaOTTipo, { label: string; icon: React.ReactNode }> =
 };
 
 const IVA_DEFAULT = 21;
-
-// Cliente "interno" para órdenes de taller sobre vehículos de la flota propia
-// (de la empresa), que no pertenecen a ningún cliente externo.
-export const FLOTA_CLIENTE_ID = 'flota-propia';
 
 interface LineaForm {
   tipo: LineaOTTipo;

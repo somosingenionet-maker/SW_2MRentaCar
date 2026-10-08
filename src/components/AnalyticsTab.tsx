@@ -4,7 +4,7 @@ import {
   TrendingUp, TrendingDown, Clock, CheckCircle, XCircle, Users, Wrench, BarChart2, Target, Download, Car, Calendar
 } from 'lucide-react';
 import { downloadCsv } from '../utils/csvExport';
-import { FLOTA_CLIENTE_ID } from './OrdenesTrabajoTab';
+import { FLOTA_CLIENTE_ID } from '../utils/flota';
 
 interface AnalyticsTabProps {
   ordenesTrabajo: OrdenTrabajo[];

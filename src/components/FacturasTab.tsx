@@ -2,7 +2,7 @@ import { useState, useMemo } from 'react';
 import { Plus, Trash2, Edit2, X, Check, Receipt, Import, Printer, MessageCircle, Mail as MailIcon } from 'lucide-react';
 import { Factura, LineaDocumento, Cliente, Vehiculo, OrdenTrabajo } from '../types';
 import { formatDate } from '../utils/dateFormat';
-import { getEmpresaConfig } from '../data/mockData';
+import { getEmpresaConfig } from '../data/empresaConfig';
 import { genId } from '../utils/id';
 import ConfirmDialog from './ConfirmDialog';
 

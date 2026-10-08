@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { Lock, Eye, EyeOff, Check, ShieldCheck } from 'lucide-react';
 import { supabase } from '../lib/supabase';
-import { getEmpresaConfig } from '../data/mockData';
+import { getEmpresaConfig } from '../data/empresaConfig';
 
 const BRAND = {
   lilaClaro: '#DCBAE8',

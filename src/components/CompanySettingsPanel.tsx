@@ -1,6 +1,6 @@
 import React, { useState, useRef } from 'react';
 import { X, Upload, RotateCcw, Check, Building2, Wrench, Plus, Edit2, Trash2 } from 'lucide-react';
-import { EmpresaConfig, DEFAULT_EMPRESA_CONFIG } from '../data/mockData';
+import { EmpresaConfig, DEFAULT_EMPRESA_CONFIG } from '../data/empresaConfig';
 import { genId } from '../utils/id';
 import { Tecnico } from '../types';
 import { contrastText } from '../utils/color';
