@@ -1,4 +1,5 @@
 import { useState, useMemo } from 'react';
+import { validarFactura } from '../utils/validarFactura';
 import { Plus, Trash2, Edit2, X, Check, Receipt, Import, Printer, MessageCircle, Mail as MailIcon } from 'lucide-react';
 import { Factura, LineaDocumento, Cliente, Vehiculo, OrdenTrabajo } from '../types';
 import { formatDate } from '../utils/dateFormat';
@@ -128,9 +129,9 @@ function FacturaModal({ factura, clientes, vehiculos, ordenesTrabajo, nextNumero
   };
 
   const handleSave = () => {
-    if (!clienteId) { setError('Selecciona un cliente.'); return; }
-    if (lineas.length === 0) { setError('Añade al menos una línea.'); return; }
     const { subtotal, totalIva, total } = totals;
+    const motivo = validarFactura({ clienteId, lineas, estado, total });
+    if (motivo) { setError(motivo); return; }
     const saved: Factura = {
       id: factura?.id ?? genId('fac'),
       numero: factura?.numero ?? nextNumero,
