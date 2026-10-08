@@ -27,7 +27,7 @@ export default function ResetPasswordScreen({ onDone }: Props) {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
-    if (password.length < 6) { setError('La contraseña debe tener al menos 6 caracteres.'); return; }
+    if (password.length < 8) { setError('La contraseña debe tener al menos 8 caracteres.'); return; }
     if (password !== confirm) { setError('Las contraseñas no coinciden.'); return; }
     setLoading(true);
     const { error: updErr } = await supabase.auth.updateUser({ password });
@@ -78,7 +78,7 @@ export default function ResetPasswordScreen({ onDone }: Props) {
                   value={password}
                   onChange={e => setPassword(e.target.value)}
                   required
-                  placeholder="mínimo 6 caracteres"
+                  placeholder="mínimo 8 caracteres"
                   className="w-full pl-9 pr-10 py-2.5 border border-slate-200 rounded-lg text-sm transition focus:outline-none focus:ring-2 focus:ring-[#C38DD6]/40 focus:border-[#C38DD6]"
                 />
                 <button

@@ -110,8 +110,8 @@ export default function AdminPanel({ currentUser, onClose }: AdminPanelProps) {
     setFormError('');
     if (!form.nombre.trim()) { setFormError('El nombre es obligatorio.'); return; }
     if (!editingId && !form.email.trim()) { setFormError('El email es obligatorio.'); return; }
-    if ((!editingId || form.password.length > 0) && form.password.length < 6) {
-      setFormError('La contraseña debe tener al menos 6 caracteres.');
+    if ((!editingId || form.password.length > 0) && form.password.length < 8) {
+      setFormError('La contraseña debe tener al menos 8 caracteres.');
       return;
     }
     setBusy(true);
@@ -311,14 +311,14 @@ export default function AdminPanel({ currentUser, onClose }: AdminPanelProps) {
 
               <div>
                 <label className="block text-xs font-semibold text-slate-600 mb-1">
-                  {editingId ? 'Nueva contraseña (dejar vacío para no cambiarla)' : 'Contraseña * (mín. 6 caracteres)'}
+                  {editingId ? 'Nueva contraseña (dejar vacío para no cambiarla)' : 'Contraseña * (mín. 8 caracteres)'}
                 </label>
                 <input
                   type="password"
                   value={form.password}
                   onChange={e => setForm(f => ({ ...f, password: e.target.value }))}
                   className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm font-mono focus:outline-none focus:ring-2 focus:ring-blue-400"
-                  placeholder={editingId ? '••••••••' : 'mínimo 6 caracteres'}
+                  placeholder={editingId ? '••••••••' : 'mínimo 8 caracteres'}
                   autoComplete="new-password"
                 />
               </div>
