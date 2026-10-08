@@ -478,7 +478,7 @@ export default function FacturasTab({
         const mailUrl = `mailto:${cli?.correo ?? ''}?subject=${encodeURIComponent(`Factura ${f.numero} - ${empresa.nombre}`)}&body=${encodeURIComponent(textoWA)}`;
 
         return (
-          <div className="fixed inset-0 z-50 bg-black/60 flex flex-col print:bg-white print:relative print:inset-auto">
+          <div data-imprimible className="fixed inset-0 z-50 bg-black/60 flex flex-col print:bg-white print:relative print:inset-auto">
             <div className="flex items-center justify-between px-6 py-3 bg-slate-800 text-white shrink-0 print:hidden">
               <div className="flex items-center gap-2">
                 <Receipt className="w-4 h-4 text-blue-400" />

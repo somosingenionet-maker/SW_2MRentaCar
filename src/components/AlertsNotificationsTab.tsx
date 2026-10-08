@@ -4,6 +4,7 @@ import {
   Bell, Check, MessageSquare, AlertTriangle, Send, Mail, Phone, Calendar, Sparkles, Clock
 } from 'lucide-react';
 import ConfirmDialog from './ConfirmDialog';
+import RenovarVencimientoModal from './RenovarVencimientoModal';
 import { formatDate } from '../utils/dateFormat';
 import { getEmpresaConfig } from '../data/empresaConfig';
 import { genId } from '../utils/id';
@@ -55,6 +56,9 @@ export default function AlertsNotificationsTab({
     message: string;
     onConfirm: () => void;
   }>({ isOpen: false, title: '', message: '', onConfirm: () => {} });
+
+  // Alerta de ITV/seguro/impuesto que se está cerrando (elige la fecha en un cuadro propio).
+  const [renovando, setRenovando] = useState<{ alerta: Alerta; titulo: string; etiqueta: string } | null>(null);
 
   // Notification Form states
   const [targetClienteId, setTargetClienteId] = useState('');
@@ -138,40 +142,27 @@ export default function AlertsNotificationsTab({
   };
 
   const handleResolveAlertClick = (alerta: Alerta) => {
-    const today = new Date();
-    let title = '';
-    let message = '';
-    let onConfirm = () => {};
-
     // Para itv/seguro/impuesto NO se llama a onResolveAlerta: al cambiar la
     // fecha del vehículo, un trigger en la base de datos reabre/actualiza
     // esta misma alerta con el nuevo vencimiento automáticamente (ver
     // supabase/schema.sql). Resolverla también desde aquí competiría con esa
     // actualización del servidor.
     if (alerta.tipo === 'itv') {
-      const nuevaFecha = new Date(today.setFullYear(today.getFullYear() + 1)).toISOString().split('T')[0];
-      title = 'Confirmar ITV realizada';
-      message = `La fecha de vencimiento técnico de la ITV se actualizará a ${nuevaFecha} (+1 año) y la alerta se reprogramará automáticamente.`;
-      onConfirm = () => { onTriggerAutoRenew(alerta.vehiculoId, 'itv', nuevaFecha); };
+      setRenovando({ alerta, titulo: 'ITV realizada', etiqueta: 'la ITV' });
     } else if (alerta.tipo === 'seguro') {
-      const nuevaFecha = new Date(today.setFullYear(today.getFullYear() + 1)).toISOString().split('T')[0];
-      title = 'Confirmar renovación de seguro';
-      message = `El vencimiento de la póliza de seguro se actualizará a ${nuevaFecha} (+1 año) y la alerta se reprogramará automáticamente.`;
-      onConfirm = () => { onTriggerAutoRenew(alerta.vehiculoId, 'seguro', nuevaFecha); };
+      setRenovando({ alerta, titulo: 'Renovación de seguro', etiqueta: 'renovación' });
     } else if (alerta.tipo === 'impuesto') {
-      const nuevaFecha = new Date(today.setFullYear(today.getFullYear() + 1)).toISOString().split('T')[0];
-      title = 'Confirmar pago de impuesto de circulación';
-      message = `La fecha del impuesto de circulación se actualizará a ${nuevaFecha} (+1 año) y la alerta se reprogramará automáticamente.`;
-      onConfirm = () => { onTriggerAutoRenew(alerta.vehiculoId, 'impuesto', nuevaFecha); };
+      setRenovando({ alerta, titulo: 'Pago del impuesto de circulación', etiqueta: 'pago' });
     } else if (alerta.tipo === 'mantenimiento') {
       const targetVeh = vehiculos.find(v => v.id === alerta.vehiculoId);
       const nextMaintKm = (targetVeh ? targetVeh.kilometraje : 0) + 15000;
-      title = 'Confirmar mantenimiento realizado';
-      message = `La alerta de kilometraje se pospondrá 15.000 km (próxima revisión recomendada: ${nextMaintKm.toLocaleString()} km).`;
-      onConfirm = () => { onTriggerAutoRenew(alerta.vehiculoId, 'mantenimiento', nextMaintKm.toString()); onResolveAlerta(alerta.id); };
+      setConfirmAlerta({
+        isOpen: true,
+        title: 'Confirmar mantenimiento realizado',
+        message: `La alerta de kilometraje se pospondrá 15.000 km (próxima revisión recomendada: ${nextMaintKm.toLocaleString()} km).`,
+        onConfirm: () => { onTriggerAutoRenew(alerta.vehiculoId, 'mantenimiento', nextMaintKm.toString()); onResolveAlerta(alerta.id); },
+      });
     }
-
-    setConfirmAlerta({ isOpen: true, title, message, onConfirm });
   };
 
   const filteredAlertas = alertas.filter(al => {
@@ -473,6 +464,15 @@ export default function AlertsNotificationsTab({
         onConfirm={() => { confirmAlerta.onConfirm(); setConfirmAlerta(prev => ({ ...prev, isOpen: false })); }}
         onCancel={() => setConfirmAlerta(prev => ({ ...prev, isOpen: false }))}
       />
+      {renovando && (
+        <RenovarVencimientoModal
+          titulo={renovando.titulo}
+          etiquetaRealizado={renovando.etiqueta}
+          vencimientoAnterior={renovando.alerta.fechaLimite}
+          onConfirm={nuevaFecha => { onTriggerAutoRenew(renovando.alerta.vehiculoId, renovando.alerta.tipo, nuevaFecha); setRenovando(null); }}
+          onCancel={() => setRenovando(null)}
+        />
+      )}
     </div>
   );
 }

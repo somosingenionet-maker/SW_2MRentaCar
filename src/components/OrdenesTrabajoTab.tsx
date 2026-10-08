@@ -841,6 +841,18 @@ export default function OrdenesTrabajoTab({ ordenes, vehiculos, clientes, tecnic
                 {/* Vehículo */}
                 <div>
                   <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Vehículo *</label>
+                  {selected.estado !== 'presupuesto' ? (
+                    // Una vez que el coche ha entrado al taller (o ya salió) la orden queda ligada a él.
+                    <>
+                      <div className="mt-1 px-3 py-2 border border-slate-200 bg-slate-50 rounded-lg text-sm text-slate-700 font-medium">
+                        {(() => {
+                          const v = vehiculos.find(x => x.id === editForm.vehiculoId);
+                          return v ? `${v.marca} ${v.modelo} · ${v.matricula}${v.esFlotaAlquiler ? ' (Flota propia)' : ''}` : 'Vehículo no disponible';
+                        })()}
+                      </div>
+                      <p className="text-[11px] text-slate-400 mt-1">El vehículo ya entró al taller y no se puede cambiar. Si te equivocaste, cancela esta orden y crea otra.</p>
+                    </>
+                  ) : (
                   <select value={editForm.vehiculoId}
                     onChange={e => {
                       const vehId = e.target.value;
@@ -853,6 +865,7 @@ export default function OrdenesTrabajoTab({ ordenes, vehiculos, clientes, tecnic
                       <option key={v.id} value={v.id}>{v.marca} {v.modelo} · {v.matricula}{v.esFlotaAlquiler ? ' (Flota propia)' : ''}</option>
                     ))}
                   </select>
+                  )}
                 </div>
 
                 {/* Cliente */}
@@ -1520,7 +1533,7 @@ export default function OrdenesTrabajoTab({ ordenes, vehiculos, clientes, tecnic
               <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
                 className="fixed inset-0 bg-black/60 z-50 print:hidden" onClick={() => setPresupuestoPDF(null)} />
               <motion.div initial={{ opacity: 0, scale: 0.97 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, scale: 0.97 }}
-                className="fixed inset-4 sm:inset-8 z-50 flex flex-col bg-white rounded-2xl shadow-2xl overflow-hidden print:inset-0 print:rounded-none print:shadow-none">
+                data-imprimible className="fixed inset-4 sm:inset-8 z-50 flex flex-col bg-white rounded-2xl shadow-2xl overflow-hidden print:inset-0 print:rounded-none print:shadow-none">
 
                 {/* Toolbar — hidden on print */}
                 <div className="flex items-center justify-between px-6 py-3 bg-slate-800 text-white print:hidden shrink-0">

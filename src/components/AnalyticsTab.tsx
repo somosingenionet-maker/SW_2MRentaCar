@@ -5,6 +5,7 @@ import {
 } from 'lucide-react';
 import { downloadCsv } from '../utils/csvExport';
 import { FLOTA_CLIENTE_ID } from '../utils/flota';
+import { formatEuros } from '../utils/moneda';
 
 interface AnalyticsTabProps {
   ordenesTrabajo: OrdenTrabajo[];
@@ -32,14 +33,6 @@ const ESTADO_COLOR: Record<OTEstado, string> = {
   entregado: 'bg-teal-100 text-teal-700',
   cancelado: 'bg-rose-100 text-rose-600',
 };
-
-function fmt(n: number) {
-  return n.toLocaleString('es-ES', { style: 'currency', currency: 'EUR', maximumFractionDigits: 0 });
-}
-
-function fmtDec(n: number) {
-  return n.toLocaleString('es-ES', { style: 'currency', currency: 'EUR' });
-}
 
 function periodoRange(periodo: Periodo): { start: Date; end: Date; prevStart: Date; prevEnd: Date } {
   const now = new Date();
@@ -317,7 +310,7 @@ export default function AnalyticsTab({ ordenesTrabajo, clientes, reservas, vehic
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
         <KpiCard
           label="Facturación"
-          value={fmt(facturacionActual)}
+          value={formatEuros(facturacionActual)}
           sub={`${entregadasActual.length} OTs entregadas`}
           delta={deltaFacturacion}
           icon={<TrendingUp className="w-4 h-4" />}
@@ -325,7 +318,7 @@ export default function AnalyticsTab({ ordenesTrabajo, clientes, reservas, vehic
         />
         <KpiCard
           label="Ticket medio"
-          value={fmtDec(ticketMedio)}
+          value={formatEuros(ticketMedio)}
           sub="por orden entregada"
           delta={deltaTicket}
           icon={<BarChart2 className="w-4 h-4" />}
@@ -394,7 +387,7 @@ export default function AnalyticsTab({ ordenesTrabajo, clientes, reservas, vehic
                   <div key={key}>
                     <div className="flex justify-between text-xs mb-1">
                       <span className="font-medium text-slate-600">{label}</span>
-                      <span className="font-bold text-slate-700">{fmtDec(val)} <span className="text-slate-400 font-normal">({pct.toFixed(0)}%)</span></span>
+                      <span className="font-bold text-slate-700">{formatEuros(val)} <span className="text-slate-400 font-normal">({pct.toFixed(0)}%)</span></span>
                     </div>
                     <div className="bg-slate-100 rounded-full h-2 overflow-hidden">
                       <div className={`h-full rounded-full ${color}`} style={{ width: `${pct}%` }} />
@@ -404,7 +397,7 @@ export default function AnalyticsTab({ ordenesTrabajo, clientes, reservas, vehic
               })}
               <div className="border-t border-slate-100 pt-3 flex justify-between text-xs">
                 <span className="text-slate-400">Total facturado</span>
-                <span className="font-black text-slate-800">{fmt(margenTipo.total)}</span>
+                <span className="font-black text-slate-800">{formatEuros(margenTipo.total)}</span>
               </div>
             </div>
           )}
@@ -459,9 +452,9 @@ export default function AnalyticsTab({ ordenesTrabajo, clientes, reservas, vehic
                   </span>
                   <div className="flex-1 min-w-0">
                     <p className="text-xs font-semibold text-slate-700 truncate">{t.nombre}</p>
-                    <p className="text-[10px] text-slate-400">{t.ots} OTs · {fmtDec(t.facturado)}</p>
+                    <p className="text-[10px] text-slate-400">{t.ots} OTs · {formatEuros(t.facturado)}</p>
                   </div>
-                  <div className="text-xs font-bold text-slate-600 shrink-0">{fmt(t.facturado)}</div>
+                  <div className="text-xs font-bold text-slate-600 shrink-0">{formatEuros(t.facturado)}</div>
                 </div>
               ))}
             </div>
@@ -486,7 +479,7 @@ export default function AnalyticsTab({ ordenesTrabajo, clientes, reservas, vehic
                     <p className="text-xs font-semibold text-slate-700 truncate">{c.nombre}</p>
                     <p className="text-[10px] text-slate-400">{c.visitas} {c.visitas === 1 ? 'visita' : 'visitas'}</p>
                   </div>
-                  <div className="text-xs font-bold text-slate-600 shrink-0">{fmt(c.facturado)}</div>
+                  <div className="text-xs font-bold text-slate-600 shrink-0">{formatEuros(c.facturado)}</div>
                 </div>
               ))}
             </div>
@@ -505,9 +498,9 @@ export default function AnalyticsTab({ ordenesTrabajo, clientes, reservas, vehic
           </div>
 
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-            <KpiCard label="Ingresos por alquiler" value={fmt(flotaTotales.ingresos)} icon={<Calendar className="w-4 h-4" />} accent="teal" />
-            <KpiCard label="Inversión en taller" value={fmt(flotaTotales.inversion)} icon={<Wrench className="w-4 h-4" />} accent="orange" />
-            <KpiCard label="Balance neto de la flota" value={fmtDec(flotaTotales.balance)} icon={<TrendingUp className="w-4 h-4" />} accent={flotaTotales.balance >= 0 ? 'teal' : 'rose'} />
+            <KpiCard label="Ingresos por alquiler" value={formatEuros(flotaTotales.ingresos)} icon={<Calendar className="w-4 h-4" />} accent="teal" />
+            <KpiCard label="Inversión en taller" value={formatEuros(flotaTotales.inversion)} icon={<Wrench className="w-4 h-4" />} accent="orange" />
+            <KpiCard label="Balance neto de la flota" value={formatEuros(flotaTotales.balance)} icon={<TrendingUp className="w-4 h-4" />} accent={flotaTotales.balance >= 0 ? 'teal' : 'rose'} />
           </div>
 
           <div className="bg-white rounded-2xl border border-slate-100 shadow-sm p-5 overflow-x-auto">
@@ -532,9 +525,9 @@ export default function AnalyticsTab({ ordenesTrabajo, clientes, reservas, vehic
                       <span className="block font-mono text-[10px] text-slate-400">{f.matricula}</span>
                     </td>
                     <td className="py-2.5 px-2 text-center text-slate-600">{f.alquileres}</td>
-                    <td className="py-2.5 px-2 text-right font-mono text-teal-600">{fmt(f.ingresos)}</td>
-                    <td className="py-2.5 px-2 text-right font-mono text-orange-600">{fmt(f.inversionTaller)}</td>
-                    <td className={`py-2.5 pl-2 text-right font-mono font-bold ${f.balance >= 0 ? 'text-teal-700' : 'text-rose-600'}`}>{fmtDec(f.balance)}</td>
+                    <td className="py-2.5 px-2 text-right font-mono text-teal-600">{formatEuros(f.ingresos)}</td>
+                    <td className="py-2.5 px-2 text-right font-mono text-orange-600">{formatEuros(f.inversionTaller)}</td>
+                    <td className={`py-2.5 pl-2 text-right font-mono font-bold ${f.balance >= 0 ? 'text-teal-700' : 'text-rose-600'}`}>{formatEuros(f.balance)}</td>
                   </tr>
                 ))}
               </tbody>

@@ -24,3 +24,30 @@
 .bg-blue-100 { background-color: color-mix(in srgb, var(--brand-color) 12%, white) !important; }
 .ring-blue-400 { --tw-ring-color: color-mix(in srgb, var(--brand-color) 70%, white) !important; }
 
+
+/* ── Impresión de documentos (factura, presupuesto/OT, contrato) ───────────────
+   Los documentos se abren en una capa a pantalla completa por encima de la app.
+   Al imprimir solo debe salir el documento: se oculta todo lo que no lo contiene
+   y se saca la capa de su posición fija para que fluya en páginas normales.
+   Cada documento imprimible lleva el atributo data-imprimible. */
+@page { margin: 12mm; }
+
+@media print {
+  body:has([data-imprimible]) :is(#root, #root *):not(:has([data-imprimible])):not([data-imprimible]):not([data-imprimible] *) {
+    display: none !important;
+  }
+  [data-imprimible] {
+    position: static !important;
+    inset: auto !important;
+    transform: none !important;
+    height: auto !important;
+    max-height: none !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    overflow: visible !important;
+    background: #fff !important;
+    backdrop-filter: none !important;
+    box-shadow: none !important;
+  }
+  [data-imprimible] .overflow-y-auto { overflow: visible !important; }
+}
