@@ -1,10 +1,12 @@
 import { useState, useMemo } from 'react';
+import { siguienteNumero } from '../utils/numeracion';
+import { vehiculosEnTaller } from '../utils/tallerOcupacion';
 import { useSeleccion } from '../utils/useSeleccion';
 import { AnimatePresence, motion } from 'motion/react';
 import {
   ClipboardList, Plus, Search, ChevronRight, X, Check, Trash2,
   Car, User, Calendar, Gauge, Wrench, Package, AlertCircle, FileText,
-  Bell, Printer, Pencil, MessageCircle, Mail
+  Bell, Printer, Pencil, MessageCircle, Mail, AlertTriangle
 } from 'lucide-react';
 import { OrdenTrabajo, OTEstado, LineaOT, LineaOTTipo, Vehiculo, Cliente, EventoOT, Tecnico } from '../types';
 import { getEmpresaConfig } from '../data/empresaConfig';
@@ -209,7 +211,7 @@ export default function OrdenesTrabajoTab({ ordenes, vehiculos, clientes, tecnic
       return;
     }
     const { subtotal, totalIva, total } = calcTotals(formLineas, otForm.ivaPct);
-    const nextNum = 'OT-' + new Date().getFullYear() + '-' + String(ordenes.length + 1).padStart(3, '0');
+    const nextNum = siguienteNumero(ordenes.map(o => o.numero), `OT-${new Date().getFullYear()}-`, 3);
     const ot: OrdenTrabajo = {
       id: genId('ot'),
       numero: nextNum,
@@ -1483,6 +1485,17 @@ export default function OrdenesTrabajoTab({ ordenes, vehiculos, clientes, tecnic
                     </select>
                   </div>
                 </div>
+                {(() => {
+                  const capacidad = getEmpresaConfig().capacidadTaller;
+                  const dentro = vehiculosEnTaller(ordenes);
+                  if (capacidad > 0 && dentro >= capacidad) return (
+                    <div className="bg-amber-50 border border-amber-200 text-amber-700 text-xs font-medium px-4 py-2.5 rounded-lg flex items-start gap-2">
+                      <AlertTriangle size={14} className="shrink-0 mt-0.5" />
+                      <span>El taller ya tiene {dentro} de {capacidad} vehículos. Recibir este lo dejaría en {dentro + 1}. Puedes confirmarlo igualmente.</span>
+                    </div>
+                  );
+                  return null;
+                })()}
                 <div className="flex justify-end gap-2 pt-2">
                   <button onClick={() => setRecepcionModal(null)}
                     className="px-4 py-2 rounded-xl border border-slate-200 text-sm text-slate-600 hover:bg-slate-50 transition">

@@ -729,6 +729,7 @@ export default function App() {
             clientes={clientes}
             tecnicos={tecnicos}
             ordenes={ordenesTrabajo}
+            capacidadTaller={empresaConfig.capacidadTaller}
             onAddCita={handleAddCita}
             onUpdateCita={handleUpdateCita}
             onDeleteCita={handleDeleteCita}

@@ -7,6 +7,8 @@ import { Cita, Vehiculo, Cliente, Tecnico, OrdenTrabajo, OTEstado, EventoOT } fr
 import { genId } from '../utils/id';
 import ConfirmDialog from './ConfirmDialog';
 import { FLOTA_CLIENTE_ID } from '../utils/flota';
+import { siguienteNumero } from '../utils/numeracion';
+import { otOcupaDia, vehiculosEnTaller, ocupacionDia, nivelCupo, ingresoDeOT, NivelCupo } from '../utils/tallerOcupacion';
 
 interface Props {
   citas: Cita[];
@@ -14,6 +16,8 @@ interface Props {
   clientes: Cliente[];
   tecnicos: Tecnico[];
   ordenes: OrdenTrabajo[];
+  /** Vehículos que caben a la vez en el taller (0 = sin límite definido). */
+  capacidadTaller: number;
   onAddCita: (c: Cita) => void;
   onUpdateCita: (c: Cita) => void;
   onDeleteCita: (id: string) => void;
@@ -35,6 +39,51 @@ const OT_BADGE_META: Record<OTEstado, { label: string; color: string; bg: string
   entregado:     { label: 'Entregado',     color: 'text-teal-700',   bg: 'bg-teal-100' },
   cancelado:     { label: 'Cancelado',     color: 'text-rose-600',   bg: 'bg-rose-50' },
 };
+
+// Colores según lo cerca que esté el taller de su capacidad.
+const ESTILO_CUPO: Record<NivelCupo, { caja: string; barra: string; chip: string }> = {
+  'sin-limite': { caja: 'bg-slate-50 border-slate-200 text-slate-700', barra: 'bg-slate-400', chip: 'bg-slate-100 text-slate-500' },
+  'libre':      { caja: 'bg-emerald-50 border-emerald-200 text-emerald-800', barra: 'bg-emerald-500', chip: 'bg-emerald-50 text-emerald-700' },
+  'casi-lleno': { caja: 'bg-amber-50 border-amber-200 text-amber-800', barra: 'bg-amber-500', chip: 'bg-amber-100 text-amber-700' },
+  'completo':   { caja: 'bg-rose-50 border-rose-200 text-rose-800', barra: 'bg-rose-500', chip: 'bg-rose-100 text-rose-700' },
+  'excedido':   { caja: 'bg-rose-100 border-rose-300 text-rose-900', barra: 'bg-rose-600', chip: 'bg-rose-600 text-white' },
+};
+
+/** Cuántos vehículos hay ahora en el taller frente a su capacidad. Siempre visible en la Agenda. */
+function CupoTallerBanner({ enTaller, capacidad }: { enTaller: number; capacidad: number }) {
+  const nivel = nivelCupo(enTaller, capacidad);
+  const est = ESTILO_CUPO[nivel];
+  const libres = capacidad - enTaller;
+  const mensaje = {
+    'sin-limite': 'Sin cupo definido: se configura en Empresa.',
+    'libre': `${libres} plaza${libres !== 1 ? 's' : ''} libre${libres !== 1 ? 's' : ''}`,
+    'casi-lleno': `Casi lleno: ${libres === 1 ? 'queda 1 plaza' : `quedan ${libres} plazas`}`,
+    'completo': 'Taller completo: no caben más',
+    'excedido': `Cupo superado en ${enTaller - capacidad}`,
+  }[nivel];
+  const pct = capacidad > 0 ? Math.min(100, Math.round((enTaller / capacidad) * 100)) : 0;
+  return (
+    <div role="status" className={`rounded-2xl border px-5 py-3 flex flex-col sm:flex-row sm:items-center gap-3 ${est.caja}`}>
+      <div className="flex items-center gap-3">
+        <Wrench className="w-5 h-5 shrink-0" />
+        <div>
+          <p className="text-[10px] font-bold uppercase tracking-wider opacity-70">Vehículos en el taller ahora</p>
+          <p className="text-xl font-extrabold leading-tight">
+            {enTaller}{capacidad > 0 && <span className="text-sm font-bold opacity-70"> / {capacidad}</span>}
+          </p>
+        </div>
+      </div>
+      {capacidad > 0 && (
+        <div className="flex-1 min-w-[120px]" aria-hidden="true">
+          <div className="h-2 rounded-full bg-white/70 overflow-hidden">
+            <div className={`h-full rounded-full ${est.barra}`} style={{ width: `${pct}%` }} />
+          </div>
+        </div>
+      )}
+      <p className="text-xs font-bold sm:text-right">{mensaje}</p>
+    </div>
+  );
+}
 
 // Entrada del cronograma de la agenda: una cita programada, o una orden de
 // trabajo directa de Taller (ver otsSinCita más abajo).
@@ -133,24 +182,7 @@ function seSolapan(a: [number, number], b: [number, number]): boolean {
   return a[0] < b[1] && b[0] < a[1];
 }
 
-/**
- * Rango de días [inicio, fin] (YYYY-MM-DD) en que un vehículo ocupa el
- * taller para una OT: desde que ingresa hasta que se entrega. Si aún no se
- * ha entregado, el rango sigue creciendo día a día (hasta hoy, o hasta la
- * fecha estimada si cae más adelante) para que se siga viendo "en curso".
- */
-function otRangoDias(ot: OrdenTrabajo, hoy: string): [string, string] {
-  if (ot.fechaEntrega) return [ot.fechaRecepcion, ot.fechaEntrega];
-  const fin = ot.fechaEstimadaEntrega && ot.fechaEstimadaEntrega > hoy ? ot.fechaEstimadaEntrega : hoy;
-  return [ot.fechaRecepcion, fin];
-}
-
-function otOcupaDia(ot: OrdenTrabajo, key: string, hoy: string): boolean {
-  const [inicio, fin] = otRangoDias(ot, hoy);
-  return inicio <= key && key <= fin;
-}
-
-export default function AgendaTab({ citas, vehiculos, clientes, tecnicos, ordenes, onAddCita, onUpdateCita, onDeleteCita, onCreateOT }: Props) {
+export default function AgendaTab({ citas, vehiculos, clientes, tecnicos, ordenes, capacidadTaller, onAddCita, onUpdateCita, onDeleteCita, onCreateOT }: Props) {
   const [selectedDay, setSelectedDay] = useState(() => new Date());
   const [vista, setVista] = useState<'dia' | 'semana' | 'mes'>('dia');
   const weekStart = useMemo(() => startOfWeek(selectedDay), [selectedDay]);
@@ -177,20 +209,23 @@ export default function AgendaTab({ citas, vehiculos, clientes, tecnicos, ordene
   const [confirmDelete, setConfirmDelete] = useState<Cita | null>(null);
   const [convertirCita, setConvertirCita] = useState<Cita | null>(null);
 
-  // Órdenes de trabajo creadas directamente en Taller (sin pasar por una cita
-  // de Agenda) — se muestran igualmente en la agenda del día de su recepción,
-  // para que la vista refleje todo lo que hay programado. Las OT que SÍ
-  // vienen de una cita ("Convertir en OT") no se duplican aquí: ya se ven
-  // como esa cita, marcada 'convertida'.
-  const otsSinCita = useMemo(() => {
-    const otIdsConCita = new Set(citas.map((c) => c.otId).filter(Boolean));
-    // Solo vehículos que ya han ingresado al taller: un presupuesto todavía
-    // no es un coche físicamente en el taller, y una OT cancelada tampoco
-    // representa nada programado ese día.
-    return ordenes.filter((ot) =>
-      !otIdsConCita.has(ot.id) && ot.estado !== 'presupuesto' && ot.estado !== 'cancelado'
-    );
-  }, [citas, ordenes]);
+  // Todas las órdenes con el vehículo dentro (o ya entregado) se muestran en cada
+  // día que ocupan el taller. Una OT que viene de una cita no se repite el día de
+  // la propia cita (ahí ya se ve como esa cita, marcada 'convertida'), pero sí los
+  // días siguientes mientras el coche sigue en el taller. Un presupuesto todavía no
+  // es un coche en el taller, y una OT cancelada tampoco.
+  const otsVisibles = useMemo(
+    () => ordenes.filter((ot) => ot.estado !== 'presupuesto' && ot.estado !== 'cancelado'),
+    [ordenes],
+  );
+  const diasDeCitaPorOt = useMemo(() => {
+    const m = new Map<string, string[]>();
+    for (const c of citas) {
+      if (!c.otId) continue;
+      m.set(c.otId, [...(m.get(c.otId) ?? []), localKey(new Date(c.fechaHora))]);
+    }
+    return m;
+  }, [citas]);
 
   // Entradas (citas + OT) de un día cualquiera — se reutiliza tanto para el
   // día seleccionado (vista día) como para cada columna de la vista semana.
@@ -200,8 +235,8 @@ export default function AgendaTab({ citas, vehiculos, clientes, tecnicos, ordene
     const citasEntries: AgendaEntry[] = citas
       .filter((c) => localKey(new Date(c.fechaHora)) === key)
       .map((c) => ({ kind: 'cita', sortKey: c.fechaHora, data: c }));
-    const otEntries: AgendaEntry[] = otsSinCita
-      .filter((ot) => otOcupaDia(ot, key, hoy))
+    const otEntries: AgendaEntry[] = otsVisibles
+      .filter((ot) => otOcupaDia(ot, key, hoy) && !diasDeCitaPorOt.get(ot.id)?.includes(key))
       .map((ot) => ({ kind: 'ot', sortKey: `${key}T00:00:00`, data: ot }));
     return [...citasEntries, ...otEntries].sort((a, b) => a.sortKey.localeCompare(b.sortKey));
   };
@@ -261,6 +296,20 @@ export default function AgendaTab({ citas, vehiculos, clientes, tecnicos, ordene
     return { candidatas, mismoTecnico: form.tecnicoId ? candidatas.filter((c) => c.tecnicoId === form.tecnicoId) : [] };
   }, [citas, fechaHoraForm, form.duracionMinutos, form.tecnicoId, editingId]);
 
+  // Cupo del taller el día de la cita: vehículos ya dentro ese día + citas vivas
+  // (cada una trae un vehículo) que aún no se han convertido en orden.
+  const avisoCupoCita = useMemo(() => {
+    if (capacidadTaller <= 0 || !form.fecha) return null;
+    const hoyKey = localKey(new Date());
+    const dentro = ocupacionDia(ordenes, form.fecha, hoyKey);
+    const citasDia = citas.filter((c) =>
+      c.id !== editingId && !c.otId && (c.estado === 'pendiente' || c.estado === 'confirmada') && localKey(new Date(c.fechaHora)) === form.fecha).length;
+    const previstos = dentro + citasDia + 1; // +1: esta cita
+    if (previstos > capacidadTaller) return `Ese día el taller superaría su cupo: ${dentro} dentro y ${citasDia} cita${citasDia !== 1 ? 's' : ''} más, con esta serían ${previstos} de ${capacidadTaller}.`;
+    if (previstos === capacidadTaller) return `Con esta cita el taller quedará completo ese día (${previstos} de ${capacidadTaller}).`;
+    return null;
+  }, [capacidadTaller, form.fecha, ordenes, citas, editingId]);
+
   const handleSave = () => {
     setFormError('');
     if (!fechaHoraForm) { setFormError('Indica una fecha y hora válidas.'); return; }
@@ -307,6 +356,9 @@ export default function AgendaTab({ citas, vehiculos, clientes, tecnicos, ordene
 
   return (
     <div className="space-y-5">
+      {/* Cupo del taller: siempre a la vista */}
+      <CupoTallerBanner enTaller={vehiculosEnTaller(ordenes)} capacidad={capacidadTaller} />
+
       {/* Toolbar */}
       <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3">
         <div className="flex items-center gap-2 flex-wrap">
@@ -368,8 +420,8 @@ export default function AgendaTab({ citas, vehiculos, clientes, tecnicos, ordene
           const key = localKey(d);
           const activo = key === localKey(selectedDay);
           const esHoy = key === hoy;
-          const nCitas = citas.filter((c) => localKey(new Date(c.fechaHora)) === key && c.estado !== 'cancelada').length
-            + otsSinCita.filter((ot) => otOcupaDia(ot, key, hoy)).length;
+          const nCitas = entriesForDay(d).filter((e) => e.kind === 'ot' || e.data.estado !== 'cancelada').length;
+          const enTallerDia = ocupacionDia(ordenes, key, hoy);
           return (
             <button
               key={key}
@@ -385,6 +437,11 @@ export default function AgendaTab({ citas, vehiculos, clientes, tecnicos, ordene
                   {nCitas}
                 </span>
               )}
+              {(enTallerDia > 0 || capacidadTaller > 0) && (
+                <span title="Vehículos en el taller ese día" className={`mt-1 text-[9px] font-bold px-1.5 rounded-full flex items-center gap-0.5 ${activo ? 'bg-white/20 text-white' : ESTILO_CUPO[nivelCupo(enTallerDia, capacidadTaller)].chip}`}>
+                  <Wrench className="w-2 h-2" />{enTallerDia}{capacidadTaller > 0 ? `/${capacidadTaller}` : ''}
+                </span>
+              )}
             </button>
           );
         })}
@@ -396,7 +453,10 @@ export default function AgendaTab({ citas, vehiculos, clientes, tecnicos, ordene
           <p className="text-sm font-bold text-slate-800">
             {selectedDay.toLocaleDateString('es-ES', { weekday: 'long', day: 'numeric', month: 'long' })}
           </p>
-          <span className="text-xs text-slate-400">{entriesDelDia.length} programado{entriesDelDia.length !== 1 ? 's' : ''}</span>
+          <span className="text-xs text-slate-400">
+            {entriesDelDia.length} programado{entriesDelDia.length !== 1 ? 's' : ''}
+            {' · '}Taller: {ocupacionDia(ordenes, localKey(selectedDay), hoy)}{capacidadTaller > 0 ? ` de ${capacidadTaller}` : ''}
+          </span>
         </div>
 
         {entriesDelDia.length === 0 ? (
@@ -428,6 +488,19 @@ export default function AgendaTab({ citas, vehiculos, clientes, tecnicos, ordene
                         {cli && <span className="flex items-center gap-1"><User className="w-3 h-3" /> {cli}</span>}
                         {veh && <span className="flex items-center gap-1"><Car className="w-3 h-3" /> {veh}</span>}
                       </div>
+                      {(() => {
+                        const ingreso = ingresoDeOT(ot);
+                        if (!ingreso) return null;
+                        const cuando = ingreso.fechaHora
+                          ? new Date(ingreso.fechaHora).toLocaleString('es-ES', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })
+                          : new Date(`${ot.fechaRecepcion}T00:00:00`).toLocaleDateString('es-ES', { day: 'numeric', month: 'short' });
+                        return (
+                          <p className="text-[11px] text-slate-400 mt-1">
+                            Ingresó el {cuando}{ingreso.km > 0 ? ` · ${ingreso.km.toLocaleString('es-ES')} km` : ''}
+                            {ot.fechaEntrega ? ` · Entregado el ${new Date(`${ot.fechaEntrega}T00:00:00`).toLocaleDateString('es-ES', { day: 'numeric', month: 'short' })}` : ''}
+                          </p>
+                        );
+                      })()}
                     </div>
                   </div>
                 );
@@ -514,6 +587,11 @@ export default function AgendaTab({ citas, vehiculos, clientes, tecnicos, ordene
                 >
                   <span className="text-[9px] font-bold uppercase tracking-wider text-slate-400 block">{DIAS_SEMANA[i]}</span>
                   <span className={`text-sm font-extrabold ${esHoy ? 'text-blue-600' : 'text-slate-800'}`}>{d.getDate()}</span>
+                  {(ocupacionDia(ordenes, key, hoy) > 0 || capacidadTaller > 0) && (
+                    <span title="Vehículos en el taller ese día" className={`mt-0.5 mx-auto text-[9px] font-bold px-1.5 rounded-full flex items-center justify-center gap-0.5 w-fit ${ESTILO_CUPO[nivelCupo(ocupacionDia(ordenes, key, hoy), capacidadTaller)].chip}`}>
+                      <Wrench className="w-2 h-2" />{ocupacionDia(ordenes, key, hoy)}{capacidadTaller > 0 ? `/${capacidadTaller}` : ''}
+                    </span>
+                  )}
                 </button>
                 <div className="flex-1 p-1.5 space-y-1 overflow-y-auto min-h-[120px] max-h-[320px]">
                   {entradas.length === 0 ? (
@@ -732,6 +810,13 @@ export default function AgendaTab({ citas, vehiculos, clientes, tecnicos, ordene
                 </div>
               )}
 
+              {avisoCupoCita && (
+                <div className="bg-amber-50 border border-amber-200 text-amber-700 text-xs font-medium px-4 py-2.5 rounded-lg flex items-start gap-2">
+                  <AlertTriangle className="w-3.5 h-3.5 shrink-0 mt-0.5" />
+                  <span>{avisoCupoCita} Puedes guardarla igualmente.</span>
+                </div>
+              )}
+
               {formError && (
                 <div className="bg-rose-50 border border-rose-200 text-rose-700 text-xs font-medium px-4 py-2.5 rounded-lg">{formError}</div>
               )}
@@ -752,6 +837,7 @@ export default function AgendaTab({ citas, vehiculos, clientes, tecnicos, ordene
           vehiculos={vehiculos}
           clientes={clientes}
           ordenes={ordenes}
+          capacidadTaller={capacidadTaller}
           onCreateOT={onCreateOT}
           onConvertida={(otId) => {
             onUpdateCita({ ...convertirCita, estado: 'convertida', otId });
@@ -779,12 +865,13 @@ interface ConvertirModalProps {
   vehiculos: Vehiculo[];
   clientes: Cliente[];
   ordenes: OrdenTrabajo[];
+  capacidadTaller: number;
   onCreateOT: (ot: OrdenTrabajo) => void;
   onConvertida: (otId: string) => void;
   onClose: () => void;
 }
 
-function ConvertirEnOTModal({ cita, vehiculos, clientes, ordenes, onCreateOT, onConvertida, onClose }: ConvertirModalProps) {
+function ConvertirEnOTModal({ cita, vehiculos, clientes, ordenes, capacidadTaller, onCreateOT, onConvertida, onClose }: ConvertirModalProps) {
   const [vehiculoId, setVehiculoId] = useState(cita.vehiculoId ?? '');
   const [clienteId, setClienteId] = useState(cita.clienteId ?? '');
   const [createTipo, setCreateTipo] = useState<'presupuesto' | 'recibido'>('presupuesto');
@@ -798,7 +885,7 @@ function ConvertirEnOTModal({ cita, vehiculos, clientes, ordenes, onCreateOT, on
     if (!vehiculoId || !clienteId) { setError('Selecciona el vehículo y el cliente registrados.'); return; }
     if (createTipo === 'recibido' && kilometraje === '') { setError('Indica el kilometraje de entrada.'); return; }
 
-    const nextNum = 'OT-' + new Date().getFullYear() + '-' + String(ordenes.length + 1).padStart(3, '0');
+    const nextNum = siguienteNumero(ordenes.map(o => o.numero), `OT-${new Date().getFullYear()}-`, 3);
     const ot: OrdenTrabajo = {
       id: genId('ot'),
       numero: nextNum,
@@ -876,6 +963,13 @@ function ConvertirEnOTModal({ cita, vehiculos, clientes, ordenes, onCreateOT, on
             <label className="block text-xs font-semibold text-slate-600 mb-1">Kilometraje de entrada *</label>
             <input type="number" min="0" value={kilometraje} onChange={(e) => setKilometraje(e.target.value === '' ? '' : Number(e.target.value))}
               className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400" />
+          </div>
+        )}
+
+        {createTipo === 'recibido' && capacidadTaller > 0 && vehiculosEnTaller(ordenes) >= capacidadTaller && (
+          <div className="bg-amber-50 border border-amber-200 text-amber-700 text-xs font-medium px-4 py-2.5 rounded-lg flex items-start gap-2">
+            <AlertTriangle className="w-3.5 h-3.5 shrink-0 mt-0.5" />
+            <span>El taller ya tiene {vehiculosEnTaller(ordenes)} de {capacidadTaller} vehículos. Recibir este lo dejaría en {vehiculosEnTaller(ordenes) + 1}.</span>
           </div>
         )}
 

@@ -1,4 +1,5 @@
 import { useState, useMemo } from 'react';
+import { siguienteNumero } from '../utils/numeracion';
 import { validarFactura } from '../utils/validarFactura';
 import { Plus, Trash2, Edit2, X, Check, Receipt, Import, Printer, MessageCircle, Mail as MailIcon } from 'lucide-react';
 import { Factura, LineaDocumento, Cliente, Vehiculo, OrdenTrabajo } from '../types';
@@ -322,7 +323,7 @@ export default function FacturasTab({
   const totalFacturas = facturas.length;
   const facturasPagadas = facturas.filter(f => f.estado === 'pagada').length;
 
-  const nextFacturaNumero = `FAC-${String(facturas.length + 1).padStart(4, '0')}`;
+  const nextFacturaNumero = siguienteNumero(facturas.map(f => f.numero), 'FAC-', 4);
   const sortedFacturas = [...facturas].sort((a, b) => b.numero.localeCompare(a.numero));
 
   const handleSaveFactura = (f: Factura, otsImportadas: OrdenTrabajo[]) => {

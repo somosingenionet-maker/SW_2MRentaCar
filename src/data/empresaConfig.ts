@@ -31,6 +31,8 @@ export interface EmpresaConfig {
   pais: string;
   brandColor: string;
   logoBase64: string;
+  /** Vehículos que caben a la vez en el taller. 0 = sin límite definido. */
+  capacidadTaller: number;
 }
 
 export const DEFAULT_EMPRESA_CONFIG: EmpresaConfig = {
@@ -46,6 +48,7 @@ export const DEFAULT_EMPRESA_CONFIG: EmpresaConfig = {
   pais: 'España',
   brandColor: '#C38DD6',
   logoBase64: '',
+  capacidadTaller: 0,
 };
 
 // Caché en memoria de la configuración de empresa. Se siembra desde

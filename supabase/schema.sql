@@ -958,3 +958,23 @@ create unique index if not exists vehiculos_matricula_unica
 create unique index if not exists vehiculos_bastidor_unico
   on public.vehiculos ((regexp_replace(upper(bastidor), '[^A-Z0-9]', '', 'g')))
   where regexp_replace(upper(bastidor), '[^A-Z0-9]', '', 'g') <> '';
+
+-- ============================================================================
+-- 18. CAPACIDAD DEL TALLER
+--
+-- Número máximo de vehículos que caben a la vez en el taller. La Agenda lo usa
+-- para mostrar cuántos hay dentro y avisar al acercarse al límite o al pasarlo.
+-- 0 = sin límite definido (la Agenda solo muestra el recuento).
+-- ============================================================================
+alter table public.empresa_config
+  add column if not exists capacidad_taller integer not null default 0 check (capacidad_taller >= 0);
+
+-- ============================================================================
+-- 19. NÚMEROS DE FACTURA Y DE OT ÚNICOS
+--
+-- La app numeraba con "cantidad + 1", lo que repetía un número ya usado al
+-- borrar un registro (una factura duplicada es un problema legal). Ahora la app
+-- usa "mayor + 1" y la base de datos rechaza cualquier número repetido.
+-- ============================================================================
+create unique index if not exists facturas_numero_unico on public.facturas (numero);
+create unique index if not exists ordenes_trabajo_numero_unico on public.ordenes_trabajo (numero);

@@ -332,6 +332,24 @@ export default function CompanySettingsPanel({ config, onSave, tecnicos, onAddTe
           </section>
         </div>
 
+        {/* Capacidad del taller */}
+        <div className="px-5 pb-5 space-y-2 border-t border-slate-100 pt-5">
+          <h3 className="text-xs font-bold text-slate-500 uppercase tracking-wider flex items-center gap-1.5">
+            <Wrench className="w-3.5 h-3.5 text-orange-500" /> Capacidad del taller
+          </h3>
+          <label className="block text-xs font-semibold text-slate-600">Vehículos que caben a la vez</label>
+          <input
+            type="number"
+            min="0"
+            step="1"
+            value={draft.capacidadTaller || ''}
+            onChange={e => setDraft(prev => ({ ...prev, capacidadTaller: Math.max(0, Math.floor(Number(e.target.value) || 0)) }))}
+            className="w-32 border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400"
+            placeholder="Sin límite"
+          />
+          <p className="text-[11px] text-slate-400">La Agenda muestra cuántos vehículos hay en el taller frente a este número y avisa al acercarse o pasarse. Déjalo vacío si no quieres límite.</p>
+        </div>
+
         {/* Técnicos */}
         <div className="px-5 pb-5 space-y-3 border-t border-slate-100 pt-5">
           <div className="flex items-center justify-between">
