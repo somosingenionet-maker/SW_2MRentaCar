@@ -211,7 +211,7 @@ export default function App() {
         id: genId('int-cli-aut-res'),
         fecha: new Date().toISOString().split('T')[0],
         tipo: 'registro_contrato',
-        notas: `Contrato de alquiler firmado de coche (${targetVeh.marca} con matrícula ${targetVeh.matricula}). Rango: ${nueva.fechaInicio} al ${nueva.fechaFin}. Liquidado total: ${nueva.totalCobrado.toFixed(2)} €.`
+        notas: `Reserva de alquiler registrada del coche (${targetVeh.marca} con matrícula ${targetVeh.matricula}). Rango: ${nueva.fechaInicio} al ${nueva.fechaFin}. Liquidado total: ${nueva.totalCobrado.toFixed(2)} €.`
       };
       const updatedCli = { ...targetCli, interacciones: [nuevaInteraccion, ...targetCli.interacciones] };
       handleUpdateCliente(updatedCli);

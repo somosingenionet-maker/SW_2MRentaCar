@@ -86,7 +86,8 @@ export default function RentalsTab({
     setSolicitudActiva(null);
     setClienteNuevo(null);
     setFormVehiculoId(vehiculos[0]?.id || '');
-    setFormClienteId(clientes[0]?.id || '');
+    // Sin cliente preseleccionado: elegir uno a mano evita dejar la reserva a nombre de otra persona.
+    setFormClienteId('');
     setFormFechaInicio(new Date().toISOString().split('T')[0]);
     setFormFechaFin(new Date(Date.now() + 5 * 24 * 60 * 60 * 1000).toISOString().split('T')[0]);
     setFormTemporada('media');

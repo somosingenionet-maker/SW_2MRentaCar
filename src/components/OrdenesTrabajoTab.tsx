@@ -392,7 +392,7 @@ export default function OrdenesTrabajoTab({ ordenes, vehiculos, clientes, tecnic
 
       {/* Filters */}
       <div className="flex flex-col sm:flex-row gap-3">
-        <div className="relative flex-1">
+        <div className="relative sm:flex-1">
           <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
           <input
             type="text"
@@ -628,7 +628,7 @@ export default function OrdenesTrabajoTab({ ordenes, vehiculos, clientes, tecnic
 
                 {/* Bloque: Cotización — PDF y seguimiento */}
                 {/* Bloque: Presupuesto */}
-                {selected.estado === 'presupuesto' && (() => {
+                {selected.estado === 'presupuesto' && selected.clienteId !== FLOTA_CLIENTE_ID && (() => {
                   const enviado = selected.presupuestoEstado === 'enviado';
                   return (
                     <div className={`rounded-xl border p-4 space-y-3 ${enviado ? 'bg-green-50 border-green-200' : 'bg-violet-50 border-violet-200'}`}>
@@ -662,7 +662,7 @@ export default function OrdenesTrabajoTab({ ordenes, vehiculos, clientes, tecnic
                 })()}
 
                 {/* Bloque: Notificar al cliente cuando está listo */}
-                {selected.estado === 'listo' && (() => {
+                {selected.estado === 'listo' && selected.clienteId !== FLOTA_CLIENTE_ID && (() => {
                   const empresa = getEmpresaConfig();
                   const cli = clientes.find(c => c.id === selected.clienteId);
                   const veh = vehiculos.find(v => v.id === selected.vehiculoId);

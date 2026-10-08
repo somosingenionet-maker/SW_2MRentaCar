@@ -1,4 +1,5 @@
 import { useState, useMemo } from 'react';
+import { datoDuplicado } from '../utils/vehiculoDuplicado';
 import { Vehiculo, OrdenTrabajo, OTEstado, TarifasAlquiler } from '../types';
 import {
   Car, Search, Plus, Wrench, Calendar, Shield, CreditCard, PenTool, Trash2, X, Check, Save, Download, ClipboardList
@@ -67,6 +68,7 @@ export default function VehiclesTab({
 
   const [editFormData, setEditFormData] = useState<Vehiculo | null>(null);
   const [addFormError, setAddFormError] = useState('');
+  const [editFormError, setEditFormError] = useState('');
   const [confirmDialog, setConfirmDialog] = useState<{ isOpen: boolean; vehiculoId: string }>({ isOpen: false, vehiculoId: '' });
   const [currentPage, setCurrentPage] = useState(1);
   const PAGE_SIZE = 8;
@@ -121,6 +123,11 @@ export default function VehiclesTab({
       setAddFormError('Por favor, rellene de forma correcta la Marca, Modelo y Matrícula.');
       return;
     }
+    const repetido = datoDuplicado(vehiculos, { id: '', matricula: formData.matricula, bastidor: formData.bastidor });
+    if (repetido) {
+      setAddFormError(`Ya existe otro vehículo con esa ${repetido}. Revisa que no estés dando de alta el mismo coche dos veces.`);
+      return;
+    }
     setAddFormError('');
     const nuevo: Vehiculo = {
       ...formData,
@@ -133,6 +140,7 @@ export default function VehiclesTab({
   };
 
   const handleEditClick = (veh: Vehiculo) => {
+    setEditFormError('');
     setEditFormData({ ...veh });
     setIsEditing(true);
   };
@@ -140,6 +148,12 @@ export default function VehiclesTab({
   const handleEditSubmit = (e: { preventDefault(): void }) => {
     e.preventDefault();
     if (editFormData) {
+      const repetido = datoDuplicado(vehiculos, editFormData);
+      if (repetido) {
+        setEditFormError(`Ya existe otro vehículo con esa ${repetido}.`);
+        return;
+      }
+      setEditFormError('');
       onUpdateVehiculo({
         ...editFormData,
         kilometraje: Number(editFormData.kilometraje)
@@ -921,6 +935,10 @@ export default function VehiclesTab({
                       </div>
                     )}
                   </div>
+                )}
+
+                {editFormError && (
+                  <p className="text-xs text-rose-600 bg-rose-50 border border-rose-200 rounded-lg px-3 py-2 font-medium">{editFormError}</p>
                 )}
 
                 <div className="border-t border-slate-100 pt-4 flex justify-end gap-2 text-sm font-medium">
