@@ -1,0 +1,55 @@
+<!--
+  Plantilla del correo "Restablecer contraseña" de Supabase Auth.
+  Se pega en: Supabase → Authentication → Emails (Email Templates) → Reset Password.
+  Asunto sugerido: Restablece tu contraseña — 2M Rent a Car
+  Las variables {{ .ConfirmationURL }} y {{ .Email }} las rellena Supabase.
+  Esto es configuración del panel de Supabase (no se despliega con la app):
+  se guarda aquí como copia de seguridad y para poder reproducirla.
+-->
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background-color:#f4eef8;padding:32px 12px;font-family:Arial,Helvetica,sans-serif;">
+  <tr>
+    <td align="center">
+      <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="max-width:480px;background-color:#ffffff;border-radius:16px;overflow:hidden;">
+        <tr>
+          <td style="background-color:#C38DD6;padding:22px 28px;">
+            <span style="font-size:20px;font-weight:bold;color:#3A1D4A;">2M Rent a Car</span>
+          </td>
+        </tr>
+        <tr>
+          <td style="padding:30px 28px 8px 28px;color:#2d2433;">
+            <h1 style="margin:0 0 14px 0;font-size:20px;color:#3A1D4A;">Restablece tu contraseña</h1>
+            <p style="margin:0 0 12px 0;font-size:15px;line-height:1.5;">
+              Hemos recibido una solicitud para restablecer la contraseña de acceso al
+              backoffice con la cuenta <strong>{{ .Email }}</strong>.
+            </p>
+            <p style="margin:0 0 24px 0;font-size:15px;line-height:1.5;">
+              Pulsa el botón para elegir una contraseña nueva:
+            </p>
+          </td>
+        </tr>
+        <tr>
+          <td align="center" style="padding:0 28px 26px 28px;">
+            <a href="{{ .ConfirmationURL }}"
+               style="display:inline-block;background-color:#7A4A93;color:#ffffff;text-decoration:none;font-weight:bold;font-size:15px;padding:14px 28px;border-radius:12px;">
+              Elegir nueva contraseña
+            </a>
+          </td>
+        </tr>
+        <tr>
+          <td style="padding:0 28px 28px 28px;color:#6b5f73;font-size:13px;line-height:1.5;">
+            <p style="margin:0 0 10px 0;">Este enlace caduca pronto y solo se puede usar una vez.</p>
+            <p style="margin:0 0 10px 0;">
+              Si tú no has pedido este cambio, ignora este correo: tu contraseña actual
+              seguirá siendo la misma.
+            </p>
+            <p style="margin:0;word-break:break-all;">
+              Si el botón no funciona, copia y pega esta dirección en tu navegador:<br>
+              <a href="{{ .ConfirmationURL }}" style="color:#7A4A93;">{{ .ConfirmationURL }}</a>
+            </p>
+          </td>
+        </tr>
+      </table>
+      <p style="margin:16px 0 0 0;font-size:11px;color:#8c7f95;">2M Rent a Car · Palma, Illes Balears</p>
+    </td>
+  </tr>
+</table>
