@@ -1,4 +1,5 @@
 import { useState, useMemo } from 'react';
+import { useSeleccion } from '../utils/useSeleccion';
 import { Cliente, Reserva, InteraccionCliente, Vehiculo, OrdenTrabajo, Factura, OTEstado, InvitacionCliente, SolicitudReserva } from '../types';
 import { canceladaEnWeb, estadoWebMeta, soloFecha } from '../utils/solicitudes';
 import { getEmpresaConfig } from '../data/empresaConfig';
@@ -68,7 +69,7 @@ export default function CrmTab({
   onAddInteraccion
 }: CrmTabProps) {
   const [searchTerm, setSearchTerm] = useState('');
-  const [selectedCliente, setSelectedCliente] = useState<Cliente | null>(null);
+  const [selectedCliente, setSelectedCliente] = useSeleccion(clientes);
   // Autorregistro: modal para generar el enlace (cliente null = persona nueva) y revisión de lo recibido.
   const [pedirDatos, setPedirDatos] = useState<{ cliente: Cliente | null } | null>(null);
   const [revisando, setRevisando] = useState<InvitacionCliente | null>(null);

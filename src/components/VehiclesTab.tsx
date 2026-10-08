@@ -1,4 +1,5 @@
 import { useState, useMemo } from 'react';
+import { useSeleccion } from '../utils/useSeleccion';
 import { datoDuplicado } from '../utils/vehiculoDuplicado';
 import { Vehiculo, OrdenTrabajo, OTEstado, TarifasAlquiler } from '../types';
 import {
@@ -48,7 +49,7 @@ export default function VehiclesTab({
   onDeleteVehiculo
 }: VehiclesTabProps) {
   const [searchTerm, setSearchTerm] = useState('');
-  const [selectedVehiculo, setSelectedVehiculo] = useState<Vehiculo | null>(null);
+  const [selectedVehiculo, setSelectedVehiculo] = useSeleccion(vehiculos);
   const [expandedOtId, setExpandedOtId] = useState<string | null>(null);
   const [isAddingOpen, setIsAddingOpen] = useState(false);
   const [isEditing, setIsEditing] = useState(false);

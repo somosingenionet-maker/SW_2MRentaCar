@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { useSeleccion } from '../utils/useSeleccion';
 import { Reserva, Vehiculo, Cliente, SolicitudReserva } from '../types';
 import SearchableSelect from './SearchableSelect';
 import {
@@ -46,7 +47,7 @@ export default function RentalsTab({
   onConvertirSolicitud,
   onDescartarSolicitud
 }: RentalsTabProps) {
-  const [selectedReserva, setSelectedReserva] = useState<Reserva | null>(null);
+  const [selectedReserva, setSelectedReserva] = useSeleccion(reservas);
   const [isAddingOpen, setIsAddingOpen] = useState(false);
   const [viewingContract, setViewingContract] = useState<Reserva | null>(null);
 

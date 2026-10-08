@@ -1,4 +1,5 @@
 import { useState, useMemo } from 'react';
+import { useSeleccion } from '../utils/useSeleccion';
 import { AnimatePresence, motion } from 'motion/react';
 import {
   ClipboardList, Plus, Search, ChevronRight, X, Check, Trash2,
@@ -109,7 +110,7 @@ function evento(descripcion: string): EventoOT {
 export default function OrdenesTrabajoTab({ ordenes, vehiculos, clientes, tecnicos, onAdd, onUpdate, onDelete }: Props) {
   const [search, setSearch] = useState('');
   const [filterEstado, setFilterEstado] = useState<OTEstado | 'todas'>('todas');
-  const [selected, setSelected] = useState<OrdenTrabajo | null>(null);
+  const [selected, setSelected] = useSeleccion(ordenes);
   const [isCreating, setIsCreating] = useState(false);
   const [createTipo, setCreateTipo] = useState<'presupuesto' | 'recibido'>('presupuesto');
   const [otForm, setOTForm] = useState<OTForm>(EMPTY_OT_FORM);
