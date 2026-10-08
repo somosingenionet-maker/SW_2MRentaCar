@@ -7,6 +7,7 @@ import { supabase } from './lib/supabase';
 import LoginScreenReset from './components/ResetPasswordScreen';
 import { fetchVehiculos, upsertVehiculo, deleteVehiculoDb } from './data/vehiculosDb';
 import { fetchAll, upsertOne, deleteOne } from './data/db';
+import { sinClienteFlota } from './utils/flota';
 import { fetchSolicitudes, updateGestionSolicitud } from './data/solicitudesDb';
 import { fetchInvitaciones, crearInvitacion, updateEstadoInvitacion } from './data/invitacionesDb';
 import LoginScreen from './components/LoginScreen';
@@ -73,17 +74,17 @@ export default function App() {
     return () => data.subscription.unsubscribe();
   }, []);
 
+  // Lista de clientes sin el cliente interno de la flota propia (ver flota.ts).
+  const cargarClientes = useCallback(
+    () => fetchAll<Cliente>('clientes').then(sinClienteFlota), []);
+
   // Todas las entidades se cargan desde Supabase al iniciar sesión
   // (requiere estar autenticado: las reglas RLS exigen sesión válida).
-  useEffect(() => {
-    if (!currentUser) {
-      setVehiculos([]); setClientes([]); setReservas([]);
-      setAlertas([]); setNotificaciones([]); setFacturas([]); setOrdenesTrabajo([]); setTecnicos([]); setCitas([]); setSolicitudes([]); setInvitaciones([]);
-      return;
-    }
+  // También se usa para volver al estado real cuando un guardado falla.
+  const cargarTodo = useCallback(() => {
     const log = (e: string) => (err: unknown) => console.error(`Error cargando ${e}`, err);
     fetchVehiculos().then(setVehiculos).catch(log('vehículos'));
-    fetchAll<Cliente>('clientes').then(setClientes).catch(log('clientes'));
+    cargarClientes().then(setClientes).catch(log('clientes'));
     fetchAll<Reserva>('reservas').then(setReservas).catch(log('reservas'));
     fetchAll<Alerta>('alertas').then(setAlertas).catch(log('alertas'));
     fetchAll<NotificacionCliente>('notificaciones').then(setNotificaciones).catch(log('notificaciones'));
@@ -94,7 +95,27 @@ export default function App() {
     fetchSolicitudes().then(setSolicitudes).catch(log('solicitudes de reserva'));
     fetchInvitaciones().then(setInvitaciones).catch(log('invitaciones de clientes'));
     loadEmpresaConfig().then(setEmpresaConfig).catch(log('configuración de empresa'));
-  }, [currentUser]);
+  }, [cargarClientes]);
+
+  useEffect(() => {
+    if (!currentUser) {
+      setVehiculos([]); setClientes([]); setReservas([]);
+      setAlertas([]); setNotificaciones([]); setFacturas([]); setOrdenesTrabajo([]); setTecnicos([]); setCitas([]); setSolicitudes([]); setInvitaciones([]);
+      return;
+    }
+    cargarTodo();
+  }, [currentUser, cargarTodo]);
+
+  // Los cambios se pintan al instante y se guardan en segundo plano. Si el
+  // guardado falla (sesión caducada, permiso, restricción de la base de datos),
+  // se avisa con un mensaje visible y se recarga lo que hay guardado de verdad:
+  // así la pantalla nunca enseña como guardado algo que no lo está.
+  const [errorGuardado, setErrorGuardado] = useState<string | null>(null);
+  const fallo = useCallback((accion: string) => (err: unknown) => {
+    console.error(`Error al ${accion}`, err);
+    setErrorGuardado(`No se pudo ${accion}. Se ha restaurado la información guardada. Si vuelve a ocurrir, avisa a soporte.`);
+    cargarTodo();
+  }, [cargarTodo]);
 
   // Solicitudes de la web en tiempo real: cuando entra o cambia un pedido, se
   // recarga la bandeja (es una tabla pequeña, no merece la pena parchear fila a fila).
@@ -103,7 +124,7 @@ export default function App() {
     const recargar = () => {
       fetchSolicitudes().then(setSolicitudes).catch(err => console.error('Error recargando solicitudes', err));
       // La función de la web también da de alta al cliente: se recarga para que aparezca en Clientes.
-      fetchAll<Cliente>('clientes').then(setClientes).catch(err => console.error('Error recargando clientes', err));
+      cargarClientes().then(setClientes).catch(err => console.error('Error recargando clientes', err));
     };
     const canal = supabase
       .channel('solicitudes-reserva')
@@ -117,7 +138,7 @@ export default function App() {
       .on('postgres_changes', { event: '*', schema: 'public', table: 'invitaciones_cliente' }, recargarInv)
       .subscribe();
     return () => { void supabase.removeChannel(canal); void supabase.removeChannel(canalInv); };
-  }, [currentUser]);
+  }, [currentUser, cargarClientes]);
 
   // Set default tab based on user modules
   useEffect(() => {
@@ -151,37 +172,37 @@ export default function App() {
     // Se recargan tras confirmar el insert para que aparezcan ya en pantalla.
     upsertVehiculo(nuevo)
       .then(() => fetchAll<Alerta>('alertas').then(setAlertas))
-      .catch(err => console.error('Error guardando vehículo', err));
-  }, []);
+      .catch(fallo('guardar el vehículo'));
+  }, [fallo]);
 
   const handleUpdateVehiculo = useCallback((editado: Vehiculo): Promise<void> => {
     setVehiculos(prev => prev.map(v => v.id === editado.id ? editado : v));
-    return upsertVehiculo(editado).catch(err => console.error('Error actualizando vehículo', err));
-  }, []);
+    return upsertVehiculo(editado).catch(fallo('actualizar el vehículo'));
+  }, [fallo]);
 
   const handleDeleteVehiculo = useCallback((id: string) => {
     setVehiculos(prev => prev.filter(v => v.id !== id));
-    deleteVehiculoDb(id).catch(err => console.error('Error eliminando vehículo', err));
-  }, []);
+    deleteVehiculoDb(id).catch(fallo('eliminar el vehículo'));
+  }, [fallo]);
 
   const handleAddCliente = useCallback((nuevo: Cliente) => {
     setClientes(prev => [...prev, nuevo]);
-    upsertOne('clientes', nuevo).catch(err => console.error('Error guardando cliente', err));
-  }, []);
+    upsertOne('clientes', nuevo).catch(fallo('guardar el cliente'));
+  }, [fallo]);
 
   const handleUpdateCliente = useCallback((editado: Cliente) => {
     setClientes(prev => prev.map(c => c.id === editado.id ? editado : c));
-    upsertOne('clientes', editado).catch(err => console.error('Error actualizando cliente', err));
-  }, []);
+    upsertOne('clientes', editado).catch(fallo('actualizar el cliente'));
+  }, [fallo]);
 
   const handleDeleteCliente = useCallback((id: string) => {
     setClientes(prev => prev.filter(c => c.id !== id));
-    deleteOne('clientes', id).catch(err => console.error('Error eliminando cliente', err));
-  }, []);
+    deleteOne('clientes', id).catch(fallo('eliminar el cliente'));
+  }, [fallo]);
 
   const handleAddReserva = useCallback((nueva: Reserva) => {
     setReservas(prev => [...prev, nueva]);
-    upsertOne('reservas', nueva).catch(err => console.error('Error guardando reserva', err));
+    upsertOne('reservas', nueva).catch(fallo('guardar la reserva'));
 
     const targetCli = clientes.find(c => c.id === nueva.clienteId);
     const targetVeh = vehiculos.find(v => v.id === nueva.vehiculoId);
@@ -195,12 +216,12 @@ export default function App() {
       const updatedCli = { ...targetCli, interacciones: [nuevaInteraccion, ...targetCli.interacciones] };
       handleUpdateCliente(updatedCli);
     }
-  }, [clientes, vehiculos, handleUpdateCliente]);
+  }, [clientes, vehiculos, handleUpdateCliente, fallo]);
 
   const handleUpdateReserva = useCallback((editada: Reserva) => {
     setReservas(prev => prev.map(r => r.id === editada.id ? editada : r));
-    upsertOne('reservas', editada).catch(err => console.error('Error actualizando reserva', err));
-  }, []);
+    upsertOne('reservas', editada).catch(fallo('actualizar la reserva'));
+  }, [fallo]);
 
   // Convierte una solicitud de la web en reserva real. Se encadena en orden
   // (cliente → reserva → solicitud) y se espera cada paso: la reserva tiene
@@ -290,12 +311,12 @@ export default function App() {
     if (!changed) return;
     const actualizada = { ...changed, estado: 'atendida' as const };
     setAlertas(prev => prev.map(a => a.id === id ? actualizada : a));
-    upsertOne('alertas', actualizada).catch(err => console.error('Error actualizando alerta', err));
-  }, [alertas]);
+    upsertOne('alertas', actualizada).catch(fallo('actualizar la alerta'));
+  }, [alertas, fallo]);
 
   const handleAddNotificacion = useCallback((notif: NotificacionCliente) => {
     setNotificaciones(prev => [...prev, notif]);
-    upsertOne('notificaciones', notif).catch(err => console.error('Error guardando notificación', err));
+    upsertOne('notificaciones', notif).catch(fallo('guardar la notificación'));
 
     const targetCli = clientes.find(c => c.id === notif.clienteId);
     if (targetCli) {
@@ -308,12 +329,12 @@ export default function App() {
       const updatedCli = { ...targetCli, interacciones: [nuevaInteraccion, ...targetCli.interacciones] };
       handleUpdateCliente(updatedCli);
     }
-  }, [clientes, handleUpdateCliente]);
+  }, [clientes, handleUpdateCliente, fallo]);
 
   const handleDeleteNotificacion = useCallback((id: string) => {
     setNotificaciones(prev => prev.filter(n => n.id !== id));
-    deleteOne('notificaciones', id).catch(err => console.error('Error eliminando notificación', err));
-  }, []);
+    deleteOne('notificaciones', id).catch(fallo('eliminar la notificación'));
+  }, [fallo]);
 
   const handleTriggerAutoRenew = useCallback((vehId: string, tipo: AlertaTipo, nuevaFechaOrKm: string) => {
     const veh = vehiculos.find(v => v.id === vehId);
@@ -336,7 +357,7 @@ export default function App() {
         kilometrajeLimite: proximoKm,
       };
       setAlertas(prev => [...prev, siguiente]);
-      upsertOne('alertas', siguiente).catch(err => console.error('Error guardando alerta', err));
+      upsertOne('alertas', siguiente).catch(fallo('guardar la alerta'));
     }
 
     const actualizado = handleUpdateVehiculo(updatedVeh);
@@ -348,74 +369,74 @@ export default function App() {
         .then(() => fetchAll<Alerta>('alertas').then(setAlertas))
         .catch(err => console.error('Error recargando alertas', err));
     }
-  }, [vehiculos, handleUpdateVehiculo]);
+  }, [vehiculos, handleUpdateVehiculo, fallo]);
 
   // Factura handlers
   const handleAddFactura = useCallback((f: Factura) => {
     setFacturas(prev => [...prev, f]);
-    upsertOne('facturas', f).catch(err => console.error('Error guardando factura', err));
-  }, []);
+    upsertOne('facturas', f).catch(fallo('guardar la factura'));
+  }, [fallo]);
 
   const handleUpdateFactura = useCallback((f: Factura) => {
     setFacturas(prev => prev.map(x => x.id === f.id ? f : x));
-    upsertOne('facturas', f).catch(err => console.error('Error actualizando factura', err));
-  }, []);
+    upsertOne('facturas', f).catch(fallo('actualizar la factura'));
+  }, [fallo]);
 
   const handleDeleteFactura = useCallback((id: string) => {
     setFacturas(prev => prev.filter(x => x.id !== id));
-    deleteOne('facturas', id).catch(err => console.error('Error eliminando factura', err));
-  }, []);
+    deleteOne('facturas', id).catch(fallo('eliminar la factura'));
+  }, [fallo]);
 
   // OT handlers
   const handleAddOT = useCallback((ot: OrdenTrabajo) => {
     setOrdenesTrabajo(prev => [...prev, ot]);
-    upsertOne('ordenes_trabajo', ot).catch(err => console.error('Error guardando orden de trabajo', err));
-  }, []);
+    upsertOne('ordenes_trabajo', ot).catch(fallo('guardar la orden de trabajo'));
+  }, [fallo]);
 
   const handleUpdateOT = useCallback((ot: OrdenTrabajo) => {
     setOrdenesTrabajo(prev => prev.map(x => x.id === ot.id ? ot : x));
-    upsertOne('ordenes_trabajo', ot).catch(err => console.error('Error actualizando orden de trabajo', err));
-  }, []);
+    upsertOne('ordenes_trabajo', ot).catch(fallo('actualizar la orden de trabajo'));
+  }, [fallo]);
 
   const handleDeleteOT = useCallback((id: string) => {
     setOrdenesTrabajo(prev => prev.filter(x => x.id !== id));
-    deleteOne('ordenes_trabajo', id).catch(err => console.error('Error eliminando orden de trabajo', err));
-  }, []);
+    deleteOne('ordenes_trabajo', id).catch(fallo('eliminar la orden de trabajo'));
+  }, [fallo]);
 
   const handleSaveEmpresa = useCallback((config: EmpresaConfig) => {
     setEmpresaConfig(config);
-    saveEmpresaConfigDb(config).catch(err => console.error('Error guardando configuración de empresa', err));
-  }, []);
+    saveEmpresaConfigDb(config).catch(fallo('guardar la configuración de la empresa'));
+  }, [fallo]);
 
   const handleAddTecnico = useCallback((t: Tecnico) => {
     setTecnicos(prev => [...prev, t]);
-    upsertOne('tecnicos', t).catch(err => console.error('Error guardando técnico', err));
-  }, []);
+    upsertOne('tecnicos', t).catch(fallo('guardar el técnico'));
+  }, [fallo]);
 
   const handleUpdateTecnico = useCallback((t: Tecnico) => {
     setTecnicos(prev => prev.map(x => x.id === t.id ? t : x));
-    upsertOne('tecnicos', t).catch(err => console.error('Error actualizando técnico', err));
-  }, []);
+    upsertOne('tecnicos', t).catch(fallo('actualizar el técnico'));
+  }, [fallo]);
 
   const handleDeleteTecnico = useCallback((id: string) => {
     setTecnicos(prev => prev.filter(x => x.id !== id));
-    deleteOne('tecnicos', id).catch(err => console.error('Error eliminando técnico', err));
-  }, []);
+    deleteOne('tecnicos', id).catch(fallo('eliminar el técnico'));
+  }, [fallo]);
 
   const handleAddCita = useCallback((c: Cita) => {
     setCitas(prev => [...prev, c]);
-    upsertOne('citas', c).catch(err => console.error('Error guardando cita', err));
-  }, []);
+    upsertOne('citas', c).catch(fallo('guardar la cita'));
+  }, [fallo]);
 
   const handleUpdateCita = useCallback((c: Cita) => {
     setCitas(prev => prev.map(x => x.id === c.id ? c : x));
-    upsertOne('citas', c).catch(err => console.error('Error actualizando cita', err));
-  }, []);
+    upsertOne('citas', c).catch(fallo('actualizar la cita'));
+  }, [fallo]);
 
   const handleDeleteCita = useCallback((id: string) => {
     setCitas(prev => prev.filter(x => x.id !== id));
-    deleteOne('citas', id).catch(err => console.error('Error eliminando cita', err));
-  }, []);
+    deleteOne('citas', id).catch(fallo('eliminar la cita'));
+  }, [fallo]);
 
   const activeAlertsCount = useMemo(() => alertas.filter(a => a.estado === 'activa').length, [alertas]);
   // Solicitudes de la web esperando que alguien asigne el coche.
@@ -472,6 +493,16 @@ export default function App() {
       className="min-h-screen bg-slate-50 font-sans flex flex-col antialiased"
       style={{ '--brand': brandColor, '--brand-text': brandText } as React.CSSProperties}
     >
+
+      {/* Aviso de guardado fallido: se queda hasta que se cierra */}
+      {errorGuardado && (
+        <div role="alert" className="fixed top-3 left-3 right-3 sm:left-1/2 sm:right-auto sm:-translate-x-1/2 sm:max-w-xl z-[100] print:hidden bg-red-600 text-white rounded-xl shadow-2xl px-4 py-3 flex items-start gap-3">
+          <span className="text-sm font-semibold flex-1">{errorGuardado}</span>
+          <button onClick={() => setErrorGuardado(null)} aria-label="Cerrar aviso" className="shrink-0 p-0.5 rounded hover:bg-red-700 cursor-pointer">
+            <X className="w-4 h-4" />
+          </button>
+        </div>
+      )}
 
       {/* PROFESSIONAL UPPER BAR */}
       <header
