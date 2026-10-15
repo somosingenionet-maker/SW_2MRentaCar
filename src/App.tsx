@@ -1,4 +1,5 @@
 import React, { lazy, Suspense, useState, useEffect, useMemo, useCallback } from 'react';
+import { kilometrajeTrasIngreso } from './utils/kilometraje';
 import { contrastText } from './utils/color';
 import { genId } from './utils/id';
 import { Vehiculo, Cliente, Reserva, Alerta, NotificacionCliente, InteraccionCliente, AlertaTipo, Usuario, Factura, ModuloId, OrdenTrabajo, Tecnico, Cita, SolicitudReserva, InvitacionCliente } from './types';
@@ -388,15 +389,31 @@ export default function App() {
   }, [fallo]);
 
   // OT handlers
+  // Cuando un vehículo ingresa en el taller, su ficha sube al kilometraje de entrada (nunca baja).
+  const sincronizarKilometraje = useCallback((ot: OrdenTrabajo) => {
+    const veh = vehiculos.find(v => v.id === ot.vehiculoId);
+    if (!veh) return;
+    const nuevo = kilometrajeTrasIngreso(veh.kilometraje, ot.kilometrajeEntrada);
+    if (nuevo !== veh.kilometraje) handleUpdateVehiculo({ ...veh, kilometraje: nuevo });
+  }, [vehiculos, handleUpdateVehiculo]);
+
+  const ingresado = (ot: OrdenTrabajo) => ot.estado !== 'presupuesto' && ot.estado !== 'cancelado';
+
   const handleAddOT = useCallback((ot: OrdenTrabajo) => {
     setOrdenesTrabajo(prev => [...prev, ot]);
     upsertOne('ordenes_trabajo', ot).catch(fallo('guardar la orden de trabajo'));
-  }, [fallo]);
+    if (ingresado(ot)) sincronizarKilometraje(ot);
+  }, [fallo, sincronizarKilometraje]);
 
   const handleUpdateOT = useCallback((ot: OrdenTrabajo) => {
+    const anterior = ordenesTrabajo.find(x => x.id === ot.id);
     setOrdenesTrabajo(prev => prev.map(x => x.id === ot.id ? ot : x));
     upsertOne('ordenes_trabajo', ot).catch(fallo('actualizar la orden de trabajo'));
-  }, [fallo]);
+    // Solo en el ingreso o si cambia el km de entrada: así no se deshace una corrección manual de la ficha.
+    if (ingresado(ot) && (!anterior || !ingresado(anterior) || anterior.kilometrajeEntrada !== ot.kilometrajeEntrada)) {
+      sincronizarKilometraje(ot);
+    }
+  }, [fallo, ordenesTrabajo, sincronizarKilometraje]);
 
   const handleDeleteOT = useCallback((id: string) => {
     setOrdenesTrabajo(prev => prev.filter(x => x.id !== id));

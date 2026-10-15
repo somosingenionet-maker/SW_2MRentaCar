@@ -1,4 +1,5 @@
 import { useState, useMemo } from 'react';
+import { avisoKilometraje } from '../utils/kilometraje';
 import ModalShell from './ModalShell';
 import {
   CalendarClock, Plus, ChevronLeft, ChevronRight, X, Check, Trash2, Pencil,
@@ -960,6 +961,16 @@ function ConvertirEnOTModal({ cita, vehiculos, clientes, ordenes, capacidadTalle
             <span>El taller ya tiene {vehiculosEnTaller(ordenes)} de {capacidadTaller} vehículos. Recibir este lo dejaría en {vehiculosEnTaller(ordenes) + 1}.</span>
           </div>
         )}
+
+        {createTipo === 'recibido' && (() => {
+          const aviso = avisoKilometraje(vehiculos.find((v) => v.id === vehiculoId)?.kilometraje, kilometraje);
+          return aviso ? (
+            <div className="bg-amber-50 border border-amber-200 text-amber-700 text-xs font-medium px-4 py-2.5 rounded-lg flex items-start gap-2">
+              <AlertTriangle className="w-3.5 h-3.5 shrink-0 mt-0.5" />
+              <span>{aviso}</span>
+            </div>
+          ) : null;
+        })()}
 
         {error && <div className="bg-rose-50 border border-rose-200 text-rose-700 text-xs font-medium px-4 py-2.5 rounded-lg">{error}</div>}
 

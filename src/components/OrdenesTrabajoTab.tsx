@@ -1,4 +1,5 @@
 import { useState, useMemo } from 'react';
+import { avisoKilometraje } from '../utils/kilometraje';
 import ModalShell from './ModalShell';
 import { usePaginacion } from '../utils/usePaginacion';
 import Pagination from './Pagination';
@@ -1404,6 +1405,15 @@ export default function OrdenesTrabajoTab({ ordenes, vehiculos, clientes, tecnic
                     className="w-full mt-1 px-3 py-2 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-1 focus:ring-blue-500 resize-none" />
                 </div>
 
+                {createTipo === 'recibido' && (() => {
+                  const aviso = avisoKilometraje(vehiculos.find(v => v.id === otForm.vehiculoId)?.kilometraje, otForm.kilometrajeEntrada);
+                  return aviso ? (
+                    <div className="flex items-start gap-2 text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2">
+                      <AlertTriangle size={13} className="mt-0.5 shrink-0" /> {aviso}
+                    </div>
+                  ) : null;
+                })()}
+
                 {formError && (
                   <div className="flex items-start gap-2 text-xs text-rose-600 bg-rose-50 border border-rose-200 rounded-lg px-3 py-2">
                     <AlertCircle size={13} className="mt-0.5 shrink-0" /> {formError}
@@ -1466,6 +1476,15 @@ export default function OrdenesTrabajoTab({ ordenes, vehiculos, clientes, tecnic
                     </select>
                   </div>
                 </div>
+                {(() => {
+                  const aviso = avisoKilometraje(vehiculos.find(v => v.id === selected.vehiculoId)?.kilometraje, recepcionModal.km);
+                  return aviso ? (
+                    <div className="bg-amber-50 border border-amber-200 text-amber-700 text-xs font-medium px-4 py-2.5 rounded-lg flex items-start gap-2">
+                      <AlertTriangle size={14} className="shrink-0 mt-0.5" />
+                      <span>{aviso}</span>
+                    </div>
+                  ) : null;
+                })()}
                 {(() => {
                   const capacidad = getEmpresaConfig().capacidadTaller;
                   const dentro = vehiculosEnTaller(ordenes);
