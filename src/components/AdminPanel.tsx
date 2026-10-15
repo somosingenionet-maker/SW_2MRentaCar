@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import ModalShell from './ModalShell';
 import { X, Shield, Plus, Edit2, Trash2, Check, ChevronDown, ChevronUp } from 'lucide-react';
 import { Usuario, ModuloId } from '../types';
 import { fetchUsuarios, updateUsuarioProfile, createUsuario, deleteUsuario, setUsuarioPassword } from '../data/usuariosDb';
@@ -162,23 +163,13 @@ export default function AdminPanel({ currentUser, onClose }: AdminPanelProps) {
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex">
-      <div className="flex-1 bg-black/40 backdrop-blur-sm" onClick={onClose} />
-      <div className="w-full max-w-md bg-white shadow-2xl flex flex-col h-full overflow-hidden border-l border-slate-200">
-
-        {/* Header */}
-        <div className="flex items-center justify-between px-5 py-4 border-b border-slate-100 bg-slate-950 text-white">
-          <div className="flex items-center gap-2.5">
-            <Shield className="w-4 h-4 text-blue-400" />
-            <span className="font-bold text-sm tracking-tight">Panel de Administración</span>
-          </div>
-          <button onClick={onClose} className="p-1.5 hover:bg-slate-800 rounded-lg transition">
-            <X className="w-4 h-4" />
-          </button>
-        </div>
-
-        {/* Body */}
-        <div className="flex-1 overflow-y-auto px-5 py-5 space-y-4">
+    <ModalShell
+      titulo="Panel de Administración"
+      icono={<Shield className="w-5 h-5 text-blue-600" />}
+      onClose={onClose}
+      ancho="max-w-lg"
+    >
+        <div className="px-6 py-5 space-y-4">
 
           {/* User list */}
           {!showForm && (
@@ -400,8 +391,6 @@ export default function AdminPanel({ currentUser, onClose }: AdminPanelProps) {
             </div>
           )}
         </div>
-
-      </div>
-    </div>
+    </ModalShell>
   );
 }

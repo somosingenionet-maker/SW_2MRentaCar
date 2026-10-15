@@ -1,4 +1,5 @@
 import { useState, useMemo } from 'react';
+import ModalShell from './ModalShell';
 import {
   CalendarClock, Plus, ChevronLeft, ChevronRight, X, Check, Trash2, Pencil,
   Clock, User, Car, Wrench, AlertTriangle, ClipboardCheck, Ban, ArrowRightCircle,
@@ -63,7 +64,7 @@ function CupoTallerBanner({ enTaller, capacidad }: { enTaller: number; capacidad
   }[nivel];
   const pct = capacidad > 0 ? Math.min(100, Math.round((enTaller / capacidad) * 100)) : 0;
   return (
-    <div role="status" className={`rounded-2xl border px-5 py-3 flex flex-col sm:flex-row sm:items-center gap-3 ${est.caja}`}>
+    <div role="status" className={`rounded-2xl border px-5 py-3.5 flex flex-col sm:flex-row sm:items-center gap-3 sm:gap-8 ${est.caja}`}>
       <div className="flex items-center gap-3">
         <Wrench className="w-5 h-5 shrink-0" />
         <div>
@@ -80,7 +81,7 @@ function CupoTallerBanner({ enTaller, capacidad }: { enTaller: number; capacidad
           </div>
         </div>
       )}
-      <p className="text-xs font-bold sm:text-right">{mensaje}</p>
+      <p className="text-xs font-bold sm:ml-auto sm:text-right sm:max-w-[60%]">{mensaje}</p>
     </div>
   );
 }
@@ -687,20 +688,13 @@ export default function AgendaTab({ citas, vehiculos, clientes, tecnicos, ordene
 
       {/* Crear / editar cita */}
       {showForm && (
-        <div className="fixed inset-0 z-50 flex">
-          <div className="flex-1 bg-black/40 backdrop-blur-sm" onClick={() => setShowForm(false)} />
-          <div className="w-full max-w-md bg-white shadow-2xl flex flex-col h-full overflow-hidden border-l border-slate-200">
-            <div className="flex items-center justify-between px-5 py-4 border-b border-slate-100 bg-slate-950 text-white">
-              <div className="flex items-center gap-2.5">
-                <CalendarClock className="w-4 h-4 text-blue-400" />
-                <span className="font-bold text-sm tracking-tight">{editingId ? 'Editar cita' : 'Nueva cita'}</span>
-              </div>
-              <button onClick={() => setShowForm(false)} className="p-1.5 hover:bg-slate-800 rounded-lg transition">
-                <X className="w-4 h-4" />
-              </button>
-            </div>
-
-            <div className="flex-1 overflow-y-auto px-5 py-5 space-y-4">
+        <ModalShell
+          titulo={editingId ? 'Editar cita' : 'Nueva cita'}
+          icono={<CalendarClock className="w-5 h-5 text-blue-600" />}
+          onClose={() => setShowForm(false)}
+          ancho="max-w-md"
+        >
+            <div className="px-6 py-5 space-y-4">
               <div className="grid grid-cols-2 gap-3">
                 <div>
                   <label className="block text-xs font-semibold text-slate-600 mb-1">Fecha *</label>
@@ -827,8 +821,7 @@ export default function AgendaTab({ citas, vehiculos, clientes, tecnicos, ordene
                 {editingId ? 'Guardar cambios' : 'Crear cita'}
               </button>
             </div>
-          </div>
-        </div>
+        </ModalShell>
       )}
 
       {convertirCita && (
@@ -909,13 +902,8 @@ function ConvertirEnOTModal({ cita, vehiculos, clientes, ordenes, capacidadTalle
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center">
-      <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" onClick={onClose} />
-      <div className="relative bg-white rounded-2xl shadow-2xl w-full max-w-sm mx-4 p-6 space-y-4">
-        <div className="flex items-center justify-between">
-          <p className="text-sm font-bold text-slate-800">Convertir en OT</p>
-          <button onClick={onClose} className="text-slate-400 hover:text-slate-600 transition cursor-pointer"><X className="w-4 h-4" /></button>
-        </div>
+    <ModalShell titulo="Convertir en OT" icono={<Wrench className="w-5 h-5 text-blue-600" />} onClose={onClose} ancho="max-w-sm">
+      <div className="p-6 space-y-4">
         <p className="text-xs text-slate-500">{cita.motivo}</p>
 
         {!datosCompletos && (
@@ -980,6 +968,6 @@ function ConvertirEnOTModal({ cita, vehiculos, clientes, ordenes, capacidadTalle
           <Check className="w-4 h-4" /> Crear orden de trabajo
         </button>
       </div>
-    </div>
+    </ModalShell>
   );
 }

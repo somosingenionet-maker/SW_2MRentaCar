@@ -1,4 +1,5 @@
 import { useState, useMemo } from 'react';
+import { usePaginacion } from '../utils/usePaginacion';
 import { useSeleccion } from '../utils/useSeleccion';
 import { Cliente, Reserva, InteraccionCliente, Vehiculo, OrdenTrabajo, Factura, OTEstado, InvitacionCliente, SolicitudReserva } from '../types';
 import { canceladaEnWeb, estadoWebMeta, soloFecha } from '../utils/solicitudes';
@@ -109,8 +110,6 @@ export default function CrmTab({
   const [vehiculoSearch, setVehiculoSearch] = useState('');
   const [vehiculoSearchEdit, setVehiculoSearchEdit] = useState('');
   const [confirmDelete, setConfirmDelete] = useState<{ isOpen: boolean; clienteId: string }>({ isOpen: false, clienteId: '' });
-  const [currentPage, setCurrentPage] = useState(1);
-  const PAGE_SIZE = 8;
 
   // Filters
   const filteredClientes = clientes
@@ -123,7 +122,8 @@ export default function CrmTab({
     )
     .sort((a, b) => b.fechaRegistro.localeCompare(a.fechaRegistro));
 
-  const pagedClientes = filteredClientes.slice((currentPage - 1) * PAGE_SIZE, currentPage * PAGE_SIZE);
+  const paginacion = usePaginacion(filteredClientes, 'clientes');
+  const pagedClientes = paginacion.items;
 
   const handleOpenAdd = () => {
     setFormData({
@@ -366,7 +366,7 @@ export default function CrmTab({
               type="text"
               placeholder="Buscar por nombre, documento (NIF/NIE) o email..."
               value={searchTerm}
-              onChange={(e) => { setSearchTerm(e.target.value); setCurrentPage(1); }}
+              onChange={(e) => { setSearchTerm(e.target.value); paginacion.setPage(1); }}
               className="w-full pl-9 pr-4 py-2 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 bg-slate-50 focus:bg-white transition font-sans"
             />
           </div>
@@ -432,12 +432,7 @@ export default function CrmTab({
                 )}
               </tbody>
             </table>
-            <Pagination
-              currentPage={currentPage}
-              totalItems={filteredClientes.length}
-              pageSize={PAGE_SIZE}
-              onPageChange={setCurrentPage}
-            />
+            <Pagination {...paginacion.props} />
           </div>
         </div>
 

@@ -1,4 +1,7 @@
 import { useState, useMemo } from 'react';
+import ModalShell from './ModalShell';
+import { usePaginacion } from '../utils/usePaginacion';
+import Pagination from './Pagination';
 import { siguienteNumero } from '../utils/numeracion';
 import { vehiculosEnTaller } from '../utils/tallerOcupacion';
 import { useSeleccion } from '../utils/useSeleccion';
@@ -148,6 +151,7 @@ export default function OrdenesTrabajoTab({ ordenes, vehiculos, clientes, tecnic
       })
       .sort((a, b) => b.fechaActualizacion.localeCompare(a.fechaActualizacion));
   }, [ordenes, vehiculos, clientes, search, filterEstado]);
+  const paginacion = usePaginacion(filtered, 'ordenes', `${search}|${filterEstado}`);
 
   const openCreate = () => {
     setCreateTipo('presupuesto');
@@ -440,7 +444,7 @@ export default function OrdenesTrabajoTab({ ordenes, vehiculos, clientes, tecnic
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-50">
-                {filtered.map(ot => {
+                {paginacion.items.map(ot => {
                   const veh = vehiculos.find(v => v.id === ot.vehiculoId);
                   const cli = clientes.find(c => c.id === ot.clienteId);
                   return (
@@ -470,6 +474,7 @@ export default function OrdenesTrabajoTab({ ordenes, vehiculos, clientes, tecnic
             </table>
           </div>
         )}
+        <div className="px-4 pb-3"><Pagination {...paginacion.props} /></div>
       </div>
 
       {/* Detail Panel */}
@@ -822,25 +827,13 @@ export default function OrdenesTrabajoTab({ ordenes, vehiculos, clientes, tecnic
       {/* Edit Panel */}
       <AnimatePresence>
         {isEditing && selected && (
-          <>
-            <motion.div
-              initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
-              className="fixed inset-0 bg-black/30 z-50"
-              onClick={() => setIsEditing(false)}
-            />
-            <motion.div
-              initial={{ x: '100%' }} animate={{ x: 0 }} exit={{ x: '100%' }}
-              transition={{ type: 'spring', damping: 28, stiffness: 260 }}
-              className="fixed inset-y-0 right-0 w-full max-w-2xl bg-white shadow-2xl z-50 flex flex-col overflow-hidden"
-            >
-              <div className="px-6 py-4 border-b border-slate-100 flex items-center justify-between bg-slate-50">
-                <h3 className="font-bold text-slate-800 flex items-center gap-2">
-                  <Pencil size={15} className="text-blue-600" /> Editar {selected.numero}
-                </h3>
-                <button onClick={() => setIsEditing(false)} className="p-2 rounded-lg text-slate-400 hover:bg-slate-100 transition"><X size={16} /></button>
-              </div>
-
-              <div className="flex-1 overflow-y-auto px-6 py-5 space-y-5">
+          <ModalShell
+            titulo={<>Editar {selected.numero}</>}
+            icono={<Pencil size={18} className="text-blue-600" />}
+            onClose={() => setIsEditing(false)}
+            ancho="max-w-2xl"
+          >
+              <div className="px-6 py-5 space-y-5">
                 {/* Vehículo */}
                 <div>
                   <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Vehículo *</label>
@@ -1123,31 +1116,20 @@ export default function OrdenesTrabajoTab({ ordenes, vehiculos, clientes, tecnic
                   </button>
                 </div>
               </div>
-            </motion.div>
-          </>
+          </ModalShell>
         )}
       </AnimatePresence>
 
       {/* Create Panel */}
       <AnimatePresence>
         {isCreating && (
-          <>
-            <motion.div
-              initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
-              className="fixed inset-0 bg-black/30 z-30"
-              onClick={() => setIsCreating(false)}
-            />
-            <motion.div
-              initial={{ x: '100%' }} animate={{ x: 0 }} exit={{ x: '100%' }}
-              transition={{ type: 'spring', damping: 28, stiffness: 260 }}
-              className="fixed inset-y-0 right-0 w-full max-w-2xl bg-white shadow-2xl z-40 flex flex-col overflow-hidden"
-            >
-              <div className="px-6 py-4 border-b border-slate-100 flex items-center justify-between bg-slate-50">
-                <h3 className="font-bold text-slate-800 flex items-center gap-2"><Plus size={15} className="text-blue-600" /> Nueva Orden de Trabajo</h3>
-                <button onClick={() => setIsCreating(false)} className="p-2 rounded-lg text-slate-400 hover:bg-slate-100 transition"><X size={16} /></button>
-              </div>
-
-              <form onSubmit={handleCreateSubmit} className="flex-1 overflow-y-auto px-6 py-5 space-y-5">
+          <ModalShell
+            titulo="Nueva Orden de Trabajo"
+            icono={<Plus size={18} className="text-blue-600" />}
+            onClose={() => setIsCreating(false)}
+            ancho="max-w-2xl"
+          >
+              <form onSubmit={handleCreateSubmit} className="px-6 py-5 space-y-5">
 
                 {/* Tipo de ingreso */}
                 <div className="grid grid-cols-2 gap-2">
@@ -1439,8 +1421,7 @@ export default function OrdenesTrabajoTab({ ordenes, vehiculos, clientes, tecnic
                   </button>
                 </div>
               </form>
-            </motion.div>
-          </>
+          </ModalShell>
         )}
       </AnimatePresence>
 

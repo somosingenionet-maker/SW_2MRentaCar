@@ -1,4 +1,6 @@
 import { useState, useEffect } from 'react';
+import { usePaginacion } from '../utils/usePaginacion';
+import Pagination from './Pagination';
 import { Alerta, NotificacionCliente, Cliente, Vehiculo, AlertaTipo } from '../types';
 import {
   Bell, Check, MessageSquare, AlertTriangle, Send, Mail, Phone, Calendar, Sparkles, Clock
@@ -170,6 +172,9 @@ export default function AlertsNotificationsTab({
     return al.tipo === selectedTipoFilter;
   });
 
+  const pagAlertas = usePaginacion(filteredAlertas, 'alertas', selectedTipoFilter);
+  const avisosOrdenados = [...notificaciones].reverse();
+  const pagAvisos = usePaginacion(avisosOrdenados, 'avisos');
   const activas = alertas.filter(al => al.estado !== 'atendida');
   const proximasAVencer = activas.filter(al => estaProximaAVencer(al, vehiculos.find(v => v.id === al.vehiculoId))).length;
   const atendidas = alertas.length - activas.length;
@@ -217,14 +222,14 @@ export default function AlertsNotificationsTab({
           ))}
         </div>
 
-        <div className="space-y-3.5 max-h-[560px] overflow-y-auto pr-1" id="active-alerts-scroller">
+        <div className="space-y-3.5" id="active-alerts-scroller">
           {filteredAlertas.length === 0 ? (
             <div className="text-center py-10 bg-slate-50 border border-slate-100 rounded-xl text-slate-400 text-xs">
               <Check className="w-6 h-6 text-blue-500 mx-auto mb-2" />
               No se registran alertas preventivas activas en este momento.
             </div>
           ) : (
-            filteredAlertas.map(al => {
+            pagAlertas.items.map(al => {
               const veh = vehiculos.find(v => v.id === al.vehiculoId);
               const proxima = al.estado !== 'atendida' && estaProximaAVencer(al, veh);
               return (
@@ -286,6 +291,7 @@ export default function AlertsNotificationsTab({
             })
           )}
         </div>
+        <Pagination {...pagAlertas.props} />
       </div>
 
       {/* Notificación manual al cliente */}
@@ -422,11 +428,11 @@ export default function AlertsNotificationsTab({
           <p className="text-[11px] text-slate-400">Avisos registrados para recordatorios de ITV, seguro y mantenimiento. No se envían automáticamente: envíalos tú por email o WhatsApp.</p>
         </div>
 
-        <div className="space-y-2 max-h-[220px] overflow-y-auto">
+        <div className="space-y-2">
           {notificaciones.length === 0 ? (
             <div className="text-center py-6 text-slate-400 text-xs">Todavía no hay avisos registrados.</div>
           ) : (
-            [...notificaciones].reverse().map(not => {
+            pagAvisos.items.map(not => {
               const cli = clientes.find(c => c.id === not.clienteId);
               return (
                 <div key={not.id} className="p-3 bg-slate-50 border border-slate-100 rounded-xl space-y-1.5 hover:bg-slate-100/50 transition">
@@ -454,6 +460,7 @@ export default function AlertsNotificationsTab({
             })
           )}
         </div>
+        <Pagination {...pagAvisos.props} />
       </div>
       <ConfirmDialog
         isOpen={confirmAlerta.isOpen}

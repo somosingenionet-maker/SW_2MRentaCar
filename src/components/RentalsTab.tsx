@@ -1,4 +1,6 @@
 import { useState } from 'react';
+import ModalShell from './ModalShell';
+import { usePaginacion } from '../utils/usePaginacion';
 import { ofreceSeguro, totalAlquiler, etiquetaTransmision } from '../utils/condicionesAlquiler';
 import { useSeleccion } from '../utils/useSeleccion';
 import { Reserva, Vehiculo, Cliente, SolicitudReserva } from '../types';
@@ -69,9 +71,8 @@ export default function RentalsTab({
   const [clienteNuevo, setClienteNuevo] = useState<Cliente | null>(null);
   const [guardando, setGuardando] = useState(false);
   const [confirmDescartar, setConfirmDescartar] = useState<SolicitudReserva | null>(null);
-  const [currentPage, setCurrentPage] = useState(1);
-  const PAGE_SIZE = 10;
   // Vista de la tabla de reservas: activas/próximas vs historial (finalizadas o anuladas).
+  const [leyendaAbierta, setLeyendaAbierta] = useState(false);
   const [reservaView, setReservaView] = useState<'activas' | 'historial'>('activas');
   const [dayModal, setDayModal] = useState<{ iso: string; reservations: Reserva[] } | null>(null);
   const [calendarDate, setCalendarDate] = useState(() => {
@@ -309,7 +310,8 @@ export default function RentalsTab({
   const reservasActivas = sortedReservas.filter(r => !esHistorica(r));
   const reservasHistorial = sortedReservas.filter(esHistorica);
   const reservasVista = reservaView === 'historial' ? reservasHistorial : reservasActivas;
-  const pagedReservas = reservasVista.slice((currentPage - 1) * PAGE_SIZE, currentPage * PAGE_SIZE);
+  const paginacion = usePaginacion(reservasVista, 'reservas');
+  const pagedReservas = paginacion.items;
 
   // Etiqueta de estado de una reserva según fechas y anulación.
   const estadoReserva = (r: Reserva): { label: string; cls: string } => {
@@ -329,10 +331,15 @@ export default function RentalsTab({
     'bg-cyan-100 text-cyan-800 border-cyan-200',
     'bg-orange-100 text-orange-800 border-orange-200',
   ];
-  let colorIdx = 0;
-  vehiculosAlquiler.forEach(v => {
-    vehicleColors[v.id] = PALETTE[colorIdx++ % PALETTE.length];
-  });
+  // Con decenas de coches una paleta de 7 colores se repetiría sin sentido: los colores
+  // se reparten solo entre los vehículos que tienen reservas en el mes que se está viendo.
+  const reservasDelMes = reservas.filter(r =>
+    r.estado !== 'cancelada' && r.fechaFin >= todayIso && r.fechaInicio <= toIso(lastOfMonth) && r.fechaFin >= toIso(firstOfMonth));
+  const vehiculosDelMes = vehiculosAlquiler
+    .filter(v => reservasDelMes.some(r => r.vehiculoId === v.id))
+    .sort((a, b) => a.matricula.localeCompare(b.matricula));
+  vehiculosDelMes.forEach((v, i) => { vehicleColors[v.id] = PALETTE[i % PALETTE.length]; });
+  const VEHICULOS_LEYENDA_INICIAL = 6;
   // ─────────────────────────────────────────────────────────────────
 
   // Bandeja de la web: pedidos sin asignar + reservas ya asignadas cuyo pedido
@@ -364,6 +371,7 @@ export default function RentalsTab({
       if (ca !== cb) return ca - cb;
       return (a.fechaRecogida ?? '9999').localeCompare(b.fechaRecogida ?? '9999');
     });
+  const pagWeb = usePaginacion(solicitudesVisibles, 'reservas-web');
   const pendientesWeb = solicitudesVisibles.filter(x => x.estadoGestion === 'pendiente' && !canceladaEnWeb(x)).length;
 
   const descripcionVehiculoWeb = (sol: SolicitudReserva) => sol.vehiculoNombre || 'Vehículo sin identificar';
@@ -387,7 +395,7 @@ export default function RentalsTab({
             <p className="text-[11px] text-slate-400">La web reserva un modelo, no un coche concreto: asigna el vehículo para crear la reserva.</p>
           </div>
           <div className="divide-y divide-slate-50">
-            {solicitudesVisibles.map(sol => {
+            {pagWeb.items.map(sol => {
               const estadoWeb = estadoWebMeta(sol);
               const cancelada = canceladaEnWeb(sol);
               const reservaAsignada = sol.estadoGestion === 'convertida' ? reservas.find(r => r.id === sol.reservaId) : undefined;
@@ -449,6 +457,7 @@ export default function RentalsTab({
               );
             })}
           </div>
+          <div className="px-5 pb-3"><Pagination {...pagWeb.props} /></div>
         </div>
       )}
 
@@ -568,64 +577,74 @@ export default function RentalsTab({
               })}
             </div>
 
-            {/* Legend */}
-            <div className="px-4 py-2.5 bg-slate-50 border-t border-slate-100 flex flex-wrap gap-3 items-center">
-              <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mr-1">Vehículos:</span>
-              {vehiculosAlquiler.map(v => (
-                <span key={v.id} className={`flex items-center gap-1 text-[10px] font-semibold px-1.5 py-0.5 rounded border ${vehicleColors[v.id] ?? PALETTE[0]}`}>
-                  {v.marca} {v.modelo}
-                  <span className="font-mono opacity-70">({v.matricula})</span>
+            {/* Leyenda: solo los coches con reservas en este mes */}
+            <div className="px-4 py-3 bg-slate-50 border-t border-slate-100">
+              <div className="flex items-center justify-between gap-3 flex-wrap">
+                <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider flex items-center gap-2">
+                  Vehículos con reservas este mes
+                  <span className="px-1.5 py-0.5 rounded-full bg-white border border-slate-200 text-slate-500 normal-case tracking-normal">
+                    {vehiculosDelMes.length} de {vehiculosAlquiler.length}
+                  </span>
                 </span>
-              ))}
-              {vehiculosAlquiler.length === 0 && <span className="text-[10px] text-slate-400">Sin vehículos de alquiler registrados.</span>}
+                {vehiculosDelMes.length > VEHICULOS_LEYENDA_INICIAL && (
+                  <button
+                    type="button"
+                    onClick={() => setLeyendaAbierta(v => !v)}
+                    className="text-[11px] font-bold text-blue-600 hover:text-blue-800 cursor-pointer"
+                  >
+                    {leyendaAbierta ? 'Ver menos' : `Ver los ${vehiculosDelMes.length}`}
+                  </button>
+                )}
+              </div>
+              {vehiculosDelMes.length === 0 ? (
+                <p className="text-[11px] text-slate-400 mt-2">
+                  {vehiculosAlquiler.length === 0 ? 'Sin vehículos de alquiler registrados.' : 'Ningún vehículo tiene reservas este mes.'}
+                </p>
+              ) : (
+                <div className={`mt-2 flex flex-wrap gap-1.5 ${leyendaAbierta ? 'max-h-40 overflow-y-auto pr-1' : ''}`}>
+                  {(leyendaAbierta ? vehiculosDelMes : vehiculosDelMes.slice(0, VEHICULOS_LEYENDA_INICIAL)).map(v => (
+                    <span key={v.id} title={`${v.marca} ${v.modelo}`} className={`inline-flex items-center gap-1.5 text-[10px] font-semibold px-2 py-1 rounded-full border ${vehicleColors[v.id] ?? PALETTE[0]}`}>
+                      <span className="font-mono font-bold">{v.matricula}</span>
+                      <span className="opacity-80">{v.marca} {v.modelo}</span>
+                    </span>
+                  ))}
+                </div>
+              )}
             </div>
           </div>
 
           {/* Day detail modal */}
           <AnimatePresence>
             {dayModal && (
-              <motion.div
-                initial={{ opacity: 0 }}
-                animate={{ opacity: 1 }}
-                exit={{ opacity: 0 }}
-                className="fixed inset-0 z-50 flex items-center justify-center bg-black/40"
-                onClick={() => setDayModal(null)}
+              <ModalShell
+                titulo={`Reservas del ${formatDate(dayModal.iso)}`}
+                icono={<Calendar className="w-5 h-5 text-blue-600" />}
+                onClose={() => setDayModal(null)}
+                ancho="max-w-sm"
               >
-                <motion.div
-                  initial={{ scale: 0.95, opacity: 0 }}
-                  animate={{ scale: 1, opacity: 1 }}
-                  exit={{ scale: 0.95, opacity: 0 }}
-                  onClick={e => e.stopPropagation()}
-                  className="bg-white rounded-xl shadow-2xl w-full max-w-sm mx-4 overflow-hidden"
-                >
-                  <div className="flex items-center justify-between px-4 py-3 border-b border-slate-100 bg-slate-50">
-                    <span className="text-sm font-bold text-slate-700">Reservas del {formatDate(dayModal.iso)}</span>
-                    <button onClick={() => setDayModal(null)} className="text-slate-400 hover:text-slate-700 transition"><X size={16} /></button>
-                  </div>
-                  <div className="divide-y divide-slate-50 max-h-80 overflow-y-auto">
-                    {dayModal.reservations.map(res => {
-                      const veh = vehiculosAlquiler.find(v => v.id === res.vehiculoId);
-                      const cli = clientes.find(c => c.id === res.clienteId);
-                      const colorClass = vehicleColors[res.vehiculoId] ?? PALETTE[0];
-                      return (
-                        <div
-                          key={res.id}
-                          onClick={() => { setSelectedReserva(res); setDayModal(null); }}
-                          className="px-4 py-3 flex items-center gap-3 cursor-pointer hover:bg-slate-50 transition"
-                        >
-                          <span className={`text-[10px] font-bold px-2 py-1 rounded border ${colorClass}`}>
-                            {veh?.matricula ?? '···'}
-                          </span>
-                          <div className="flex-1 min-w-0">
-                            <div className="text-xs font-semibold text-slate-700 truncate">{cli?.nombre} {cli?.apellidos}</div>
-                            <div className="text-[10px] text-slate-400">{veh?.marca} {veh?.modelo} · {formatDate(res.fechaInicio)} → {formatDate(res.fechaFin)}</div>
-                          </div>
+                <div className="divide-y divide-slate-50">
+                  {dayModal.reservations.map(res => {
+                    const veh = vehiculosAlquiler.find(v => v.id === res.vehiculoId);
+                    const cli = clientes.find(c => c.id === res.clienteId);
+                    const colorClass = vehicleColors[res.vehiculoId] ?? PALETTE[0];
+                    return (
+                      <div
+                        key={res.id}
+                        onClick={() => { setSelectedReserva(res); setDayModal(null); }}
+                        className="px-4 py-3 flex items-center gap-3 cursor-pointer hover:bg-slate-50 transition"
+                      >
+                        <span className={`text-[10px] font-bold px-2 py-1 rounded border ${colorClass}`}>
+                          {veh?.matricula ?? '···'}
+                        </span>
+                        <div className="flex-1 min-w-0">
+                          <div className="text-xs font-semibold text-slate-700 truncate">{cli?.nombre} {cli?.apellidos}</div>
+                          <div className="text-[10px] text-slate-400">{veh?.marca} {veh?.modelo} · {formatDate(res.fechaInicio)} → {formatDate(res.fechaFin)}</div>
                         </div>
-                      );
-                    })}
-                  </div>
-                </motion.div>
-              </motion.div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </ModalShell>
             )}
           </AnimatePresence>
 
@@ -638,14 +657,14 @@ export default function RentalsTab({
               <div className="inline-flex rounded-lg border border-slate-200 overflow-hidden text-[11px] font-bold">
                 <button
                   type="button"
-                  onClick={() => { setReservaView('activas'); setCurrentPage(1); }}
+                  onClick={() => { setReservaView('activas'); paginacion.setPage(1); }}
                   className={`px-3 py-1.5 transition cursor-pointer ${reservaView === 'activas' ? 'bg-blue-600 text-white' : 'bg-white text-slate-500 hover:bg-slate-50'}`}
                 >
                   Activas y próximas ({reservasActivas.length})
                 </button>
                 <button
                   type="button"
-                  onClick={() => { setReservaView('historial'); setCurrentPage(1); }}
+                  onClick={() => { setReservaView('historial'); paginacion.setPage(1); }}
                   className={`px-3 py-1.5 transition cursor-pointer border-l border-slate-200 ${reservaView === 'historial' ? 'bg-blue-600 text-white' : 'bg-white text-slate-500 hover:bg-slate-50'}`}
                 >
                   Historial ({reservasHistorial.length})
@@ -739,12 +758,7 @@ export default function RentalsTab({
                 </tbody>
               </table>
             </div>
-            <Pagination
-              currentPage={currentPage}
-              totalItems={reservasVista.length}
-              pageSize={PAGE_SIZE}
-              onPageChange={setCurrentPage}
-            />
+            <Pagination {...paginacion.props} />
           </div>
         </div>
 
@@ -891,27 +905,7 @@ export default function RentalsTab({
       {/* MODAL: CREATE RESERVATION */}
       <AnimatePresence>
         {isAddingOpen && (
-          <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4 z-50 overflow-y-auto">
-            <motion.div 
-              initial={{ scale: 0.95, opacity: 0 }}
-              animate={{ scale: 1, opacity: 1 }}
-              exit={{ scale: 0.95, opacity: 0 }}
-              className="bg-white rounded-2xl border border-slate-200 shadow-2xl max-w-lg w-full overflow-hidden"
-              id="create-reservation-modal"
-            >
-              <div className="px-6 py-4 bg-slate-50 border-b border-slate-100 flex justify-between items-center">
-                <h3 className="font-extrabold text-slate-800 flex items-center gap-2 font-display">
-                  <Calendar className="w-5 h-5 text-blue-600" />
-                  {solicitudActiva ? 'Asignar reserva de la web' : 'Alta de Reserva de Alquiler'}
-                </h3>
-                <button 
-                  onClick={cerrarModal}
-                  className="p-1 hover:bg-slate-200 rounded-md transition text-slate-400"
-                >
-                  <X className="w-5 h-5" />
-                </button>
-              </div>
-
+          <ModalShell id="create-reservation-modal" titulo={solicitudActiva ? 'Asignar reserva de la web' : 'Alta de Reserva de Alquiler'} icono={<Calendar className="w-5 h-5 text-blue-600" />} onClose={cerrarModal}>
               {vehiculos.length === 0 || (clientes.length === 0 && !clienteNuevo) ? (
                 <div className="p-6 text-center text-slate-500 text-xs space-y-3">
                   <p>⚠️ Se necesitan vehículos y clientes registrados en el CRM para poder formalizar reservas.</p>
@@ -1129,8 +1123,7 @@ export default function RentalsTab({
                   </div>
                 </form>
               )}
-            </motion.div>
-          </div>
+          </ModalShell>
         )}
       </AnimatePresence>
 

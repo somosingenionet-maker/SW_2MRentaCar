@@ -6,6 +6,8 @@ import {
 import { downloadCsv } from '../utils/csvExport';
 import { FLOTA_CLIENTE_ID } from '../utils/flota';
 import { formatEuros } from '../utils/moneda';
+import { usePaginacion } from '../utils/usePaginacion';
+import Pagination from './Pagination';
 
 interface AnalyticsTabProps {
   ordenesTrabajo: OrdenTrabajo[];
@@ -256,6 +258,7 @@ export default function AnalyticsTab({ ordenesTrabajo, clientes, reservas, vehic
     ),
     [flotaStats]
   );
+  const pagFlota = usePaginacion(flotaStats, 'rentabilidad-flota');
 
   const ESTADOS_ACTIVOS: OTEstado[] = ['presupuesto', 'recibido', 'en_reparacion', 'listo'];
 
@@ -518,7 +521,7 @@ export default function AnalyticsTab({ ordenesTrabajo, clientes, reservas, vehic
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-50">
-                {flotaStats.map(f => (
+                {pagFlota.items.map(f => (
                   <tr key={f.id} className="hover:bg-slate-50/60 transition">
                     <td className="py-2.5 pr-2">
                       <span className="font-semibold text-slate-700">{f.nombre}</span>
@@ -532,6 +535,7 @@ export default function AnalyticsTab({ ordenesTrabajo, clientes, reservas, vehic
                 ))}
               </tbody>
             </table>
+            <Pagination {...pagFlota.props} />
           </div>
         </div>
       )}

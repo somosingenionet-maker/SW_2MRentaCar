@@ -1,4 +1,6 @@
 import { useState, useMemo } from 'react';
+import ModalShell from './ModalShell';
+import { usePaginacion } from '../utils/usePaginacion';
 import CondicionesAlquilerFields from './CondicionesAlquilerFields';
 import { CONDICIONES_POR_DEFECTO, etiquetaTransmision } from '../utils/condicionesAlquiler';
 import { useSeleccion } from '../utils/useSeleccion';
@@ -73,9 +75,6 @@ export default function VehiclesTab({
   const [addFormError, setAddFormError] = useState('');
   const [editFormError, setEditFormError] = useState('');
   const [confirmDialog, setConfirmDialog] = useState<{ isOpen: boolean; vehiculoId: string }>({ isOpen: false, vehiculoId: '' });
-  const [currentPage, setCurrentPage] = useState(1);
-  const PAGE_SIZE = 8;
-
   // Filter vehicles
   const filteredVehiculos = useMemo(() => {
     const term = searchTerm.toLowerCase();
@@ -89,10 +88,8 @@ export default function VehiclesTab({
       .sort((a, b) => b.id.localeCompare(a.id));
   }, [vehiculos, searchTerm]);
 
-  const pagedVehiculos = useMemo(() => {
-    const start = (currentPage - 1) * PAGE_SIZE;
-    return filteredVehiculos.slice(start, start + PAGE_SIZE);
-  }, [filteredVehiculos, currentPage]);
+  const paginacion = usePaginacion(filteredVehiculos, 'vehiculos');
+  const pagedVehiculos = paginacion.items;
 
   // Statistics
   const totalVehiculos = useMemo(() => vehiculos.length, [vehiculos]);
@@ -290,7 +287,7 @@ export default function VehiclesTab({
               type="text"
               placeholder="Buscar por marca, modelo, matrícula o bastidor..."
               value={searchTerm}
-              onChange={(e) => { setSearchTerm(e.target.value); setCurrentPage(1); }}
+              onChange={(e) => { setSearchTerm(e.target.value); paginacion.setPage(1); }}
               id="search-vehiculos"
               className="w-full pl-9 pr-4 py-2 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 bg-slate-50 focus:bg-white transition"
             />
@@ -365,12 +362,7 @@ export default function VehiclesTab({
                 )}
               </tbody>
             </table>
-            <Pagination
-              currentPage={currentPage}
-              totalItems={filteredVehiculos.length}
-              pageSize={PAGE_SIZE}
-              onPageChange={setCurrentPage}
-            />
+            <Pagination {...paginacion.props} />
           </div>
         </div>
 
@@ -596,27 +588,7 @@ export default function VehiclesTab({
       {/* MODAL: ADD VEHICLE */}
       <AnimatePresence>
         {isAddingOpen && (
-          <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4 z-50 overflow-y-auto">
-            <motion.div 
-              initial={{ scale: 0.95, opacity: 0 }}
-              animate={{ scale: 1, opacity: 1 }}
-              exit={{ scale: 0.95, opacity: 0 }}
-              className="bg-white rounded-2xl border border-slate-200 shadow-2xl max-w-lg w-full overflow-hidden"
-              id="add-vehicle-modal"
-            >
-              <div className="px-6 py-4 bg-slate-50 border-b border-slate-100 flex justify-between items-center">
-                <h3 className="font-extrabold text-slate-800 flex items-center gap-2 font-display">
-                  <Car className="w-5 h-5 text-blue-600" />
-                  Alta de Nuevo Vehículo
-                </h3>
-                <button 
-                  onClick={() => setIsAddingOpen(false)}
-                  className="p-1 hover:bg-slate-200 rounded-md transition text-slate-400"
-                >
-                  <X className="w-5 h-5" />
-                </button>
-              </div>
-
+          <ModalShell id="add-vehicle-modal" titulo="Alta de Nuevo Vehículo" icono={<Car className="w-5 h-5 text-blue-600" />} onClose={() => setIsAddingOpen(false)}>
               <form onSubmit={handleAddSubmit} className="p-6 space-y-4">
                 <div className="grid grid-cols-2 gap-4">
                   <div>
@@ -783,8 +755,7 @@ export default function VehiclesTab({
                   </button>
                 </div>
               </form>
-            </motion.div>
-          </div>
+          </ModalShell>
         )}
       </AnimatePresence>
 
@@ -801,27 +772,7 @@ export default function VehiclesTab({
       {/* MODAL: EDIT VEHICLE */}
       <AnimatePresence>
         {isEditing && editFormData && (
-          <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4 z-50 overflow-y-auto">
-            <motion.div 
-              initial={{ scale: 0.95, opacity: 0 }}
-              animate={{ scale: 1, opacity: 1 }}
-              exit={{ scale: 0.95, opacity: 0 }}
-              className="bg-white rounded-2xl border border-slate-200 shadow-2xl max-w-lg w-full overflow-hidden"
-              id="edit-vehicle-modal"
-            >
-              <div className="px-6 py-4 bg-slate-50 border-b border-slate-100 flex justify-between items-center text-slate-800">
-                <h3 className="font-extrabold flex items-center gap-2 font-display">
-                  <PenTool className="w-5 h-5 text-blue-600" />
-                  Editar Vehículo
-                </h3>
-                <button 
-                  onClick={() => setIsEditing(false)}
-                  className="p-1 hover:bg-slate-200 rounded-md transition text-slate-400"
-                >
-                  <X className="w-5 h-5" />
-                </button>
-              </div>
-
+          <ModalShell id="edit-vehicle-modal" titulo="Editar Vehículo" icono={<PenTool className="w-5 h-5 text-blue-600" />} onClose={() => setIsEditing(false)}>
               <form onSubmit={handleEditSubmit} className="p-6 space-y-4">
                 <div className="grid grid-cols-2 gap-4">
                   <div>
@@ -984,8 +935,7 @@ export default function VehiclesTab({
                   </button>
                 </div>
               </form>
-            </motion.div>
-          </div>
+          </ModalShell>
         )}
       </AnimatePresence>
     </div>
