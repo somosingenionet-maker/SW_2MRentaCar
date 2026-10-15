@@ -1,4 +1,6 @@
 import { Reserva, SolicitudReserva, SolicitudExtra, Vehiculo } from '../types';
+import { finEfectivo } from './entregaDevolucion';
+import { hoyISO } from './fechas';
 
 /** Días de alquiler entre dos fechas 'YYYY-MM-DD' (mínimo 1). */
 export function diasAlquiler(inicio: string, fin: string): number {
@@ -7,13 +9,17 @@ export function diasAlquiler(inicio: string, fin: string): number {
   return Math.ceil(diff / (1000 * 60 * 60 * 24)) || 1;
 }
 
-/** Reservas activas del vehículo que se pisan con el rango dado. */
-export function reservasSolapadas(reservas: Reserva[], vehiculoId: string, inicio: string, fin: string): Reserva[] {
+/**
+ * Reservas activas del vehículo que se pisan con el rango dado. Cuenta hasta el día real en que
+ * el coche queda libre: una devolución anticipada lo libera antes, y un coche entregado que aún
+ * no ha vuelto sigue ocupado aunque haya pasado su fecha de fin.
+ */
+export function reservasSolapadas(reservas: Reserva[], vehiculoId: string, inicio: string, fin: string, hoy: string = hoyISO()): Reserva[] {
   const ini = new Date(inicio).getTime();
   const end = new Date(fin).getTime();
   return reservas.filter(r => {
     if (r.vehiculoId !== vehiculoId || r.estado === 'cancelada') return false;
-    return ini <= new Date(r.fechaFin).getTime() && new Date(r.fechaInicio).getTime() <= end;
+    return ini <= new Date(finEfectivo(r, hoy)).getTime() && new Date(r.fechaInicio).getTime() <= end;
   });
 }
 

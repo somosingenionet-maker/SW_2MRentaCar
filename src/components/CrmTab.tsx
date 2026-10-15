@@ -1,4 +1,6 @@
 import { useState, useMemo } from 'react';
+import { ESTADO_META, estadoReserva } from '../utils/entregaDevolucion';
+import { hoyISO } from '../utils/fechas';
 import { usePaginacion } from '../utils/usePaginacion';
 import { useSeleccion } from '../utils/useSeleccion';
 import { Cliente, Reserva, InteraccionCliente, Vehiculo, OrdenTrabajo, Factura, OTEstado, InvitacionCliente, SolicitudReserva } from '../types';
@@ -704,9 +706,10 @@ export default function CrmTab({
                             </div>
                             <div className="text-right shrink-0">
                               <span className="font-bold text-slate-900 block font-mono">{res.totalCobrado.toFixed(2)} €</span>
-                              <span className={`inline-block text-[9px] font-bold uppercase rounded px-1.5 ${
-                                res.estado === 'cancelada' ? 'bg-rose-50 text-rose-600' : 'bg-emerald-50 text-emerald-700'
-                              }`}>{res.estado === 'cancelada' ? 'Anulado' : 'Activo'}</span>
+                              {(() => {
+                                const e = ESTADO_META[estadoReserva(res, hoyISO())];
+                                return <span className={`inline-block text-[9px] font-bold uppercase rounded px-1.5 ${e.cls}`}>{e.label}</span>;
+                              })()}
                             </div>
                           </div>
                         );

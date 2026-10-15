@@ -1,9 +1,11 @@
 import { useState } from 'react';
+import RegistroMovimientoModal, { TarjetaMovimiento } from './RegistroMovimientoModal';
+import { COMBUSTIBLES, estadoReserva as estadoDeReserva, esHistorica as esHistoricaReserva, finEfectivo, kmRecorridos, ESTADO_META } from '../utils/entregaDevolucion';
 import ModalShell from './ModalShell';
 import { usePaginacion } from '../utils/usePaginacion';
 import { ofreceSeguro, totalAlquiler, etiquetaTransmision } from '../utils/condicionesAlquiler';
 import { useSeleccion } from '../utils/useSeleccion';
-import { Reserva, Vehiculo, Cliente, SolicitudReserva } from '../types';
+import { Reserva, Vehiculo, Cliente, SolicitudReserva, MovimientoVehiculo } from '../types';
 import SearchableSelect from './SearchableSelect';
 import {
   Calendar, Plus, User, Car, FileText, Check, X, Printer, Download, ChevronLeft, ChevronRight, MessageCircle, Mail as MailIcon, Globe, AlertTriangle
@@ -38,9 +40,12 @@ interface RentalsTabProps {
   /** Crea la reserva (y el cliente si es nuevo) y marca la solicitud como convertida. Rechaza si algo falla. */
   onConvertirSolicitud: (sol: SolicitudReserva, reserva: Reserva, clienteNuevo: Cliente | null) => Promise<void>;
   onDescartarSolicitud: (sol: SolicitudReserva) => Promise<void>;
+  /** Nombre de quien trabaja con la app, para firmar entregas y devoluciones. */
+  usuarioNombre?: string;
 }
 
 export default function RentalsTab({
+  usuarioNombre = '',
   reservas,
   vehiculos,
   clientes,
@@ -73,6 +78,7 @@ export default function RentalsTab({
   const [confirmDescartar, setConfirmDescartar] = useState<SolicitudReserva | null>(null);
   // Vista de la tabla de reservas: activas/próximas vs historial (finalizadas o anuladas).
   const [leyendaAbierta, setLeyendaAbierta] = useState(false);
+  const [movimientoModal, setMovimientoModal] = useState<{ tipo: 'entrega' | 'devolucion'; reserva: Reserva } | null>(null);
   const [reservaView, setReservaView] = useState<'activas' | 'historial'>('activas');
   const [dayModal, setDayModal] = useState<{ iso: string; reservations: Reserva[] } | null>(null);
   const [calendarDate, setCalendarDate] = useState(() => {
@@ -236,6 +242,12 @@ export default function RentalsTab({
     setIsAddingOpen(true);
   };
 
+  const handleGuardarMovimiento = (m: MovimientoVehiculo) => {
+    if (!movimientoModal) return;
+    onUpdateReserva({ ...movimientoModal.reserva, [movimientoModal.tipo]: m });
+    setMovimientoModal(null);
+  };
+
   const handleStatusChange = (resId: string, nuevoEstado: Reserva['estado']) => {
     const res = reservas.find(r => r.id === resId);
     if (res) {
@@ -302,24 +314,20 @@ export default function RentalsTab({
   // El calendario solo muestra reservas activas o futuras: las que ya terminaron
   // (fechaFin anterior a hoy) o están anuladas no se pintan.
   const reservasForDay = (iso: string) =>
-    reservas.filter(r => r.estado !== 'cancelada' && r.fechaFin >= todayIso && r.fechaInicio <= iso && r.fechaFin >= iso);
+    reservas.filter(r => !esHistoricaReserva(r, todayIso) && r.fechaInicio <= iso && finEfectivo(r, todayIso) >= iso);
 
   // Clasificación para las vistas de la tabla.
-  // Histórica = anulada o ya finalizada (fechaFin anterior a hoy).
-  const esHistorica = (r: Reserva) => r.estado === 'cancelada' || r.fechaFin < todayIso;
+  // Histórica = anulada o devuelta (o terminada por fechas sin haberse llegado a entregar).
+  // Un coche entregado que aún no ha vuelto sigue activo aunque haya pasado su fecha de fin.
+  const esHistorica = (r: Reserva) => esHistoricaReserva(r, todayIso);
   const reservasActivas = sortedReservas.filter(r => !esHistorica(r));
   const reservasHistorial = sortedReservas.filter(esHistorica);
   const reservasVista = reservaView === 'historial' ? reservasHistorial : reservasActivas;
   const paginacion = usePaginacion(reservasVista, 'reservas');
   const pagedReservas = paginacion.items;
 
-  // Etiqueta de estado de una reserva según fechas y anulación.
-  const estadoReserva = (r: Reserva): { label: string; cls: string } => {
-    if (r.estado === 'cancelada') return { label: 'Anulada', cls: 'bg-rose-50 text-rose-600' };
-    if (r.fechaFin < todayIso) return { label: 'Finalizada', cls: 'bg-slate-100 text-slate-500' };
-    if (r.fechaInicio > todayIso) return { label: 'Próxima', cls: 'bg-blue-50 text-blue-600' };
-    return { label: 'Activa', cls: 'bg-emerald-50 text-emerald-600' };
-  };
+  // Etiqueta de estado de una reserva (anulada, por entregar, en curso, retrasada, finalizada…).
+  const estadoReserva = (r: Reserva): { label: string; cls: string } => ESTADO_META[estadoDeReserva(r, todayIso)];
 
   const vehicleColors: Record<string, string> = {};
   const PALETTE = [
@@ -334,7 +342,7 @@ export default function RentalsTab({
   // Con decenas de coches una paleta de 7 colores se repetiría sin sentido: los colores
   // se reparten solo entre los vehículos que tienen reservas en el mes que se está viendo.
   const reservasDelMes = reservas.filter(r =>
-    r.estado !== 'cancelada' && r.fechaFin >= todayIso && r.fechaInicio <= toIso(lastOfMonth) && r.fechaFin >= toIso(firstOfMonth));
+    !esHistorica(r) && r.fechaInicio <= toIso(lastOfMonth) && finEfectivo(r, todayIso) >= toIso(firstOfMonth));
   const vehiculosDelMes = vehiculosAlquiler
     .filter(v => reservasDelMes.some(r => r.vehiculoId === v.id))
     .sort((a, b) => a.matricula.localeCompare(b.matricula));
@@ -853,6 +861,32 @@ export default function RentalsTab({
                 </div>
               </div>
 
+              {/* Entrega y devolución del vehículo */}
+              {(selectedReserva.estado !== 'cancelada' || selectedReserva.entrega || selectedReserva.devolucion) && (
+                <div className="space-y-2 border-t border-slate-50 pt-3">
+                  <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest block">Entrega y devolución</span>
+                  <TarjetaMovimiento
+                    titulo="Entrega al cliente"
+                    mov={selectedReserva.entrega}
+                    bloqueada={selectedReserva.estado === 'cancelada' ? 'La reserva está anulada.' : undefined}
+                    onRegistrar={() => setMovimientoModal({ tipo: 'entrega', reserva: selectedReserva })}
+                    onEditar={() => setMovimientoModal({ tipo: 'entrega', reserva: selectedReserva })}
+                  />
+                  <TarjetaMovimiento
+                    titulo="Devolución del vehículo"
+                    mov={selectedReserva.devolucion}
+                    bloqueada={!selectedReserva.entrega ? 'Registra primero la entrega.' : selectedReserva.estado === 'cancelada' ? 'La reserva está anulada.' : undefined}
+                    onRegistrar={() => setMovimientoModal({ tipo: 'devolucion', reserva: selectedReserva })}
+                    onEditar={() => setMovimientoModal({ tipo: 'devolucion', reserva: selectedReserva })}
+                  />
+                  {kmRecorridos(selectedReserva.entrega, selectedReserva.devolucion) != null && (
+                    <p className="text-[11px] font-semibold text-blue-700 bg-blue-50 border border-blue-100 rounded-lg px-3 py-2">
+                      Kilómetros recorridos: {kmRecorridos(selectedReserva.entrega, selectedReserva.devolucion)!.toLocaleString('es-ES')} km
+                    </p>
+                  )}
+                </div>
+              )}
+
               {/* State Management actions */}
               <div className="space-y-2 border-t border-slate-50 pt-3">
                 <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest block">Estado del contrato</span>
@@ -901,6 +935,26 @@ export default function RentalsTab({
           )}
         </div>
       </div>
+
+      {/* MODAL: ENTREGA / DEVOLUCIÓN */}
+      <AnimatePresence>
+        {movimientoModal && (() => {
+          const veh = vehiculos.find(v => v.id === movimientoModal.reserva.vehiculoId);
+          return (
+            <RegistroMovimientoModal
+              key={`${movimientoModal.reserva.id}-${movimientoModal.tipo}`}
+              tipo={movimientoModal.tipo}
+              vehiculoNombre={veh ? `${veh.marca} ${veh.modelo} · ${veh.matricula}` : 'Vehículo no disponible'}
+              kmFicha={veh?.kilometraje ?? 0}
+              entrega={movimientoModal.reserva.entrega}
+              inicial={movimientoModal.reserva[movimientoModal.tipo]}
+              responsableDefecto={usuarioNombre}
+              onSave={handleGuardarMovimiento}
+              onClose={() => setMovimientoModal(null)}
+            />
+          );
+        })()}
+      </AnimatePresence>
 
       {/* MODAL: CREATE RESERVATION */}
       <AnimatePresence>
@@ -1345,6 +1399,29 @@ export default function RentalsTab({
                       <strong className="font-mono text-blue-950">{viewingContract.totalCobrado.toFixed(2)} €</strong>
                     </div>
                   </div>
+                </div>
+
+                {/* Estado del coche a la entrega y a la devolución (registrado, o líneas para rellenar a mano) */}
+                <div className="grid grid-cols-2 gap-4" id="contract-delivery-return">
+                  {([
+                    { titulo: '6. ENTREGA DEL VEHÍCULO', mov: viewingContract.entrega },
+                    { titulo: '7. DEVOLUCIÓN DEL VEHÍCULO', mov: viewingContract.devolucion },
+                  ] as const).map(({ titulo, mov }) => (
+                    <div key={titulo} className="p-4 bg-slate-50 border border-slate-200 rounded-xl space-y-1.5 text-xs text-slate-700">
+                      <h5 className="font-bold text-slate-900 uppercase text-[10px] pb-1 border-b border-slate-200">{titulo}</h5>
+                      {([
+                        ['Fecha y hora', mov ? new Date(mov.fechaHora).toLocaleString('es-ES', { day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' }) : null],
+                        ['Kilometraje', mov ? `${mov.km.toLocaleString('es-ES')} km` : null],
+                        ['Combustible', mov ? (COMBUSTIBLES.find(c => c.valor === mov.combustible)?.etiqueta ?? '—') : null],
+                        ['Daños', mov ? (mov.danos || 'Ninguno') : null],
+                      ] as const).map(([etiqueta, valor]) => (
+                        <div key={etiqueta} className="flex justify-between gap-2">
+                          <span className="text-slate-400">{etiqueta}:</span>
+                          {valor != null ? <strong className="text-right">{valor}</strong> : <span className="flex-1 border-b border-dashed border-slate-300 mb-1" />}
+                        </div>
+                      ))}
+                    </div>
+                  ))}
                 </div>
 
                 {/* Terms conditions text in Spanish */}

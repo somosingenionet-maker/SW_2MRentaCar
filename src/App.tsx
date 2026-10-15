@@ -219,10 +219,40 @@ export default function App() {
     }
   }, [clientes, vehiculos, handleUpdateCliente, fallo]);
 
+  // Cuando un vehículo entra en el taller o se entrega/devuelve en un alquiler, su ficha sube al
+  // kilometraje registrado (nunca baja).
+  const sincronizarKilometraje = useCallback((vehiculoId: string, km: number) => {
+    const veh = vehiculos.find(v => v.id === vehiculoId);
+    if (!veh) return;
+    const nuevo = kilometrajeTrasIngreso(veh.kilometraje, km);
+    if (nuevo !== veh.kilometraje) handleUpdateVehiculo({ ...veh, kilometraje: nuevo });
+  }, [vehiculos, handleUpdateVehiculo]);
+
   const handleUpdateReserva = useCallback((editada: Reserva) => {
+    const anterior = reservas.find(r => r.id === editada.id);
     setReservas(prev => prev.map(r => r.id === editada.id ? editada : r));
     upsertOne('reservas', editada).catch(fallo('actualizar la reserva'));
-  }, [fallo]);
+
+    // Entrega y devolución: actualizan el kilometraje del coche y dejan apunte en el historial del cliente.
+    const veh = vehiculos.find(v => v.id === editada.vehiculoId);
+    const apuntes: InteraccionCliente[] = [];
+    for (const tipo of ['entrega', 'devolucion'] as const) {
+      const nuevo = editada[tipo];
+      const previo = anterior?.[tipo];
+      if (!nuevo) continue;
+      if (!previo || previo.km !== nuevo.km) sincronizarKilometraje(editada.vehiculoId, nuevo.km);
+      if (!previo) {
+        apuntes.push({
+          id: genId('int-cli-mov'),
+          fecha: new Date().toISOString().split('T')[0],
+          tipo: 'registro_contrato',
+          notas: `Vehículo ${tipo === 'entrega' ? 'entregado' : 'devuelto'}${veh ? `: ${veh.marca} ${veh.modelo} (${veh.matricula})` : ''} · ${nuevo.km.toLocaleString('es-ES')} km · combustible ${nuevo.combustible.replace('_', ' ')}${nuevo.danos ? ` · Daños: ${nuevo.danos}` : ''}.`,
+        });
+      }
+    }
+    const cli = clientes.find(c => c.id === editada.clienteId);
+    if (cli && apuntes.length > 0) handleUpdateCliente({ ...cli, interacciones: [...apuntes, ...cli.interacciones] });
+  }, [fallo, reservas, vehiculos, clientes, sincronizarKilometraje, handleUpdateCliente]);
 
   // Convierte una solicitud de la web en reserva real. Se encadena en orden
   // (cliente → reserva → solicitud) y se espera cada paso: la reserva tiene
@@ -389,20 +419,12 @@ export default function App() {
   }, [fallo]);
 
   // OT handlers
-  // Cuando un vehículo ingresa en el taller, su ficha sube al kilometraje de entrada (nunca baja).
-  const sincronizarKilometraje = useCallback((ot: OrdenTrabajo) => {
-    const veh = vehiculos.find(v => v.id === ot.vehiculoId);
-    if (!veh) return;
-    const nuevo = kilometrajeTrasIngreso(veh.kilometraje, ot.kilometrajeEntrada);
-    if (nuevo !== veh.kilometraje) handleUpdateVehiculo({ ...veh, kilometraje: nuevo });
-  }, [vehiculos, handleUpdateVehiculo]);
-
   const ingresado = (ot: OrdenTrabajo) => ot.estado !== 'presupuesto' && ot.estado !== 'cancelado';
 
   const handleAddOT = useCallback((ot: OrdenTrabajo) => {
     setOrdenesTrabajo(prev => [...prev, ot]);
     upsertOne('ordenes_trabajo', ot).catch(fallo('guardar la orden de trabajo'));
-    if (ingresado(ot)) sincronizarKilometraje(ot);
+    if (ingresado(ot)) sincronizarKilometraje(ot.vehiculoId, ot.kilometrajeEntrada);
   }, [fallo, sincronizarKilometraje]);
 
   const handleUpdateOT = useCallback((ot: OrdenTrabajo) => {
@@ -411,7 +433,7 @@ export default function App() {
     upsertOne('ordenes_trabajo', ot).catch(fallo('actualizar la orden de trabajo'));
     // Solo en el ingreso o si cambia el km de entrada: así no se deshace una corrección manual de la ficha.
     if (ingresado(ot) && (!anterior || !ingresado(anterior) || anterior.kilometrajeEntrada !== ot.kilometrajeEntrada)) {
-      sincronizarKilometraje(ot);
+      sincronizarKilometraje(ot.vehiculoId, ot.kilometrajeEntrada);
     }
   }, [fallo, ordenesTrabajo, sincronizarKilometraje]);
 
@@ -807,6 +829,7 @@ export default function App() {
             onUpdateReserva={handleUpdateReserva}
             onConvertirSolicitud={handleConvertirSolicitud}
             onDescartarSolicitud={handleDescartarSolicitud}
+            usuarioNombre={currentUser?.nombre ?? ''}
           />
         )}
 

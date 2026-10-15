@@ -143,6 +143,24 @@ export interface Reserva {
   seguroDia?: number;
   /** De dónde viene: creada a mano o asignada desde una solicitud de la web. */
   origen?: 'manual' | 'web';
+  /** Registro de la entrega del coche al cliente. */
+  entrega?: MovimientoVehiculo | null;
+  /** Registro de la devolución del coche. */
+  devolucion?: MovimientoVehiculo | null;
+}
+
+export type NivelCombustible = 'lleno' | 'tres_cuartos' | 'medio' | 'cuarto' | 'reserva';
+
+/** Estado del coche en el momento de entregarlo o de recibirlo de vuelta. */
+export interface MovimientoVehiculo {
+  /** Fecha y hora reales (ISO). */
+  fechaHora: string;
+  km: number;
+  combustible: NivelCombustible;
+  /** Entrega: daños que ya tenía. Devolución: daños nuevos o incidencias. Vacío = ninguno. */
+  danos: string;
+  /** Quién lo registró. */
+  responsable: string;
 }
 
 /** Extra contratado junto al vehículo en una solicitud (sillita, cobertura...). */
