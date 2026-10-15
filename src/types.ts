@@ -23,6 +23,12 @@ export interface Vehiculo {
   esFlotaAlquiler?: boolean;
   /** Tarifas de alquiler por temporada. Solo aplica si esFlotaAlquiler=true. */
   tarifasAlquiler?: TarifasAlquiler;
+  /** Cambio del vehículo. */
+  transmision?: 'manual' | 'automatico';
+  /** Fianza (€) que se deja al recoger el coche. Solo alquiler. */
+  fianza?: number;
+  /** Precio por día (€) del seguro a todo riesgo. null o ausente = este vehículo no lo ofrece. */
+  seguroAmpliadoDia?: number | null;
 }
 
 // ─── Órdenes de Trabajo ───────────────────────────────────────────────────────
@@ -131,6 +137,10 @@ export interface Reserva {
   totalCobrado: number;
   estado: 'confirmada' | 'cancelada';
   incluyeSeguroTodoRiesgo: boolean;
+  /** Fianza (€) del vehículo en el momento de crear la reserva: el contrato firmado no cambia si luego se edita. */
+  fianza?: number;
+  /** Precio por día (€) del seguro en el momento de crear la reserva. */
+  seguroDia?: number;
   /** De dónde viene: creada a mano o asignada desde una solicitud de la web. */
   origen?: 'manual' | 'web';
 }

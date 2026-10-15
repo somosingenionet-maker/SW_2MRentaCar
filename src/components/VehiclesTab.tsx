@@ -1,4 +1,6 @@
 import { useState, useMemo } from 'react';
+import CondicionesAlquilerFields from './CondicionesAlquilerFields';
+import { CONDICIONES_POR_DEFECTO, etiquetaTransmision } from '../utils/condicionesAlquiler';
 import { useSeleccion } from '../utils/useSeleccion';
 import { datoDuplicado } from '../utils/vehiculoDuplicado';
 import { Vehiculo, OrdenTrabajo, OTEstado, TarifasAlquiler } from '../types';
@@ -99,8 +101,8 @@ export default function VehiclesTab({
     const hoy = new Date();
     const limite = new Date(hoy.getTime() + DIAS_ALERTA * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
     return {
-      itvAlerta: vehiculos.filter(v => v.itvVencimiento <= limite).length,
-      seguroAlerta: vehiculos.filter(v => v.seguroVencimiento <= limite).length,
+      itvAlerta: vehiculos.filter(v => !!v.itvVencimiento && v.itvVencimiento <= limite).length,
+      seguroAlerta: vehiculos.filter(v => !!v.seguroVencimiento && v.seguroVencimiento <= limite).length,
     };
   }, [vehiculos]);
 
@@ -204,8 +206,9 @@ export default function VehiclesTab({
   };
 
   const handleExportCsv = () => {
-    const headers = ['Marca', 'Modelo', 'Matrícula', 'Bastidor', 'Km', 'ITV Vencimiento', 'Seguro Vencimiento', 'Impuesto Vencimiento', 'Fecha Registro'];
-    const rows = vehiculos.map(v => [v.marca, v.modelo, v.matricula, v.bastidor, String(v.kilometraje), v.itvVencimiento, v.seguroVencimiento, v.impuestoVencimiento, v.fechaRegistro]);
+    const headers = ['Marca', 'Modelo', 'Matrícula', 'Bastidor', 'Km', 'ITV Vencimiento', 'Seguro Vencimiento', 'Impuesto Vencimiento', 'Fecha Registro', 'Transmisión', 'Fianza (€)', 'Seguro ampliado (€/día)'];
+    const rows = vehiculos.map(v => [v.marca, v.modelo, v.matricula, v.bastidor, String(v.kilometraje), v.itvVencimiento ?? '', v.seguroVencimiento ?? '', v.impuestoVencimiento ?? '', v.fechaRegistro,
+      v.esFlotaAlquiler ? etiquetaTransmision(v.transmision) : '', v.esFlotaAlquiler && v.fianza ? String(v.fianza) : '', v.seguroAmpliadoDia != null ? String(v.seguroAmpliadoDia) : '']);
     downloadCsv(`${slugify(getEmpresaConfig().nombre)}_flota_${new Date().toISOString().slice(0, 10)}.csv`, [headers, ...rows]);
   };
 
@@ -326,6 +329,7 @@ export default function VehiclesTab({
                           <div className="flex items-center gap-1.5">
                             <span className="font-bold text-slate-800">{veh.marca} {veh.modelo}</span>
                             {veh.esFlotaAlquiler && hasAlquileres && <span className="text-[9px] font-bold px-1.5 py-0.5 rounded-full bg-blue-100 text-blue-700">Alquiler</span>}
+                            {veh.transmision === 'automatico' && <span className="text-[9px] font-bold px-1.5 py-0.5 rounded-full bg-violet-100 text-violet-700">Automático</span>}
                           </div>
                           <div className="text-[10px] font-mono text-slate-400">{veh.bastidor}</div>
                         </div>
@@ -462,6 +466,22 @@ export default function VehiclesTab({
                       );
                     })}
                   </div>
+                </div>
+              )}
+
+              {/* Condiciones de alquiler: transmisión, fianza y seguro */}
+              {selectedVehiculo.esFlotaAlquiler && hasAlquileres && (
+                <div className="grid grid-cols-3 gap-2">
+                  {[
+                    { label: 'Transmisión', valor: etiquetaTransmision(selectedVehiculo.transmision) },
+                    { label: 'Fianza', valor: selectedVehiculo.fianza ? `${selectedVehiculo.fianza} €` : '—' },
+                    { label: 'Seguro ampliado', valor: selectedVehiculo.seguroAmpliadoDia != null ? `${selectedVehiculo.seguroAmpliadoDia} €/día` : 'No ofrece' },
+                  ].map(({ label, valor }) => (
+                    <div key={label} className="bg-white rounded-lg border border-blue-100 p-2 text-center">
+                      <div className="text-[10px] text-slate-400 font-semibold uppercase">{label}</div>
+                      <div className="text-sm font-extrabold text-slate-800 mt-0.5">{valor}</div>
+                    </div>
+                  ))}
                 </div>
               )}
 
@@ -703,7 +723,7 @@ export default function VehiclesTab({
                       <input
                         type="checkbox"
                         checked={formData.esFlotaAlquiler ?? false}
-                        onChange={e => setFormData({ ...formData, esFlotaAlquiler: e.target.checked })}
+                        onChange={e => setFormData({ ...formData, esFlotaAlquiler: e.target.checked, ...(e.target.checked && formData.fianza == null ? CONDICIONES_POR_DEFECTO : {}) })}
                         className="w-4 h-4 rounded border-slate-300 text-blue-600 focus:ring-blue-500"
                       />
                       <span className="text-xs font-bold text-blue-800">Vehículo de alquiler</span>
@@ -737,6 +757,9 @@ export default function VehiclesTab({
                           ))}
                         </div>
                       </div>
+                    )}
+                    {formData.esFlotaAlquiler && (
+                      <CondicionesAlquilerFields value={formData} onChange={c => setFormData(fd => ({ ...fd, ...c }))} />
                     )}
                   </div>
                 )}
@@ -866,7 +889,7 @@ export default function VehiclesTab({
                       <input
                         type="date"
                         className="w-full mt-1 px-2.5 py-1.5 border border-slate-200 rounded-lg text-xs focus:outline-none focus:ring-1 focus:ring-blue-500"
-                        value={editFormData.itvVencimiento}
+                        value={editFormData.itvVencimiento ?? ''}
                         onChange={e => setEditFormData({ ...editFormData, itvVencimiento: e.target.value })}
                         required
                       />
@@ -876,7 +899,7 @@ export default function VehiclesTab({
                       <input
                         type="date"
                         className="w-full mt-1 px-2.5 py-1.5 border border-slate-200 rounded-lg text-xs focus:outline-none focus:ring-1 focus:ring-blue-500"
-                        value={editFormData.seguroVencimiento}
+                        value={editFormData.seguroVencimiento ?? ''}
                         onChange={e => setEditFormData({ ...editFormData, seguroVencimiento: e.target.value })}
                         required
                       />
@@ -886,7 +909,7 @@ export default function VehiclesTab({
                       <input
                         type="date"
                         className="w-full mt-1 px-2.5 py-1.5 border border-slate-200 rounded-lg text-xs focus:outline-none focus:ring-1 focus:ring-blue-500"
-                        value={editFormData.impuestoVencimiento}
+                        value={editFormData.impuestoVencimiento ?? ''}
                         onChange={e => setEditFormData({ ...editFormData, impuestoVencimiento: e.target.value })}
                         required
                       />
@@ -934,6 +957,9 @@ export default function VehiclesTab({
                           ))}
                         </div>
                       </div>
+                    )}
+                    {editFormData.esFlotaAlquiler && (
+                      <CondicionesAlquilerFields value={editFormData} onChange={c => setEditFormData(ef => ef ? { ...ef, ...c } : ef)} />
                     )}
                   </div>
                 )}

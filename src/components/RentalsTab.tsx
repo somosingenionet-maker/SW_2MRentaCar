@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { ofreceSeguro, totalAlquiler, etiquetaTransmision } from '../utils/condicionesAlquiler';
 import { useSeleccion } from '../utils/useSeleccion';
 import { Reserva, Vehiculo, Cliente, SolicitudReserva } from '../types';
 import SearchableSelect from './SearchableSelect';
@@ -81,7 +82,10 @@ export default function RentalsTab({
   const calculateDays = diasAlquiler;
 
   const currentDuration = calculateDays(formFechaInicio, formFechaFin);
-  const calculatedTotal = currentDuration * formTarifa + (formSeguro ? currentDuration * 15 : 0);
+  // Condiciones del vehículo elegido: el seguro y la fianza son suyos, no valores fijos.
+  const vehiculoElegido = vehiculos.find(v => v.id === formVehiculoId);
+  const seguroDiaElegido = vehiculoElegido?.seguroAmpliadoDia ?? null;
+  const calculatedTotal = totalAlquiler(currentDuration, formTarifa, seguroDiaElegido, formSeguro);
 
   const handleOpenAdd = () => {
     setSolicitudActiva(null);
@@ -93,7 +97,7 @@ export default function RentalsTab({
     setFormFechaFin(new Date(Date.now() + 5 * 24 * 60 * 60 * 1000).toISOString().split('T')[0]);
     setFormTemporada('media');
     setFormTarifa(vehiculos[0]?.tarifasAlquiler?.temporadaMedia ?? 45);
-    setFormSeguro(true);
+    setFormSeguro(ofreceSeguro(vehiculos[0]));
     setIsAddingOpen(true);
   };
 
@@ -112,10 +116,12 @@ export default function RentalsTab({
         totalCobrado: solicitudActiva.total,
         estado: 'confirmada',
         incluyeSeguroTodoRiesgo: incluyeCobertura(solicitudActiva.extras),
+        fianza: vehiculoElegido?.fianza || undefined,
+        seguroDia: seguroDiaElegido ?? undefined,
         origen: 'web',
       };
     }
-    const total = duration * Number(formTarifa) + (formSeguro ? duration * 15 : 0);
+    const total = totalAlquiler(duration, Number(formTarifa), seguroDiaElegido, formSeguro);
     return {
       id: genId('res'),
       vehiculoId: formVehiculoId,
@@ -126,7 +132,9 @@ export default function RentalsTab({
       tarifaDiaria: Number(formTarifa),
       totalCobrado: total,
       estado: 'confirmada',
-      incluyeSeguroTodoRiesgo: formSeguro
+      incluyeSeguroTodoRiesgo: formSeguro && seguroDiaElegido != null,
+      fianza: vehiculoElegido?.fianza || undefined,
+      seguroDia: formSeguro && seguroDiaElegido != null ? seguroDiaElegido : undefined,
     };
   };
 
@@ -816,8 +824,14 @@ export default function RentalsTab({
                   </div>
                   <div className="flex justify-between text-xs font-semibold">
                     <span>Seguro Todo Riesgo:</span>
-                    <span>{selectedReserva.incluyeSeguroTodoRiesgo ? '15.00 € / día' : 'No incluido'}</span>
+                    <span>{selectedReserva.incluyeSeguroTodoRiesgo ? (selectedReserva.seguroDia != null ? `${selectedReserva.seguroDia.toFixed(2)} € / día` : 'Incluido') : 'No incluido'}</span>
                   </div>
+                  {selectedReserva.fianza != null && selectedReserva.fianza > 0 && (
+                    <div className="flex justify-between text-xs font-semibold">
+                      <span>Fianza (depósito):</span>
+                      <span>{selectedReserva.fianza.toFixed(2)} €</span>
+                    </div>
+                  )}
                   <div className="flex justify-between border-t border-blue-200 pt-1.5 text-xs font-bold text-blue-800">
                     <span>LIQUIDACIÓN TOTAL:</span>
                     <span>{selectedReserva.totalCobrado.toFixed(2)} €</span>
@@ -941,6 +955,8 @@ export default function RentalsTab({
                         const veh = vehiculos.find(v => v.id === val);
                         const precio = veh?.tarifasAlquiler?.[`temporada${formTemporada.charAt(0).toUpperCase() + formTemporada.slice(1)}` as 'temporadaAlta' | 'temporadaMedia' | 'temporadaBaja'];
                         if (precio !== undefined) setFormTarifa(precio);
+                        // El seguro depende del coche: se marca por defecto si lo ofrece y se quita si no.
+                        if (!solicitudActiva) setFormSeguro(ofreceSeguro(veh));
                       }}
                       placeholder="Seleccionar vehículo..."
                       emptyMessage="No hay vehículos de alquiler disponibles"
@@ -1048,8 +1064,13 @@ export default function RentalsTab({
                     )}
                   </div>
 
-                  {/* Extra Todo Riesgo Insurance checkbox */}
-                  {!solicitudActiva && (
+                  {/* Seguro a todo riesgo: solo si el vehículo lo ofrece, con su precio */}
+                  {!solicitudActiva && vehiculoElegido && !ofreceSeguro(vehiculoElegido) && (
+                    <p className="text-[11px] text-slate-500 bg-slate-50 border border-slate-100 rounded-lg px-3 py-2">
+                      Este vehículo no ofrece seguro a todo riesgo.
+                    </p>
+                  )}
+                  {!solicitudActiva && ofreceSeguro(vehiculoElegido) && (
                   <div className="p-3 bg-slate-50 rounded-lg border border-slate-100 flex items-start gap-2">
                     <input
                       type="checkbox"
@@ -1060,7 +1081,7 @@ export default function RentalsTab({
                     />
                     <label htmlFor="opt-seguro" className="text-xs text-slate-600 block cursor-pointer select-none">
                       <strong className="font-bold text-slate-700">Incluir Cobertura de Seguro a Todo Riesgo</strong>
-                      <span className="block text-[10px] text-slate-400">Surcharge de +15.00 €/día. Protege el vehículo contra accidentes, fuegos o colisiones en via pública.</span>
+                      <span className="block text-[10px] text-slate-400">Suplemento de +{seguroDiaElegido?.toFixed(2)} €/día. Protege el vehículo contra accidentes, fuegos o colisiones en vía pública.</span>
                     </label>
                   </div>
                   )}
@@ -1081,6 +1102,10 @@ export default function RentalsTab({
                       {(solicitudActiva ? solicitudActiva.total : calculatedTotal).toFixed(2)} €
                     </div>
                   </div>
+
+                  {vehiculoElegido && (vehiculoElegido.fianza ?? 0) > 0 && (
+                    <p className="text-[11px] text-slate-500">Fianza a dejar al recoger el coche: <strong className="text-slate-700">{vehiculoElegido.fianza} €</strong>{vehiculoElegido.transmision ? ` · Cambio ${etiquetaTransmision(vehiculoElegido.transmision).toLowerCase()}` : ''}</p>
+                  )}
 
                   {formError && (
                     <p className="text-xs text-rose-600 bg-rose-50 border border-rose-200 rounded-lg px-3 py-2 font-medium">{formError}</p>
@@ -1282,6 +1307,10 @@ export default function RentalsTab({
                           <strong className="font-mono text-slate-500 text-[10px]">{v.bastidor}</strong>
                         </div>
                         <div>
+                          <span className="text-slate-400 block text-[9px] uppercase font-semibold">Transmisión</span>
+                          <strong className="font-bold text-slate-800">{etiquetaTransmision(v.transmision)}</strong>
+                        </div>
+                        <div>
                           <span className="text-slate-400 block text-[9px] uppercase font-semibold">Kilometraje Entrada</span>
                           <strong className="font-mono font-bold text-slate-800">{v.kilometraje.toLocaleString()} km</strong>
                         </div>
@@ -1310,8 +1339,14 @@ export default function RentalsTab({
                     </div>
                     <div className="flex justify-between font-sans">
                       <span>Seguro Técnico Completo:</span>
-                      <strong className="font-mono">{viewingContract.incluyeSeguroTodoRiesgo ? '15.00 € / día' : 'Póliza Terceros Básica'}</strong>
+                      <strong className="font-mono">{viewingContract.incluyeSeguroTodoRiesgo ? (viewingContract.seguroDia != null ? `${viewingContract.seguroDia.toFixed(2)} € / día` : 'Incluido') : 'Póliza Terceros Básica'}</strong>
                     </div>
+                    {viewingContract.fianza != null && viewingContract.fianza > 0 && (
+                      <div className="flex justify-between font-sans">
+                        <span>Fianza (depósito reembolsable):</span>
+                        <strong className="font-mono">{viewingContract.fianza.toFixed(2)} €</strong>
+                      </div>
+                    )}
                     <div className="flex justify-between border-t border-blue-300 pt-1 text-blue-900 font-extrabold font-sans">
                       <span>IMPORTE FACTURADO NETO:</span>
                       <strong className="font-mono text-blue-950">{viewingContract.totalCobrado.toFixed(2)} €</strong>
@@ -1330,9 +1365,9 @@ export default function RentalsTab({
                   </p>
                   <p>
                     {viewingContract.incluyeSeguroTodoRiesgo ? (
-                      <span><strong>TERCERA. Cobertura del Seguro.</strong> Al haber contratado la póliza de SEGURO A TODO RIESGO, se exime al cliente de cualquier responsabilidad por siniestros fortuitos, colisiones, daños superficiales de pintura, ralladuras o robo del coche en vía pública, sujeto a fianza de depósito de 150.00 €.</span>
+                      <span><strong>TERCERA. Cobertura del Seguro.</strong> Al haber contratado la póliza de SEGURO A TODO RIESGO, se exime al cliente de cualquier responsabilidad por siniestros fortuitos, colisiones, daños superficiales de pintura, ralladuras o robo del coche en vía pública{viewingContract.fianza ? `, sujeto a fianza de depósito de ${viewingContract.fianza.toFixed(2)} €` : ''}.</span>
                     ) : (
-                      <span><strong>TERCERA. Cobertura Restringida.</strong> Se suscribe únicamente el SEGURO OBLIGATORIO DE RESPONSABILIDAD CIVIL a terceros. Cualquier avería por negligencia, daño en chapa, lunas o interior será responsabilidad íntegra del cliente arrendatario y liquidada en base al baremo de taller oficial.</span>
+                      <span><strong>TERCERA. Cobertura Restringida.</strong> Se suscribe únicamente el SEGURO OBLIGATORIO DE RESPONSABILIDAD CIVIL a terceros. Cualquier avería por negligencia, daño en chapa, lunas o interior será responsabilidad íntegra del cliente arrendatario y liquidada en base al baremo de taller oficial.{viewingContract.fianza ? ` El arrendatario deja en depósito una fianza de ${viewingContract.fianza.toFixed(2)} €.` : ''}</span>
                     )}
                   </p>
                 </div>
