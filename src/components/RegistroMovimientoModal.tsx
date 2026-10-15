@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { AlertTriangle, Check, KeyRound, LogIn } from 'lucide-react';
 import ModalShell from './ModalShell';
 import { MovimientoVehiculo, NivelCombustible } from '../types';
@@ -37,6 +37,8 @@ export default function RegistroMovimientoModal({ tipo, vehiculoNombre, kmFicha,
   const [danos, setDanos] = useState(inicial?.danos ?? '');
   const [responsable, setResponsable] = useState(inicial?.responsable ?? responsableDefecto);
   const [error, setError] = useState('');
+  // Un error de un intento anterior desaparece en cuanto se cambia algo.
+  useEffect(() => { setError(''); }, [fechaHora, km, combustible]);
 
   const actual: MovimientoVehiculo | null = km !== '' && combustible
     ? { fechaHora: new Date(fechaHora).toISOString(), km: Number(km), combustible, danos, responsable }
@@ -64,9 +66,14 @@ export default function RegistroMovimientoModal({ tipo, vehiculoNombre, kmFicha,
       ancho="max-w-md"
       pie={
         <div className="px-6 py-4 space-y-3 bg-slate-50">
-          {recorridos != null && (
+          {recorridos != null && recorridos >= 0 && (
             <p className="text-xs font-semibold text-blue-700 bg-blue-50 border border-blue-100 rounded-lg px-3 py-2">
               Kilómetros recorridos en el alquiler: {recorridos.toLocaleString('es-ES')} km
+            </p>
+          )}
+          {recorridos != null && recorridos < 0 && (
+            <p className="text-xs font-semibold text-rose-700 bg-rose-50 border border-rose-200 rounded-lg px-3 py-2">
+              El kilometraje es menor que el de la entrega ({entrega!.km.toLocaleString('es-ES')} km).
             </p>
           )}
           {faltan > 0 && (
@@ -81,7 +88,9 @@ export default function RegistroMovimientoModal({ tipo, vehiculoNombre, kmFicha,
               {avisoKm}
             </p>
           )}
-          {error && <p className="text-xs font-medium text-rose-700 bg-rose-50 border border-rose-200 rounded-lg px-3 py-2">{error}</p>}
+          {error && !(recorridos != null && recorridos < 0 && error.startsWith('El kilometraje no puede')) && (
+            <p className="text-xs font-medium text-rose-700 bg-rose-50 border border-rose-200 rounded-lg px-3 py-2">{error}</p>
+          )}
           <div className="flex justify-end gap-2 text-sm font-medium">
             <button type="button" onClick={onClose} className="px-4 py-2 border border-slate-200 rounded-xl hover:bg-white transition text-slate-500 cursor-pointer">Cancelar</button>
             <button type="button" onClick={guardar} className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-xl transition flex items-center gap-1 cursor-pointer">
