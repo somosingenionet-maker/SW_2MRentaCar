@@ -63,6 +63,17 @@ export async function getSessionUsuario(): Promise<Usuario | null> {
   return perfil && perfil.activo ? perfil : null;
 }
 
+/**
+ * Cambia la contraseña de la cuenta en curso. Comprueba antes la contraseña actual,
+ * para que una sesión abierta y desatendida no baste para cambiarla.
+ */
+export async function cambiarPassword(email: string, actual: string, nueva: string): Promise<void> {
+  const { error: errActual } = await supabase.auth.signInWithPassword({ email, password: actual });
+  if (errActual) throw new Error('La contraseña actual no es correcta.');
+  const { error } = await supabase.auth.updateUser({ password: nueva });
+  if (error) throw new Error('No se pudo actualizar la contraseña. Inténtalo de nuevo.');
+}
+
 /** Envía un email de restablecimiento de contraseña. */
 export async function resetPassword(email: string): Promise<void> {
   const { error } = await supabase.auth.resetPasswordForEmail(email.trim(), {

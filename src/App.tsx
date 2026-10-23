@@ -13,7 +13,7 @@ import { fetchSolicitudes, updateGestionSolicitud } from './data/solicitudesDb';
 import { fetchInvitaciones, crearInvitacion, updateEstadoInvitacion } from './data/invitacionesDb';
 import LoginScreen from './components/LoginScreen';
 import {
-  Car, Wrench, Users, Calendar, CalendarClock, BarChart2, Bell, Shield, Phone, Mail, Globe, Menu, X, Settings, FileText, LogOut
+  Car, Wrench, Users, Calendar, CalendarClock, BarChart2, Bell, Shield, Phone, Mail, Globe, Menu, X, Settings, FileText, LogOut, KeyRound
 } from 'lucide-react';
 import { EmpresaConfig, getEmpresaConfig } from './data/empresaConfig';
 import { loadEmpresaConfig, saveEmpresaConfigDb } from './data/empresaDb';
@@ -30,6 +30,7 @@ const FacturasTab = lazy(() => import('./components/FacturasTab'));
 const AgendaTab = lazy(() => import('./components/AgendaTab'));
 const AdminPanel = lazy(() => import('./components/AdminPanel'));
 const CompanySettingsPanel = lazy(() => import('./components/CompanySettingsPanel'));
+const CambiarPasswordModal = lazy(() => import('./components/CambiarPasswordModal'));
 
 type TabId = ModuloId;
 
@@ -44,6 +45,7 @@ export default function App() {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [adminPanelOpen, setAdminPanelOpen] = useState(false);
+  const [passwordOpen, setPasswordOpen] = useState(false);
   const [empresaConfig, setEmpresaConfig] = useState<EmpresaConfig>(getEmpresaConfig);
 
   // States
@@ -633,6 +635,15 @@ export default function App() {
                 )}
               </div>
               <button
+                onClick={() => setPasswordOpen(true)}
+                title="Cambiar contraseña"
+                aria-label="Cambiar contraseña"
+                className="p-2 rounded-xl transition cursor-pointer"
+                style={{ backgroundColor: `${brandText === '#ffffff' ? '#00000033' : '#ffffff33'}`, color: brandText }}
+              >
+                <KeyRound className="w-3.5 h-3.5" />
+              </button>
+              <button
                 onClick={handleLogout}
                 title="Cerrar sesión"
                 className="p-2 rounded-xl transition cursor-pointer"
@@ -750,6 +761,9 @@ export default function App() {
                   ⚙️ Configuración de empresa
                 </button>
               )}
+              <button onClick={() => { setPasswordOpen(true); setMobileMenuOpen(false); }} className="w-full text-left px-3 py-2 text-xs font-bold rounded-lg text-slate-600 block hover:bg-slate-50">
+                🔑 Cambiar contraseña
+              </button>
               <button onClick={handleLogout} className="w-full text-left px-3 py-2 text-xs font-bold rounded-lg text-slate-600 block hover:bg-slate-50">
                 🚪 Cerrar sesión
               </button>
@@ -889,6 +903,10 @@ export default function App() {
           currentUser={currentUser}
           onClose={() => setAdminPanelOpen(false)}
         />
+      )}
+
+      {passwordOpen && (
+        <CambiarPasswordModal email={currentUser.email} onClose={() => setPasswordOpen(false)} />
       )}
       </Suspense>
 
