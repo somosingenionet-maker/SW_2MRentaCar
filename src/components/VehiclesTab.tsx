@@ -203,8 +203,8 @@ export default function VehiclesTab({
   };
 
   const handleExportCsv = () => {
-    const headers = ['Marca', 'Modelo', 'Matrícula', 'Bastidor', 'Km', 'ITV Vencimiento', 'Seguro Vencimiento', 'Impuesto Vencimiento', 'Fecha Registro', 'Transmisión', 'Fianza (€)', 'Seguro ampliado (€/día)'];
-    const rows = vehiculos.map(v => [v.marca, v.modelo, v.matricula, v.bastidor, String(v.kilometraje), v.itvVencimiento ?? '', v.seguroVencimiento ?? '', v.impuestoVencimiento ?? '', v.fechaRegistro,
+    const headers = ['Marca', 'Modelo', 'Matrícula', 'Bastidor', 'Km', 'ITV Vencimiento', 'Seguro Vencimiento', 'Aseguradora', 'Impuesto Vencimiento', 'Fecha Registro', 'Transmisión', 'Fianza (€)', 'Seguro ampliado (€/día)'];
+    const rows = vehiculos.map(v => [v.marca, v.modelo, v.matricula, v.bastidor, String(v.kilometraje), v.itvVencimiento ?? '', v.seguroVencimiento ?? '', v.aseguradora ?? '', v.impuestoVencimiento ?? '', v.fechaRegistro,
       v.esFlotaAlquiler ? etiquetaTransmision(v.transmision) : '', v.esFlotaAlquiler && v.fianza ? String(v.fianza) : '', v.seguroAmpliadoDia != null ? String(v.seguroAmpliadoDia) : '']);
     downloadCsv(`${slugify(getEmpresaConfig().nombre)}_flota_${new Date().toISOString().slice(0, 10)}.csv`, [headers, ...rows]);
   };
@@ -424,6 +424,9 @@ export default function VehiclesTab({
                     {formatDate(selectedVehiculo.seguroVencimiento)}
                     <span className="w-1.5 h-1.5 rounded-full bg-red-400"></span>
                   </div>
+                  {selectedVehiculo.aseguradora && (
+                    <div className="text-[10px] text-slate-500 mt-0.5">{selectedVehiculo.aseguradora}</div>
+                  )}
                 </div>
 
                 <div className="col-span-2 p-3 bg-slate-50 rounded-xl border border-slate-100 flex justify-between items-center">
@@ -687,6 +690,16 @@ export default function VehiclesTab({
                       />
                     </div>
                   </div>
+                  <div>
+                    <label className="block text-[10px] font-bold text-slate-500 uppercase">Aseguradora</label>
+                    <input
+                      type="text"
+                      className="w-full mt-1 px-2.5 py-1.5 border border-slate-200 rounded-lg text-xs focus:outline-none focus:ring-1 focus:ring-blue-500"
+                      value={formData.aseguradora ?? ''}
+                      onChange={e => setFormData({ ...formData, aseguradora: e.target.value })}
+                      placeholder="Ej.: Mutua, FIATC…"
+                    />
+                  </div>
                 </div>
 
                 {hasAlquileres && (
@@ -842,7 +855,6 @@ export default function VehiclesTab({
                         className="w-full mt-1 px-2.5 py-1.5 border border-slate-200 rounded-lg text-xs focus:outline-none focus:ring-1 focus:ring-blue-500"
                         value={editFormData.itvVencimiento ?? ''}
                         onChange={e => setEditFormData({ ...editFormData, itvVencimiento: e.target.value })}
-                        required
                       />
                     </div>
                     <div>
@@ -852,7 +864,6 @@ export default function VehiclesTab({
                         className="w-full mt-1 px-2.5 py-1.5 border border-slate-200 rounded-lg text-xs focus:outline-none focus:ring-1 focus:ring-blue-500"
                         value={editFormData.seguroVencimiento ?? ''}
                         onChange={e => setEditFormData({ ...editFormData, seguroVencimiento: e.target.value })}
-                        required
                       />
                     </div>
                     <div>
@@ -862,9 +873,18 @@ export default function VehiclesTab({
                         className="w-full mt-1 px-2.5 py-1.5 border border-slate-200 rounded-lg text-xs focus:outline-none focus:ring-1 focus:ring-blue-500"
                         value={editFormData.impuestoVencimiento ?? ''}
                         onChange={e => setEditFormData({ ...editFormData, impuestoVencimiento: e.target.value })}
-                        required
                       />
                     </div>
+                  </div>
+                  <div>
+                    <label className="block text-[10px] font-bold text-slate-500 uppercase">Aseguradora</label>
+                    <input
+                      type="text"
+                      className="w-full mt-1 px-2.5 py-1.5 border border-slate-200 rounded-lg text-xs focus:outline-none focus:ring-1 focus:ring-blue-500"
+                      value={editFormData.aseguradora ?? ''}
+                      onChange={e => setEditFormData({ ...editFormData, aseguradora: e.target.value })}
+                      placeholder="Ej.: Mutua, FIATC…"
+                    />
                   </div>
                 </div>
 

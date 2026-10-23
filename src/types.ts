@@ -17,6 +17,8 @@ export interface Vehiculo {
   kilometraje: number;
   itvVencimiento: string;       // YYYY-MM-DD
   seguroVencimiento: string;    // YYYY-MM-DD
+  /** Compañía aseguradora de la póliza (texto libre: Mutua, FIATC…). */
+  aseguradora?: string;
   impuestoVencimiento: string;  // YYYY-MM-DD
   fechaRegistro: string;
   /** Vehículo propio del taller para alquiler (módulo Rent-a-Car). */

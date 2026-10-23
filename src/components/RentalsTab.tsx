@@ -1357,6 +1357,12 @@ export default function RentalsTab({
                           <span className="text-slate-400 block text-[9px] uppercase font-semibold">Transmisión</span>
                           <strong className="font-bold text-slate-800">{etiquetaTransmision(v.transmision)}</strong>
                         </div>
+                        {v.aseguradora && (
+                          <div>
+                            <span className="text-slate-400 block text-[9px] uppercase font-semibold">Aseguradora</span>
+                            <strong className="font-bold text-slate-800">{v.aseguradora}</strong>
+                          </div>
+                        )}
                         <div>
                           <span className="text-slate-400 block text-[9px] uppercase font-semibold">Kilometraje Entrada</span>
                           <strong className="font-mono font-bold text-slate-800">{v.kilometraje.toLocaleString()} km</strong>
