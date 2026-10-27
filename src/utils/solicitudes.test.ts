@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import type { Reserva, SolicitudReserva, Vehiculo } from '../types';
 import {
-  canceladaEnWeb, diasAlquiler, estadoWebMeta, incluyeCobertura, reservasSolapadas, soloFecha, soloHora, vehiculosCompatibles,
+  canceladaEnWeb, diasAlquiler, estadoWebMeta, incluyeCobertura, reservasSolapadas, soloFecha, soloHora, vehiculosCompatibles, webPasadasDelDia,
 } from './solicitudes';
 
 const veh = (id: string, marca: string, modelo: string, flota = true) => ({ id, marca, modelo, esFlotaAlquiler: flota }) as unknown as Vehiculo;
@@ -70,5 +70,36 @@ describe('estado de la solicitud web', () => {
     expect(soloHora('2026-09-13T14:30')).toBe('14:30');
     expect(soloFecha(null)).toBe('');
     expect(soloHora(undefined)).toBe('');
+  });
+});
+
+describe('webPasadasDelDia', () => {
+  const web = (extra: Partial<SolicitudReserva>) => sol('Seat Ibiza o similar', { estadoGestion: 'historica', fechaRecogida: '2026-10-09T10:00', fechaDevolucion: '2026-10-12T10:00', ...extra });
+
+  it('incluye los días del pedido, ambos extremos', () => {
+    const s = [web({})];
+    expect(webPasadasDelDia(s, '2026-10-08')).toHaveLength(0);
+    expect(webPasadasDelDia(s, '2026-10-09')).toHaveLength(1);
+    expect(webPasadasDelDia(s, '2026-10-12')).toHaveLength(1);
+    expect(webPasadasDelDia(s, '2026-10-13')).toHaveLength(0);
+  });
+
+  it('solo cuenta las históricas: ni pendientes, ni descartadas, ni convertidas', () => {
+    for (const estadoGestion of ['pendiente', 'descartada', 'convertida'] as const) {
+      expect(webPasadasDelDia([web({ estadoGestion })], '2026-10-10')).toHaveLength(0);
+    }
+  });
+
+  it('no cuenta los pedidos cancelados, reembolsados o fallidos en la web', () => {
+    for (const estadoExterno of ['cancelled', 'refunded', 'failed']) {
+      expect(webPasadasDelDia([web({ estadoExterno })], '2026-10-10')).toHaveLength(0);
+    }
+  });
+
+  it('sin fecha de recogida no se pinta; sin devolución cuenta solo el día de recogida', () => {
+    expect(webPasadasDelDia([web({ fechaRecogida: null })], '2026-10-10')).toHaveLength(0);
+    const unDia = [web({ fechaDevolucion: null })];
+    expect(webPasadasDelDia(unDia, '2026-10-09')).toHaveLength(1);
+    expect(webPasadasDelDia(unDia, '2026-10-10')).toHaveLength(0);
   });
 });

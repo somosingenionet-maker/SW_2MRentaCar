@@ -42,7 +42,7 @@ export const DEFAULT_EMPRESA_CONFIG: EmpresaConfig = {
   nif: 'B13712658',
   direccionFiscal: 'Camí de Son Gotleu, 8 bajos',
   correo: 'info@2mrentacar.es',
-  telefono: '(+34) 633 47 48 87',
+  telefono: '(+34) 623 59 64 15',
   web: 'www.2mrentacar.es',
   ciudad: 'Palma (Illes Balears)',
   pais: 'España',

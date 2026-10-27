@@ -68,6 +68,20 @@ export function estadoWebMeta(sol: SolicitudReserva): { label: string; cls: stri
   }
 }
 
+/**
+ * Pedidos de la web ya pasados (estado «histórica») que cubren un día. Se muestran en el calendario
+ * solo como referencia: ya no son trabajo pendiente. Los cancelados, reembolsados o fallidos no se
+ * cuentan, porque nunca llegaron a ser un alquiler.
+ */
+export function webPasadasDelDia(solicitudes: SolicitudReserva[], iso: string): SolicitudReserva[] {
+  return solicitudes.filter(s => {
+    if (s.estadoGestion !== 'historica' || canceladaEnWeb(s) || !s.fechaRecogida) return false;
+    const ini = s.fechaRecogida.slice(0, 10);
+    const fin = s.fechaDevolucion ? s.fechaDevolucion.slice(0, 10) : ini;
+    return ini <= iso && fin >= iso;
+  });
+}
+
 /** '2026-09-13T14:30' → '2026-09-13' (la reserva de la app solo guarda la fecha). */
 export const soloFecha = (iso?: string | null): string => (iso ? iso.slice(0, 10) : '');
 /** '2026-09-13T14:30' → '14:30'. */

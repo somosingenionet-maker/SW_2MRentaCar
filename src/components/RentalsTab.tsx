@@ -19,7 +19,7 @@ import { genId } from '../utils/id';
 import { getEmpresaConfig } from '../data/empresaConfig';
 import {
   diasAlquiler, reservasSolapadas, vehiculosCompatibles, canceladaEnWeb, incluyeCobertura,
-  estadoWebMeta, soloFecha, soloHora,
+  estadoWebMeta, soloFecha, soloHora, webPasadasDelDia,
 } from '../utils/solicitudes';
 
 // Código ISO de país ("ES") → nombre en español ("España") para la ficha del cliente.
@@ -348,6 +348,8 @@ export default function RentalsTab({
     .sort((a, b) => a.matricula.localeCompare(b.matricula));
   vehiculosDelMes.forEach((v, i) => { vehicleColors[v.id] = PALETTE[i % PALETTE.length]; });
   const VEHICULOS_LEYENDA_INICIAL = 6;
+  // ¿Este mes tiene pedidos de la web ya pasados? Se pintan en gris solo para consultar.
+  const hayWebPasadasEnMes = calDays.some(d => !!d && webPasadasDelDia(solicitudes, toIso(d)).length > 0);
   // ─────────────────────────────────────────────────────────────────
 
   // Bandeja de la web: pedidos sin asignar + reservas ya asignadas cuyo pedido
@@ -546,6 +548,7 @@ export default function RentalsTab({
                 const dayReservations = reservasForDay(iso);
                 const visible = dayReservations.slice(0, 2);
                 const overflow = dayReservations.length - 2;
+                const webPasadas = webPasadasDelDia(solicitudes, iso);
 
                 return (
                   <div
@@ -578,6 +581,15 @@ export default function RentalsTab({
                           onClick={(e) => { e.stopPropagation(); setDayModal({ iso, reservations: dayReservations }); }}
                           className="text-[9px] text-blue-500 font-semibold pl-1 hover:text-blue-700 hover:underline cursor-pointer"
                         >+{overflow} más</button>
+                      )}
+                      {webPasadas.length > 0 && (
+                        <div
+                          data-testid="web-pasada"
+                          title={webPasadas.map(s => `Pedido web ${s.referenciaExterna} · ${s.vehiculoNombre} · ${s.clienteNombre} ${s.clienteApellidos}`.trim()).join('\n')}
+                          className="text-[9px] font-semibold px-1 py-0.5 rounded border border-slate-200 bg-slate-100 text-slate-400 truncate cursor-default"
+                        >
+                          Web · {webPasadas.length === 1 ? (webPasadas[0].clienteNombre || 'pedido') : `${webPasadas.length} pedidos`}
+                        </div>
                       )}
                     </div>
                   </div>
@@ -617,6 +629,12 @@ export default function RentalsTab({
                     </span>
                   ))}
                 </div>
+              )}
+              {hayWebPasadasEnMes && (
+                <p className="mt-2 text-[10px] text-slate-400 flex items-center gap-1.5">
+                  <span className="inline-block w-3 h-3 rounded border border-slate-200 bg-slate-100" />
+                  Pedidos de la web ya pasados, solo para consultar.
+                </p>
               )}
             </div>
           </div>

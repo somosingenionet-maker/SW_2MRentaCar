@@ -316,7 +316,7 @@ values (
   'B13712658',
   'Camí de Son Gotleu, 8 bajos',
   'info@2mrentacar.es',
-  '(+34) 633 47 48 87',
+  '(+34) 623 59 64 15',
   'www.2mrentacar.es',
   'Palma (Illes Balears)',
   'España',
