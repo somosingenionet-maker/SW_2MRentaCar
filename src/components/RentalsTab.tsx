@@ -14,6 +14,7 @@ import { motion, AnimatePresence } from 'motion/react';
 import ConfirmDialog from './ConfirmDialog';
 import Pagination from './Pagination';
 import { formatDate } from '../utils/dateFormat';
+import { formatEuros } from '../utils/moneda';
 import { downloadCsv, slugify } from '../utils/csvExport';
 import { genId } from '../utils/id';
 import { getEmpresaConfig } from '../data/empresaConfig';
@@ -81,6 +82,8 @@ export default function RentalsTab({
   const [movimientoModal, setMovimientoModal] = useState<{ tipo: 'entrega' | 'devolucion'; reserva: Reserva } | null>(null);
   const [reservaView, setReservaView] = useState<'activas' | 'historial'>('activas');
   const [dayModal, setDayModal] = useState<{ iso: string; reservations: Reserva[] } | null>(null);
+  // Pedidos de la web ya pasados de un día del calendario (solo consulta).
+  const [webDiaModal, setWebDiaModal] = useState<{ iso: string; pedidos: SolicitudReserva[] } | null>(null);
   const [calendarDate, setCalendarDate] = useState(() => {
     const d = new Date();
     return new Date(d.getFullYear(), d.getMonth(), 1);
@@ -583,13 +586,15 @@ export default function RentalsTab({
                         >+{overflow} más</button>
                       )}
                       {webPasadas.length > 0 && (
-                        <div
+                        <button
+                          type="button"
                           data-testid="web-pasada"
+                          onClick={(e) => { e.stopPropagation(); setWebDiaModal({ iso, pedidos: webPasadas }); }}
                           title={webPasadas.map(s => `Pedido web ${s.referenciaExterna} · ${s.vehiculoNombre} · ${s.clienteNombre} ${s.clienteApellidos}`.trim()).join('\n')}
-                          className="text-[9px] font-semibold px-1 py-0.5 rounded border border-slate-200 bg-slate-100 text-slate-400 truncate cursor-default"
+                          className="w-full text-left text-[9px] font-semibold px-1 py-0.5 rounded border border-slate-200 bg-slate-100 text-slate-500 hover:bg-slate-200 transition truncate cursor-pointer"
                         >
                           Web · {webPasadas.length === 1 ? (webPasadas[0].clienteNombre || 'pedido') : `${webPasadas.length} pedidos`}
-                        </div>
+                        </button>
                       )}
                     </div>
                   </div>
@@ -633,7 +638,7 @@ export default function RentalsTab({
               {hayWebPasadasEnMes && (
                 <p className="mt-2 text-[10px] text-slate-400 flex items-center gap-1.5">
                   <span className="inline-block w-3 h-3 rounded border border-slate-200 bg-slate-100" />
-                  Pedidos de la web ya pasados, solo para consultar.
+                  Pedidos de la web ya pasados: púlsalos para ver el detalle (solo consulta).
                 </p>
               )}
             </div>
@@ -665,6 +670,52 @@ export default function RentalsTab({
                         <div className="flex-1 min-w-0">
                           <div className="text-xs font-semibold text-slate-700 truncate">{cli?.nombre} {cli?.apellidos}</div>
                           <div className="text-[10px] text-slate-400">{veh?.marca} {veh?.modelo} · {formatDate(res.fechaInicio)} → {formatDate(res.fechaFin)}</div>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </ModalShell>
+            )}
+          </AnimatePresence>
+
+          {/* Pedidos de la web ya pasados de un día (solo consulta) */}
+          <AnimatePresence>
+            {webDiaModal && (
+              <ModalShell
+                id="web-dia-modal"
+                titulo={`Pedidos de la web del ${formatDate(webDiaModal.iso)}`}
+                icono={<Calendar className="w-5 h-5 text-slate-500" />}
+                onClose={() => setWebDiaModal(null)}
+                ancho="max-w-md"
+              >
+                <p className="px-4 pt-3 text-[11px] text-slate-400">
+                  Pedidos anteriores a la app o ya cumplidos. No requieren ninguna acción; se muestran solo como referencia.
+                </p>
+                <div className="divide-y divide-slate-100">
+                  {webDiaModal.pedidos.map(s => {
+                    const meta = estadoWebMeta(s);
+                    const cuando = (f?: string | null) => f ? `${formatDate(soloFecha(f))}${soloHora(f) ? ` ${soloHora(f)}` : ''}` : '—';
+                    return (
+                      <div key={s.id} className="px-4 py-3 space-y-1">
+                        <div className="flex items-center justify-between gap-2">
+                          <span className="text-xs font-bold text-slate-700">Pedido web #{s.referenciaExterna}</span>
+                          <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${meta.cls}`}>{meta.label}</span>
+                        </div>
+                        <div className="text-xs font-semibold text-slate-700">{s.vehiculoNombre || 'Vehículo sin indicar'}</div>
+                        <div className="text-[11px] text-slate-500">
+                          {s.clienteNombre} {s.clienteApellidos}{s.clienteTelefono ? ` · ${s.clienteTelefono}` : ''}
+                        </div>
+                        <div className="text-[11px] text-slate-500">
+                          {cuando(s.fechaRecogida)} → {cuando(s.fechaDevolucion)}
+                        </div>
+                        {(s.lugarRecogida || s.lugarDevolucion) && (
+                          <div className="text-[11px] text-slate-400">
+                            {s.lugarRecogida ?? '—'}{s.lugarDevolucion && s.lugarDevolucion !== s.lugarRecogida ? ` → ${s.lugarDevolucion}` : ''}
+                          </div>
+                        )}
+                        <div className="text-[11px] font-semibold text-slate-600">
+                          {formatEuros(s.total)}{s.metodoPago ? ` · ${s.metodoPago}` : ''}{s.pagado ? ' · pagado' : ''}
                         </div>
                       </div>
                     );
