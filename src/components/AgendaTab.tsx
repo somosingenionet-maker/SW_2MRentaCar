@@ -1,6 +1,7 @@
 import { useState, useMemo } from 'react';
 import { avisoKilometraje } from '../utils/kilometraje';
 import ModalShell from './ModalShell';
+import Hora24Field from './Hora24Field';
 import {
   CalendarClock, Plus, ChevronLeft, ChevronRight, X, Check, Trash2, Pencil,
   Clock, User, Car, Wrench, AlertTriangle, ClipboardCheck, Ban, ArrowRightCircle,
@@ -704,8 +705,7 @@ export default function AgendaTab({ citas, vehiculos, clientes, tecnicos, ordene
                 </div>
                 <div>
                   <label className="block text-xs font-semibold text-slate-600 mb-1">Hora *</label>
-                  <input type="time" value={form.hora} onChange={(e) => setForm((f) => ({ ...f, hora: e.target.value }))}
-                    className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400" />
+                  <Hora24Field etiqueta="Hora de la cita" value={form.hora} onChange={(v) => setForm((f) => ({ ...f, hora: v }))} />
                 </div>
               </div>
               <div>

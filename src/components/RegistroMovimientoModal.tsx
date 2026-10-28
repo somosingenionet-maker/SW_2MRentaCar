@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { AlertTriangle, Check, KeyRound, LogIn } from 'lucide-react';
 import ModalShell from './ModalShell';
+import Hora24Field from './Hora24Field';
 import { MovimientoVehiculo, NivelCombustible } from '../types';
 import { COMBUSTIBLES, combustibleFaltante, kmRecorridos } from '../utils/entregaDevolucion';
 import { avisoKilometraje } from '../utils/kilometraje';
@@ -21,7 +22,7 @@ interface Props {
   onClose: () => void;
 }
 
-// Valor para <input type="datetime-local">: fecha y hora LOCALES (no UTC).
+// Fecha y hora LOCALES (no UTC) en formato «AAAA-MM-DDTHH:mm».
 const aLocal = (d: Date) => {
   const p = (n: number) => String(n).padStart(2, '0');
   return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}T${p(d.getHours())}:${p(d.getMinutes())}`;
@@ -107,7 +108,12 @@ export default function RegistroMovimientoModal({ tipo, vehiculoNombre, previsto
         {previsto && <p className="text-xs text-slate-500">{tipo === 'entrega' ? 'Entrega acordada' : 'Devolución acordada'}: <strong className="text-slate-700">{previsto}</strong></p>}
         <div>
           <label className={etiqueta}>Fecha y hora *</label>
-          <input type="datetime-local" value={fechaHora} onChange={e => setFechaHora(e.target.value)} className={campo} />
+          <div className="grid grid-cols-2 gap-2 items-start">
+            <input type="date" aria-label="Fecha" value={fechaHora.slice(0, 10)}
+              onChange={e => setFechaHora(`${e.target.value}T${fechaHora.slice(11, 16)}`)} className={`${campo} h-[38px]`} />
+            <Hora24Field etiqueta="Hora" value={fechaHora.slice(11, 16)}
+              onChange={v => setFechaHora(`${fechaHora.slice(0, 10)}T${v}`)} />
+          </div>
         </div>
         <div className="grid grid-cols-2 gap-4">
           <div>

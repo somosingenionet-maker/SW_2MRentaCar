@@ -17,6 +17,7 @@ import { formatDate } from '../utils/dateFormat';
 import { formatEuros } from '../utils/moneda';
 import { resumenCarnet, avisoCarnetReserva } from '../utils/carnet';
 import { validarHorasReserva, fechaConHora } from '../utils/horaReserva';
+import Hora24Field from './Hora24Field';
 import { downloadCsv, slugify } from '../utils/csvExport';
 import { genId } from '../utils/id';
 import { getEmpresaConfig } from '../data/empresaConfig';
@@ -1157,25 +1158,21 @@ export default function RentalsTab({
 
                     <div>
                       <label className="block text-xs font-bold text-slate-500 uppercase whitespace-nowrap">Hora de entrega *</label>
-                      <input
-                        type="time"
+                      <Hora24Field
                         id="reserva-hora-inicio"
-                        className="w-full mt-1 px-3 h-[38px] border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-1 focus:ring-blue-500"
+                        etiqueta="Hora de entrega"
                         value={formHoraInicio}
-                        onChange={e => { setFormHoraInicio(e.target.value); if (formError) setFormError(''); }}
-                        required
+                        onChange={v => { setFormHoraInicio(v); if (formError) setFormError(''); }}
                       />
                     </div>
 
                     <div>
                       <label className="block text-xs font-bold text-slate-500 uppercase whitespace-nowrap">Hora de devolución *</label>
-                      <input
-                        type="time"
+                      <Hora24Field
                         id="reserva-hora-fin"
-                        className="w-full mt-1 px-3 h-[38px] border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-1 focus:ring-blue-500"
+                        etiqueta="Hora de devolución"
                         value={formHoraFin}
-                        onChange={e => { setFormHoraFin(e.target.value); if (formError) setFormError(''); }}
-                        required
+                        onChange={v => { setFormHoraFin(v); if (formError) setFormError(''); }}
                       />
                     </div>
                   </div>
