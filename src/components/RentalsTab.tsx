@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import RegistroMovimientoModal, { TarjetaMovimiento } from './RegistroMovimientoModal';
 import { COMBUSTIBLES, estadoReserva as estadoDeReserva, esHistorica as esHistoricaReserva, finEfectivo, kmRecorridos, ESTADO_META } from '../utils/entregaDevolucion';
 import ModalShell from './ModalShell';
@@ -71,6 +71,8 @@ export default function RentalsTab({
   // Horas de entrega y de devolución: obligatorias, sin valor por defecto para que se elijan a propósito.
   const [formHoraInicio, setFormHoraInicio] = useState('');
   const [formHoraFin, setFormHoraFin] = useState('');
+  // Edición de las horas de una reserva ya creada (desde la ficha de gestión).
+  const [editandoHoras, setEditandoHoras] = useState<{ inicio: string; fin: string; error: string } | null>(null);
   const [formTarifa, setFormTarifa] = useState<number>(45.00);
   const [formTemporada, setFormTemporada] = useState<'alta' | 'media' | 'baja'>('media');
   const [formSeguro, setFormSeguro] = useState(true);
@@ -282,6 +284,24 @@ export default function RentalsTab({
         setSelectedReserva({ ...res, estado: nuevoEstado });
       }
     }
+  };
+
+  // Al elegir otra reserva se descarta una edición de horas a medias.
+  useEffect(() => { setEditandoHoras(null); }, [selectedReserva?.id]);
+
+  const abrirEdicionHoras = (res: Reserva) => setEditandoHoras({ inicio: res.horaInicio ?? '', fin: res.horaFin ?? '', error: '' });
+
+  const handleGuardarHoras = () => {
+    if (!selectedReserva || !editandoHoras) return;
+    const err = validarHorasReserva({
+      fechaInicio: selectedReserva.fechaInicio, fechaFin: selectedReserva.fechaFin,
+      horaInicio: editandoHoras.inicio, horaFin: editandoHoras.fin,
+    });
+    if (err) { setEditandoHoras({ ...editandoHoras, error: err }); return; }
+    const actualizada = { ...selectedReserva, horaInicio: editandoHoras.inicio, horaFin: editandoHoras.fin };
+    onUpdateReserva(actualizada);
+    setSelectedReserva(actualizada);
+    setEditandoHoras(null);
   };
 
   const handlePrintContract = () => {
@@ -918,14 +938,46 @@ export default function RentalsTab({
 
                 {/* Dates & Times */}
                 <div className="p-3 bg-slate-50 rounded-xl border border-slate-100 space-y-1.5">
-                  <div className="flex justify-between">
+                  <div className="flex justify-between gap-2">
                     <span className="text-slate-400">Entrega al cliente:</span>
-                    <strong className="font-bold text-slate-700">{fechaConHora(selectedReserva.fechaInicio, selectedReserva.horaInicio, formatDate)}</strong>
+                    <strong className="font-bold text-slate-700 text-right">
+                      {fechaConHora(selectedReserva.fechaInicio, selectedReserva.horaInicio, formatDate)}
+                      {!selectedReserva.horaInicio && <span className="ml-1.5 text-[10px] font-semibold text-amber-600">sin hora</span>}
+                    </strong>
                   </div>
-                  <div className="flex justify-between">
+                  <div className="flex justify-between gap-2">
                     <span className="text-slate-400">Devolución del vehículo:</span>
-                    <strong className="font-bold text-slate-700">{fechaConHora(selectedReserva.fechaFin, selectedReserva.horaFin, formatDate)}</strong>
+                    <strong className="font-bold text-slate-700 text-right">
+                      {fechaConHora(selectedReserva.fechaFin, selectedReserva.horaFin, formatDate)}
+                      {!selectedReserva.horaFin && <span className="ml-1.5 text-[10px] font-semibold text-amber-600">sin hora</span>}
+                    </strong>
                   </div>
+                  {selectedReserva.estado !== 'cancelada' && (editandoHoras ? (
+                    <div className="border-t border-slate-100/50 pt-2 space-y-2" data-testid="editar-horas">
+                      <div className="grid grid-cols-2 gap-3 items-start">
+                        <div>
+                          <span className="block text-[10px] font-bold text-slate-500 uppercase whitespace-nowrap">Hora de entrega</span>
+                          <Hora24Field etiqueta="Hora de entrega" value={editandoHoras.inicio}
+                            onChange={v => setEditandoHoras({ ...editandoHoras, inicio: v, error: '' })} />
+                        </div>
+                        <div>
+                          <span className="block text-[10px] font-bold text-slate-500 uppercase whitespace-nowrap">Hora de devolución</span>
+                          <Hora24Field etiqueta="Hora de devolución" value={editandoHoras.fin}
+                            onChange={v => setEditandoHoras({ ...editandoHoras, fin: v, error: '' })} />
+                        </div>
+                      </div>
+                      {editandoHoras.error && <p role="alert" className="text-[11px] text-rose-600 font-medium">{editandoHoras.error}</p>}
+                      <div className="flex justify-end gap-2 text-[11px] font-bold">
+                        <button type="button" onClick={() => setEditandoHoras(null)} className="px-3 py-1.5 border border-slate-200 rounded-lg text-slate-500 hover:bg-slate-50 cursor-pointer">Cancelar</button>
+                        <button type="button" onClick={handleGuardarHoras} className="px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded-lg cursor-pointer">Guardar horas</button>
+                      </div>
+                    </div>
+                  ) : (
+                    <button type="button" onClick={() => abrirEdicionHoras(selectedReserva)}
+                      className={`w-full mt-1 py-1.5 rounded-lg text-[11px] font-bold transition cursor-pointer ${!selectedReserva.horaInicio || !selectedReserva.horaFin ? 'bg-amber-50 text-amber-700 border border-amber-200 hover:bg-amber-100' : 'bg-white text-slate-500 border border-slate-200 hover:bg-slate-50'}`}>
+                      {!selectedReserva.horaInicio || !selectedReserva.horaFin ? 'Indicar la hora de entrega y de devolución' : 'Cambiar las horas'}
+                    </button>
+                  ))}
                   <div className="flex justify-between border-t border-slate-100/50 pt-1.5 text-[11px] font-semibold text-slate-600">
                     <span>Días de devengo:</span>
                     <span>{calculateDays(selectedReserva.fechaInicio, selectedReserva.fechaFin)} días</span>
