@@ -1,13 +1,15 @@
 import { useState, useMemo } from 'react';
 import { ESTADO_META, estadoReserva } from '../utils/entregaDevolucion';
 import { hoyISO } from '../utils/fechas';
+import { validarCarnet, estadoCarnet } from '../utils/carnet';
+import CarnetConducirFields from './CarnetConducirFields';
 import { usePaginacion } from '../utils/usePaginacion';
 import { useSeleccion } from '../utils/useSeleccion';
 import { Cliente, Reserva, InteraccionCliente, Vehiculo, OrdenTrabajo, Factura, OTEstado, InvitacionCliente, SolicitudReserva } from '../types';
 import { canceladaEnWeb, estadoWebMeta, soloFecha } from '../utils/solicitudes';
 import { getEmpresaConfig } from '../data/empresaConfig';
 import {
-  Users, UserPlus, Search, Mail, Phone, MapPin, CreditCard, Clock, MessageSquare, Plus, Trash2, X, Check, Save, Download, PenTool, Car, Wrench, Receipt, ChevronDown, ChevronRight, Link2
+  Users, UserPlus, Search, Mail, Phone, MapPin, CreditCard, Clock, MessageSquare, Plus, Trash2, X, Check, Save, Download, PenTool, Car, Wrench, Receipt, ChevronDown, ChevronRight, Link2, IdCard
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import ConfirmDialog from './ConfirmDialog';
@@ -109,6 +111,7 @@ export default function CrmTab({
 
   const [editFormData, setEditFormData] = useState<Cliente | null>(null);
   const [addFormError, setAddFormError] = useState('');
+  const [editFormError, setEditFormError] = useState('');
   const [vehiculoSearch, setVehiculoSearch] = useState('');
   const [vehiculoSearchEdit, setVehiculoSearchEdit] = useState('');
   const [confirmDelete, setConfirmDelete] = useState<{ isOpen: boolean; clienteId: string }>({ isOpen: false, clienteId: '' });
@@ -119,6 +122,7 @@ export default function CrmTab({
       cli.nombre.toLowerCase().includes(searchTerm.toLowerCase()) ||
       cli.apellidos.toLowerCase().includes(searchTerm.toLowerCase()) ||
       cli.nifNiePasaporte.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      (cli.carnetNumero ?? '').toLowerCase().includes(searchTerm.toLowerCase()) ||
       cli.correo.toLowerCase().includes(searchTerm.toLowerCase()) ||
       cli.telefono.includes(searchTerm)
     )
@@ -153,6 +157,8 @@ export default function CrmTab({
       setAddFormError('Por favor complete Nombre, Apellidos y Documento (DNI/NIE/Pasaporte).');
       return;
     }
+    const errCarnet = validarCarnet(formData);
+    if (errCarnet) { setAddFormError(errCarnet); return; }
     setAddFormError('');
     const nuevo: Cliente = {
       ...formData,
@@ -175,12 +181,15 @@ export default function CrmTab({
   const handleEditClick = (cli: Cliente) => {
     setEditFormData({ ...cli });
     setVehiculoSearchEdit('');
+    setEditFormError('');
     setIsEditing(true);
   };
 
   const handleEditSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (editFormData) {
+      const errCarnet = validarCarnet(editFormData);
+      if (errCarnet) { setEditFormError(errCarnet); return; }
       onUpdateCliente(editFormData);
       setIsEditing(false);
       if (selectedCliente?.id === editFormData.id) {
@@ -223,8 +232,8 @@ export default function CrmTab({
   };
 
   const handleExportCsv = () => {
-    const headers = ['Nombre', 'Apellidos', 'NIF/NIE/Pasaporte', 'Correo', 'Teléfono', 'Dirección', 'Fecha Registro'];
-    const rows = clientes.map(c => [c.nombre, c.apellidos, c.nifNiePasaporte, c.correo, c.telefono, c.direccion, c.fechaRegistro]);
+    const headers = ['Nombre', 'Apellidos', 'NIF/NIE/Pasaporte', 'Carnet de conducir', 'Carnet: expedición', 'Carnet: vencimiento', 'Correo', 'Teléfono', 'Dirección', 'Fecha Registro'];
+    const rows = clientes.map(c => [c.nombre, c.apellidos, c.nifNiePasaporte, c.carnetNumero ?? '', c.carnetExpedicion ?? '', c.carnetVencimiento ?? '', c.correo, c.telefono, c.direccion, c.fechaRegistro]);
     downloadCsv(`${slugify(getEmpresaConfig().nombre)}_clientes_${new Date().toISOString().slice(0, 10)}.csv`, [headers, ...rows]);
   };
 
@@ -480,6 +489,32 @@ export default function CrmTab({
                   <div>
                     <span className="text-slate-400 mr-1 block text-[10px] uppercase font-bold">Documento de Identidad</span>
                     <span className="font-mono font-bold text-slate-700">{selectedCliente.nifNiePasaporte}</span>
+                  </div>
+                </div>
+
+                <div className="flex items-center gap-3 text-xs" id="cliente-carnet">
+                  <IdCard className="w-4 h-4 text-slate-400 shrink-0" />
+                  <div>
+                    <span className="text-slate-400 mr-1 block text-[10px] uppercase font-bold">Carnet de conducir</span>
+                    {selectedCliente.carnetNumero || selectedCliente.carnetExpedicion || selectedCliente.carnetVencimiento ? (
+                      <>
+                        {selectedCliente.carnetNumero && <span className="font-mono font-bold text-slate-700 block">{selectedCliente.carnetNumero}</span>}
+                        <span className="text-slate-500 flex items-center gap-1.5 flex-wrap">
+                          {selectedCliente.carnetExpedicion && <>Expedido {formatDate(selectedCliente.carnetExpedicion)}</>}
+                          {selectedCliente.carnetExpedicion && selectedCliente.carnetVencimiento && ' · '}
+                          {selectedCliente.carnetVencimiento && <>Vence {formatDate(selectedCliente.carnetVencimiento)}</>}
+                          {(() => {
+                            const e = estadoCarnet(selectedCliente.carnetVencimiento);
+                            if (e === 'vencido') return <span className="text-[9px] font-bold px-1.5 py-0.5 rounded-full bg-rose-100 text-rose-700">Vencido</span>;
+                            if (e === 'por_vencer') return <span className="text-[9px] font-bold px-1.5 py-0.5 rounded-full bg-amber-100 text-amber-700">Vence pronto</span>;
+                            if (e === 'vigente') return <span className="text-[9px] font-bold px-1.5 py-0.5 rounded-full bg-emerald-100 text-emerald-700">Vigente</span>;
+                            return null;
+                          })()}
+                        </span>
+                      </>
+                    ) : (
+                      <span className="text-slate-400">Sin informar</span>
+                    )}
                   </div>
                 </div>
 
@@ -861,6 +896,8 @@ export default function CrmTab({
                   </div>
                 </div>
 
+                <CarnetConducirFields value={formData} onChange={c => setFormData({ ...formData, ...c })} />
+
                 <div>
                   <label className="block text-xs font-bold text-slate-500 uppercase">Correo Electrónico</label>
                   <input
@@ -1067,6 +1104,8 @@ export default function CrmTab({
                   </div>
                 </div>
 
+                <CarnetConducirFields value={editFormData} onChange={c => { setEditFormData({ ...editFormData, ...c }); if (editFormError) setEditFormError(''); }} />
+
                 <div>
                   <label className="block text-xs font-bold text-slate-500 uppercase">Correo Electrónico</label>
                   <input
@@ -1169,6 +1208,9 @@ export default function CrmTab({
                   </div>
                 )}
 
+                {editFormError && (
+                  <p role="alert" className="text-xs text-rose-600 bg-rose-50 border border-rose-200 rounded-lg px-3 py-2 font-medium">{editFormError}</p>
+                )}
                 <div className="border-t border-slate-100 pt-4 flex justify-end gap-2 text-sm font-medium">
                   <button
                     type="button"

@@ -114,6 +114,10 @@ export interface Cliente {
   direccion: string;
   ciudad?: string;
   pais?: string;
+  /** Carnet de conducir: número y fechas (AAAA-MM-DD) de expedición y vencimiento. */
+  carnetNumero?: string;
+  carnetExpedicion?: string;
+  carnetVencimiento?: string;
   /**
    * Cuando es `true`, el cliente es exclusivo de alquiler y no se le asocia
    * un vehículo de flota propio (el selector de vehículo se oculta en el CRM).

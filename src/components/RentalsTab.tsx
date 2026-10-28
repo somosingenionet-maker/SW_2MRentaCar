@@ -15,6 +15,7 @@ import ConfirmDialog from './ConfirmDialog';
 import Pagination from './Pagination';
 import { formatDate } from '../utils/dateFormat';
 import { formatEuros } from '../utils/moneda';
+import { resumenCarnet } from '../utils/carnet';
 import { downloadCsv, slugify } from '../utils/csvExport';
 import { genId } from '../utils/id';
 import { getEmpresaConfig } from '../data/empresaConfig';
@@ -1391,6 +1392,7 @@ export default function RentalsTab({
                         <>
                           <p className="font-bold">{c.nombre} {c.apellidos}</p>
                           <p className="text-slate-500 font-mono">DNI/NIF/NIE: {c.nifNiePasaporte}</p>
+                          <p className="text-slate-500">Carnet de conducir: {resumenCarnet(c, formatDate) || 'No informado'}</p>
                           <p className="text-slate-500">Email: {c.correo || 'No informado'}</p>
                           <p className="text-slate-500">Teléfono: {c.telefono}</p>
                           <p className="text-slate-500">Domicilio: {c.direccion || 'No informado'}</p>

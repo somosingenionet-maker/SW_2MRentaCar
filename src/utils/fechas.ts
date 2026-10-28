@@ -14,3 +14,11 @@ export function sumarAnios(iso: string, anios: number): string {
   const diasDelMes = new Date(anio, m, 0).getDate();
   return `${anio}-${dosDigitos(m)}-${dosDigitos(Math.min(d, diasDelMes))}`;
 }
+
+/** Suma días (o resta, si es negativo) a una fecha AAAA-MM-DD. */
+export function sumarDias(iso: string, dias: number): string {
+  const [a, m, d] = iso.split('-').map(Number);
+  if (!a || !m || !d) return iso;
+  const f = new Date(a, m - 1, d + dias);
+  return `${f.getFullYear()}-${dosDigitos(f.getMonth() + 1)}-${dosDigitos(f.getDate())}`;
+}
