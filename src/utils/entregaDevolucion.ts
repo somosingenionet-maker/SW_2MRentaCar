@@ -9,9 +9,6 @@ export const COMBUSTIBLES: { valor: NivelCombustible; etiqueta: string; cuartos:
   { valor: 'reserva', etiqueta: 'Reserva', cuartos: 0 },
 ];
 
-export const etiquetaCombustible = (n?: NivelCombustible): string =>
-  COMBUSTIBLES.find(c => c.valor === n)?.etiqueta ?? '—';
-
 const cuartos = (n: NivelCombustible) => COMBUSTIBLES.find(c => c.valor === n)?.cuartos ?? 0;
 
 /** Kilómetros hechos durante el alquiler, o null si falta alguno de los dos registros. */

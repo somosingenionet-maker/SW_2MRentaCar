@@ -3,7 +3,7 @@ import { avisoKilometraje } from '../utils/kilometraje';
 import ModalShell from './ModalShell';
 import Hora24Field from './Hora24Field';
 import {
-  CalendarClock, Plus, ChevronLeft, ChevronRight, X, Check, Trash2, Pencil,
+  CalendarClock, Plus, ChevronLeft, ChevronRight, Check, Trash2, Pencil,
   Clock, User, Car, Wrench, AlertTriangle, ClipboardCheck, Ban, ArrowRightCircle,
 } from 'lucide-react';
 import { Cita, Vehiculo, Cliente, Tecnico, OrdenTrabajo, OTEstado, EventoOT } from '../types';

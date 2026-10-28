@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import ModalShell from './ModalShell';
-import { X, Shield, Plus, Edit2, Trash2, Check, ChevronDown, ChevronUp } from 'lucide-react';
+import { Shield, Plus, Edit2, Trash2, Check, ChevronDown, ChevronUp } from 'lucide-react';
 import { Usuario, ModuloId } from '../types';
 import { fetchUsuarios, updateUsuarioProfile, createUsuario, deleteUsuario, setUsuarioPassword } from '../data/usuariosDb';
 
