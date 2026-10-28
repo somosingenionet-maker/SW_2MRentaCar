@@ -168,7 +168,7 @@ export function TarjetaMovimiento({ titulo, mov, bloqueada, onRegistrar, onEdita
             type="button"
             onClick={onRegistrar}
             disabled={!!bloqueada}
-            className="px-2.5 py-1 rounded-lg text-[11px] font-bold bg-blue-600 hover:bg-blue-700 text-white disabled:bg-slate-200 disabled:text-slate-400 disabled:cursor-not-allowed cursor-pointer transition"
+            className="px-2.5 py-1 rounded-lg text-[11px] font-bold bg-blue-600 hover:bg-blue-700 text-white disabled:opacity-60 disabled:cursor-not-allowed cursor-pointer transition"
           >
             Registrar
           </button>
