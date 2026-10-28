@@ -16,6 +16,7 @@ import Pagination from './Pagination';
 import { formatDate } from '../utils/dateFormat';
 import { formatEuros } from '../utils/moneda';
 import { resumenCarnet, avisoCarnetReserva } from '../utils/carnet';
+import { validarHorasReserva, fechaConHora } from '../utils/horaReserva';
 import { downloadCsv, slugify } from '../utils/csvExport';
 import { genId } from '../utils/id';
 import { getEmpresaConfig } from '../data/empresaConfig';
@@ -66,6 +67,9 @@ export default function RentalsTab({
   const [formClienteId, setFormClienteId] = useState('');
   const [formFechaInicio, setFormFechaInicio] = useState(new Date().toISOString().split('T')[0]);
   const [formFechaFin, setFormFechaFin] = useState(new Date(Date.now() + 5 * 24 * 60 * 60 * 1000).toISOString().split('T')[0]);
+  // Horas de entrega y de devolución: obligatorias, sin valor por defecto para que se elijan a propósito.
+  const [formHoraInicio, setFormHoraInicio] = useState('');
+  const [formHoraFin, setFormHoraFin] = useState('');
   const [formTarifa, setFormTarifa] = useState<number>(45.00);
   const [formTemporada, setFormTemporada] = useState<'alta' | 'media' | 'baja'>('media');
   const [formSeguro, setFormSeguro] = useState(true);
@@ -106,6 +110,8 @@ export default function RentalsTab({
     setFormClienteId('');
     setFormFechaInicio(new Date().toISOString().split('T')[0]);
     setFormFechaFin(new Date(Date.now() + 5 * 24 * 60 * 60 * 1000).toISOString().split('T')[0]);
+    setFormHoraInicio('');
+    setFormHoraFin('');
     setFormTemporada('media');
     setFormTarifa(vehiculos[0]?.tarifasAlquiler?.temporadaMedia ?? 45);
     setFormSeguro(ofreceSeguro(vehiculos[0]));
@@ -122,6 +128,8 @@ export default function RentalsTab({
         clienteId: formClienteId,
         fechaInicio: formFechaInicio,
         fechaFin: formFechaFin,
+        horaInicio: formHoraInicio,
+        horaFin: formHoraFin,
         temporada: formTemporada,
         tarifaDiaria: Math.round((solicitudActiva.vehiculoTotal / duration) * 100) / 100,
         totalCobrado: solicitudActiva.total,
@@ -139,6 +147,8 @@ export default function RentalsTab({
       clienteId: formClienteId,
       fechaInicio: formFechaInicio,
       fechaFin: formFechaFin,
+      horaInicio: formHoraInicio,
+      horaFin: formHoraFin,
       temporada: formTemporada,
       tarifaDiaria: Number(formTarifa),
       totalCobrado: total,
@@ -157,6 +167,11 @@ export default function RentalsTab({
     }
     if (new Date(formFechaFin) < new Date(formFechaInicio)) {
       setFormError('La fecha de fin no puede ser anterior a la fecha de inicio.');
+      return;
+    }
+    const errHoras = validarHorasReserva({ fechaInicio: formFechaInicio, fechaFin: formFechaFin, horaInicio: formHoraInicio, horaFin: formHoraFin });
+    if (errHoras) {
+      setFormError(errHoras);
       return;
     }
     setFormError('');
@@ -240,6 +255,9 @@ export default function RentalsTab({
     setFormClienteId(existente?.id ?? nuevo!.id);
     setFormFechaInicio(ini);
     setFormFechaFin(fin);
+    // La web ya trae la hora de recogida y de devolución del pedido.
+    setFormHoraInicio(soloHora(sol.fechaRecogida));
+    setFormHoraFin(soloHora(sol.fechaDevolucion));
     setFormTemporada('media');
     setFormSeguro(incluyeCobertura(sol.extras));
     setFormError('');
@@ -270,7 +288,7 @@ export default function RentalsTab({
   };
 
   const handleExportCsv = () => {
-    const headers = ['ID', 'Vehículo', 'Matrícula', 'Cliente', 'Fecha Inicio', 'Fecha Fin', 'Días', 'Tarifa/día (€)', 'Seguro', 'Total (€)', 'Estado'];
+    const headers = ['ID', 'Vehículo', 'Matrícula', 'Cliente', 'Fecha Inicio', 'Hora entrega', 'Fecha Fin', 'Hora devolución', 'Días', 'Tarifa/día (€)', 'Seguro', 'Total (€)', 'Estado'];
     const rows = reservas.map(res => {
       const veh = vehiculos.find(v => v.id === res.vehiculoId);
       const cli = clientes.find(c => c.id === res.clienteId);
@@ -281,7 +299,9 @@ export default function RentalsTab({
         veh?.matricula ?? '',
         cli ? `${cli.nombre} ${cli.apellidos}` : res.clienteId,
         res.fechaInicio,
+        res.horaInicio ?? '',
         res.fechaFin,
+        res.horaFin ?? '',
         String(days),
         String(res.tarifaDiaria),
         res.incluyeSeguroTodoRiesgo ? 'Sí' : 'No',
@@ -573,7 +593,7 @@ export default function RentalsTab({
                           <div
                             key={res.id}
                             onClick={() => setSelectedReserva(res)}
-                            title={`${cli?.nombre ?? 'Cliente'} · ${formatDate(res.fechaInicio)} → ${formatDate(res.fechaFin)}`}
+                            title={`${cli?.nombre ?? 'Cliente'} · ${fechaConHora(res.fechaInicio, res.horaInicio, formatDate)} → ${fechaConHora(res.fechaFin, res.horaFin, formatDate)}`}
                             className={`text-[9px] font-bold px-1 py-0.5 rounded border cursor-pointer hover:opacity-80 transition truncate ${colorClass}`}
                           >
                             {isStart ? '▶ ' : ''}{cli?.nombre ?? '···'}
@@ -670,7 +690,7 @@ export default function RentalsTab({
                         </span>
                         <div className="flex-1 min-w-0">
                           <div className="text-xs font-semibold text-slate-700 truncate">{cli?.nombre} {cli?.apellidos}</div>
-                          <div className="text-[10px] text-slate-400">{veh?.marca} {veh?.modelo} · {formatDate(res.fechaInicio)} → {formatDate(res.fechaFin)}</div>
+                          <div className="text-[10px] text-slate-400">{veh?.marca} {veh?.modelo} · {fechaConHora(res.fechaInicio, res.horaInicio, formatDate)} → {fechaConHora(res.fechaFin, res.horaFin, formatDate)}</div>
                         </div>
                       </div>
                     );
@@ -810,6 +830,9 @@ export default function RentalsTab({
                           </td>
                           <td className="py-3 px-2 whitespace-nowrap">
                             <span className="font-bold text-slate-600 block">{formatDate(res.fechaInicio)} al {formatDate(res.fechaFin)}</span>
+                            {(res.horaInicio || res.horaFin) && (
+                              <span className="text-[10px] text-slate-500 font-semibold block">Entrega {res.horaInicio ?? '—'} · Devolución {res.horaFin ?? '—'}</span>
+                            )}
                             <span className="text-[10px] text-slate-400 font-medium">{calculateDays(res.fechaInicio, res.fechaFin)} días de contrato</span>
                           </td>
                           <td className="py-3 px-2 text-right">
@@ -895,12 +918,12 @@ export default function RentalsTab({
                 {/* Dates & Times */}
                 <div className="p-3 bg-slate-50 rounded-xl border border-slate-100 space-y-1.5">
                   <div className="flex justify-between">
-                    <span className="text-slate-400">Fecha de Entrega:</span>
-                    <strong className="font-bold text-slate-700">{formatDate(selectedReserva.fechaInicio)}</strong>
+                    <span className="text-slate-400">Entrega al cliente:</span>
+                    <strong className="font-bold text-slate-700">{fechaConHora(selectedReserva.fechaInicio, selectedReserva.horaInicio, formatDate)}</strong>
                   </div>
                   <div className="flex justify-between">
-                    <span className="text-slate-400">Fecha de Devolución:</span>
-                    <strong className="font-bold text-slate-700">{formatDate(selectedReserva.fechaFin)}</strong>
+                    <span className="text-slate-400">Devolución del vehículo:</span>
+                    <strong className="font-bold text-slate-700">{fechaConHora(selectedReserva.fechaFin, selectedReserva.horaFin, formatDate)}</strong>
                   </div>
                   <div className="flex justify-between border-t border-slate-100/50 pt-1.5 text-[11px] font-semibold text-slate-600">
                     <span>Días de devengo:</span>
@@ -1015,6 +1038,9 @@ export default function RentalsTab({
               key={`${movimientoModal.reserva.id}-${movimientoModal.tipo}`}
               tipo={movimientoModal.tipo}
               vehiculoNombre={veh ? `${veh.marca} ${veh.modelo} · ${veh.matricula}` : 'Vehículo no disponible'}
+              previsto={movimientoModal.tipo === 'entrega'
+                ? fechaConHora(movimientoModal.reserva.fechaInicio, movimientoModal.reserva.horaInicio, formatDate)
+                : fechaConHora(movimientoModal.reserva.fechaFin, movimientoModal.reserva.horaFin, formatDate)}
               kmFicha={veh?.kilometraje ?? 0}
               entrega={movimientoModal.reserva.entrega}
               inicial={movimientoModal.reserva[movimientoModal.tipo]}
@@ -1105,13 +1131,13 @@ export default function RentalsTab({
                     />
                   </div>
 
-                  {/* Dates range */}
-                  <div className="grid grid-cols-2 gap-4">
+                  {/* Fechas y horas de entrega y de devolución (primera fila las fechas, segunda las horas) */}
+                  <div className="grid grid-cols-2 gap-x-4 gap-y-3 items-start">
                     <div>
-                      <label className="block text-xs font-bold text-slate-500 uppercase">Fecha de Inicio *</label>
+                      <label className="block text-xs font-bold text-slate-500 uppercase whitespace-nowrap">Fecha de entrega *</label>
                       <input
                         type="date"
-                        className="w-full mt-1 px-3 py-2 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-1 focus:ring-blue-500"
+                        className="w-full mt-1 px-3 h-[38px] border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-1 focus:ring-blue-500"
                         value={formFechaInicio}
                         onChange={e => setFormFechaInicio(e.target.value)}
                         required
@@ -1119,12 +1145,36 @@ export default function RentalsTab({
                     </div>
 
                     <div>
-                      <label className="block text-xs font-bold text-slate-500 uppercase">Fecha de Finalización *</label>
+                      <label className="block text-xs font-bold text-slate-500 uppercase whitespace-nowrap">Fecha de devolución *</label>
                       <input
                         type="date"
-                        className="w-full mt-1 px-3 py-2 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-1 focus:ring-blue-500"
+                        className="w-full mt-1 px-3 h-[38px] border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-1 focus:ring-blue-500"
                         value={formFechaFin}
                         onChange={e => setFormFechaFin(e.target.value)}
+                        required
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block text-xs font-bold text-slate-500 uppercase whitespace-nowrap">Hora de entrega *</label>
+                      <input
+                        type="time"
+                        id="reserva-hora-inicio"
+                        className="w-full mt-1 px-3 h-[38px] border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-1 focus:ring-blue-500"
+                        value={formHoraInicio}
+                        onChange={e => { setFormHoraInicio(e.target.value); if (formError) setFormError(''); }}
+                        required
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block text-xs font-bold text-slate-500 uppercase whitespace-nowrap">Hora de devolución *</label>
+                      <input
+                        type="time"
+                        id="reserva-hora-fin"
+                        className="w-full mt-1 px-3 h-[38px] border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-1 focus:ring-blue-500"
+                        value={formHoraFin}
+                        onChange={e => { setFormHoraFin(e.target.value); if (formError) setFormError(''); }}
                         required
                       />
                     </div>
@@ -1329,7 +1379,7 @@ export default function RentalsTab({
                     const cli = clientes.find(c => c.id === viewingContract.clienteId);
                     const veh = vehiculos.find(v => v.id === viewingContract.vehiculoId);
                     const dias = calculateDays(viewingContract.fechaInicio, viewingContract.fechaFin);
-                    const texto = `Hola ${cli?.nombre ?? ''},\n\nAdjuntamos el contrato de alquiler del vehículo ${veh?.marca ?? ''} ${veh?.modelo ?? ''} (${veh?.matricula ?? ''}) desde el ${formatDate(viewingContract.fechaInicio)} hasta el ${formatDate(viewingContract.fechaFin)} (${dias} días). Total: ${viewingContract.totalCobrado.toFixed(2)} €.\n\nUn saludo,\n${empresa.nombre}`;
+                    const texto = `Hola ${cli?.nombre ?? ''},\n\nAdjuntamos el contrato de alquiler del vehículo ${veh?.marca ?? ''} ${veh?.modelo ?? ''} (${veh?.matricula ?? ''}) desde el ${fechaConHora(viewingContract.fechaInicio, viewingContract.horaInicio, formatDate)} hasta el ${fechaConHora(viewingContract.fechaFin, viewingContract.horaFin, formatDate)} (${dias} días). Total: ${viewingContract.totalCobrado.toFixed(2)} €.\n\nUn saludo,\n${empresa.nombre}`;
                     const tel = cli?.telefono?.replace(/\D/g, '') ?? '';
                     return (
                       <>
@@ -1459,8 +1509,8 @@ export default function RentalsTab({
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6 text-xs text-slate-700">
                   <div className="space-y-1.5">
                     <h5 className="font-bold text-slate-900 uppercase text-[10px] pb-1 border-b border-slate-200">4. VIGENCIA Y PLAZOS</h5>
-                    <p><strong>Fecha inicial de entrega:</strong> {formatDate(viewingContract.fechaInicio)}</p>
-                    <p><strong>Fecha acordada retorno:</strong> {formatDate(viewingContract.fechaFin)}</p>
+                    <p><strong>Fecha y hora de entrega:</strong> {fechaConHora(viewingContract.fechaInicio, viewingContract.horaInicio, formatDate)}</p>
+                    <p><strong>Fecha y hora acordadas de retorno:</strong> {fechaConHora(viewingContract.fechaFin, viewingContract.horaFin, formatDate)}</p>
                     <p><strong>Número total de jornadas:</strong> {calculateDays(viewingContract.fechaInicio, viewingContract.fechaFin)} días naturales</p>
                     <p className="text-slate-500 italic text-[10px]">El retraso superior a 59 minutos en la devolución facultará el cobro de un día adicional con penalización.</p>
                   </div>

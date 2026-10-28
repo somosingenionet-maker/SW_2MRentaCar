@@ -137,6 +137,10 @@ export interface Reserva {
   clienteId: string;
   fechaInicio: string; // YYYY-MM-DD
   fechaFin: string;    // YYYY-MM-DD
+  /** Hora de entrega del coche al cliente (HH:mm, hora local). Las reservas anteriores a este campo no la tienen. */
+  horaInicio?: string;
+  /** Hora de devolución del coche (HH:mm, hora local). */
+  horaFin?: string;
   temporada: TemporadaAlquiler;
   /** Tarifa aplicada en el momento de crear la reserva. No cambia si se editan las tarifas del vehículo. */
   tarifaDiaria: number;

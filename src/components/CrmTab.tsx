@@ -2,6 +2,7 @@ import { useState, useMemo } from 'react';
 import { ESTADO_META, estadoReserva } from '../utils/entregaDevolucion';
 import { hoyISO } from '../utils/fechas';
 import { validarCarnet, estadoCarnet } from '../utils/carnet';
+import { fechaConHora } from '../utils/horaReserva';
 import CarnetConducirFields from './CarnetConducirFields';
 import { usePaginacion } from '../utils/usePaginacion';
 import { useSeleccion } from '../utils/useSeleccion';
@@ -738,7 +739,7 @@ export default function CrmTab({
                                 {res.origen === 'web' && <span className="ml-1.5 text-[9px] font-bold uppercase rounded px-1.5 py-0.5 bg-blue-50 text-blue-600">Web</span>}
                               </div>
                               <div className="text-[10px] text-slate-500">
-                                {formatDate(res.fechaInicio)} — {formatDate(res.fechaFin)} · Reserva {res.id.slice(-6)}
+                                {fechaConHora(res.fechaInicio, res.horaInicio, formatDate)} — {fechaConHora(res.fechaFin, res.horaFin, formatDate)} · Reserva {res.id.slice(-6)}
                               </div>
                             </div>
                             <div className="text-right shrink-0">

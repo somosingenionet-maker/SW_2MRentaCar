@@ -8,6 +8,8 @@ import { avisoKilometraje } from '../utils/kilometraje';
 interface Props {
   tipo: 'entrega' | 'devolucion';
   vehiculoNombre: string;
+  /** Fecha y hora acordadas en la reserva, ya formateadas (referencia para quien registra). */
+  previsto?: string;
   /** Kilometraje que tiene ahora la ficha del vehículo. */
   kmFicha: number;
   /** Para la devolución: cómo se entregó. */
@@ -29,7 +31,7 @@ const campo = 'w-full mt-1 px-3 py-2 border border-slate-200 rounded-lg text-sm 
 const etiqueta = 'block text-xs font-bold text-slate-500 uppercase';
 
 /** Registro de la entrega del coche al cliente o de su devolución. */
-export default function RegistroMovimientoModal({ tipo, vehiculoNombre, kmFicha, entrega, inicial, responsableDefecto, onSave, onClose }: Props) {
+export default function RegistroMovimientoModal({ tipo, vehiculoNombre, previsto, kmFicha, entrega, inicial, responsableDefecto, onSave, onClose }: Props) {
   const esEntrega = tipo === 'entrega';
   const [fechaHora, setFechaHora] = useState(aLocal(inicial ? new Date(inicial.fechaHora) : new Date()));
   const [km, setKm] = useState<number | ''>(inicial?.km ?? (esEntrega && kmFicha > 0 ? kmFicha : ''));
@@ -102,6 +104,7 @@ export default function RegistroMovimientoModal({ tipo, vehiculoNombre, kmFicha,
     >
       <div className="px-6 py-5 space-y-4">
         <p className="text-xs text-slate-500">{vehiculoNombre}</p>
+        {previsto && <p className="text-xs text-slate-500">{tipo === 'entrega' ? 'Entrega acordada' : 'Devolución acordada'}: <strong className="text-slate-700">{previsto}</strong></p>}
         <div>
           <label className={etiqueta}>Fecha y hora *</label>
           <input type="datetime-local" value={fechaHora} onChange={e => setFechaHora(e.target.value)} className={campo} />
