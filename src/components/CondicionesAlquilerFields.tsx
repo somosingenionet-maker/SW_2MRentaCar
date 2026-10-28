@@ -29,7 +29,7 @@ export default function CondicionesAlquilerFields({ value, onChange }: Props) {
           </select>
         </div>
         <div>
-          <label className="block text-[10px] font-semibold text-blue-700 mb-0.5">Fianza (€)</label>
+          <label className="block text-[10px] font-semibold text-blue-700 mb-0.5" title="Es el importe que se propone en cada reserva; el taller lo puede cambiar en cada una.">Fianza habitual (€)</label>
           <input
             type="number" min="0" step="0.01" placeholder="0"
             value={value.fianza ?? ''}

@@ -147,7 +147,7 @@ export interface Reserva {
   totalCobrado: number;
   estado: 'confirmada' | 'cancelada';
   incluyeSeguroTodoRiesgo: boolean;
-  /** Fianza (€) del vehículo en el momento de crear la reserva: el contrato firmado no cambia si luego se edita. */
+  /** Fianza (€) acordada para esta reserva. Parte del importe habitual del vehículo, pero el taller la fija en cada reserva (0 = sin fianza). */
   fianza?: number;
   /** Precio por día (€) del seguro en el momento de crear la reserva. */
   seguroDia?: number;

@@ -3,7 +3,7 @@ import RegistroMovimientoModal, { TarjetaMovimiento } from './RegistroMovimiento
 import { COMBUSTIBLES, estadoReserva as estadoDeReserva, esHistorica as esHistoricaReserva, finEfectivo, kmRecorridos, ESTADO_META } from '../utils/entregaDevolucion';
 import ModalShell from './ModalShell';
 import { usePaginacion } from '../utils/usePaginacion';
-import { ofreceSeguro, totalAlquiler, etiquetaTransmision } from '../utils/condicionesAlquiler';
+import { ofreceSeguro, totalAlquiler, etiquetaTransmision, parseFianza, fianzaSugerida } from '../utils/condicionesAlquiler';
 import { useSeleccion } from '../utils/useSeleccion';
 import { Reserva, Vehiculo, Cliente, SolicitudReserva, MovimientoVehiculo } from '../types';
 import SearchableSelect from './SearchableSelect';
@@ -71,6 +71,10 @@ export default function RentalsTab({
   // Horas de entrega y de devolución: obligatorias, sin valor por defecto para que se elijan a propósito.
   const [formHoraInicio, setFormHoraInicio] = useState('');
   const [formHoraFin, setFormHoraFin] = useState('');
+  // Fianza de la reserva: parte del importe habitual del vehículo, pero el taller la puede cambiar.
+  const [formFianza, setFormFianza] = useState('');
+  // Cambio de la fianza de una reserva ya creada (desde la ficha de gestión).
+  const [editandoFianza, setEditandoFianza] = useState<{ valor: string; error: string } | null>(null);
   // Edición de las horas de una reserva ya creada (desde la ficha de gestión).
   const [editandoHoras, setEditandoHoras] = useState<{ inicio: string; fin: string; error: string } | null>(null);
   const [formTarifa, setFormTarifa] = useState<number>(45.00);
@@ -109,6 +113,7 @@ export default function RentalsTab({
     setSolicitudActiva(null);
     setClienteNuevo(null);
     setFormVehiculoId(vehiculos[0]?.id || '');
+    setFormFianza(fianzaSugerida(vehiculos[0]));
     // Sin cliente preseleccionado: elegir uno a mano evita dejar la reserva a nombre de otra persona.
     setFormClienteId('');
     setFormFechaInicio(new Date().toISOString().split('T')[0]);
@@ -138,7 +143,7 @@ export default function RentalsTab({
         totalCobrado: solicitudActiva.total,
         estado: 'confirmada',
         incluyeSeguroTodoRiesgo: incluyeCobertura(solicitudActiva.extras),
-        fianza: vehiculoElegido?.fianza || undefined,
+        fianza: parseFianza(formFianza) ?? undefined,
         seguroDia: seguroDiaElegido ?? undefined,
         origen: 'web',
       };
@@ -157,7 +162,7 @@ export default function RentalsTab({
       totalCobrado: total,
       estado: 'confirmada',
       incluyeSeguroTodoRiesgo: formSeguro && seguroDiaElegido != null,
-      fianza: vehiculoElegido?.fianza || undefined,
+      fianza: parseFianza(formFianza) ?? undefined,
       seguroDia: formSeguro && seguroDiaElegido != null ? seguroDiaElegido : undefined,
     };
   };
@@ -170,6 +175,10 @@ export default function RentalsTab({
     }
     if (new Date(formFechaFin) < new Date(formFechaInicio)) {
       setFormError('La fecha de fin no puede ser anterior a la fecha de inicio.');
+      return;
+    }
+    if (parseFianza(formFianza) === null) {
+      setFormError('Indica la fianza de esta reserva (0 si no se pide fianza).');
       return;
     }
     const errHoras = validarHorasReserva({ fechaInicio: formFechaInicio, fechaFin: formFechaFin, horaInicio: formHoraInicio, horaFin: formHoraFin });
@@ -255,6 +264,7 @@ export default function RentalsTab({
     setSolicitudActiva(sol);
     setClienteNuevo(nuevo);
     setFormVehiculoId(libre?.id ?? '');
+    setFormFianza(fianzaSugerida(libre));
     setFormClienteId(existente?.id ?? nuevo!.id);
     setFormFechaInicio(ini);
     setFormFechaFin(fin);
@@ -287,7 +297,17 @@ export default function RentalsTab({
   };
 
   // Al elegir otra reserva se descarta una edición de horas a medias.
-  useEffect(() => { setEditandoHoras(null); }, [selectedReserva?.id]);
+  useEffect(() => { setEditandoHoras(null); setEditandoFianza(null); }, [selectedReserva?.id]);
+
+  const handleGuardarFianza = () => {
+    if (!selectedReserva || !editandoFianza) return;
+    const valor = parseFianza(editandoFianza.valor);
+    if (valor === null) { setEditandoFianza({ ...editandoFianza, error: 'Indica un importe válido (0 si no hay fianza).' }); return; }
+    const actualizada = { ...selectedReserva, fianza: valor };
+    onUpdateReserva(actualizada);
+    setSelectedReserva(actualizada);
+    setEditandoFianza(null);
+  };
 
   const abrirEdicionHoras = (res: Reserva) => setEditandoHoras({ inicio: res.horaInicio ?? '', fin: res.horaFin ?? '', error: '' });
 
@@ -994,12 +1014,32 @@ export default function RentalsTab({
                     <span>Seguro Todo Riesgo:</span>
                     <span>{selectedReserva.incluyeSeguroTodoRiesgo ? (selectedReserva.seguroDia != null ? `${selectedReserva.seguroDia.toFixed(2)} € / día` : 'Incluido') : 'No incluido'}</span>
                   </div>
-                  {selectedReserva.fianza != null && selectedReserva.fianza > 0 && (
-                    <div className="flex justify-between text-xs font-semibold">
-                      <span>Fianza (depósito):</span>
-                      <span>{selectedReserva.fianza.toFixed(2)} €</span>
-                    </div>
-                  )}
+                  <div className="flex justify-between items-center gap-2 text-xs font-semibold" id="reserva-fianza-ficha">
+                    <span>Fianza (depósito):</span>
+                    {editandoFianza ? (
+                      <span className="flex items-center gap-1.5">
+                        <input
+                          type="number" min="0" step="0.01" inputMode="decimal" aria-label="Fianza en euros"
+                          className="w-24 px-2 h-[30px] border border-blue-200 rounded-md text-right text-xs text-slate-800 bg-white focus:outline-none focus:ring-1 focus:ring-blue-500"
+                          value={editandoFianza.valor}
+                          onChange={e => setEditandoFianza({ valor: e.target.value, error: '' })}
+                          autoFocus
+                        />
+                        <span>€</span>
+                        <button type="button" onClick={handleGuardarFianza} className="px-2 py-1 rounded-md bg-blue-600 hover:bg-blue-700 text-white text-[10px] font-bold cursor-pointer">Guardar</button>
+                        <button type="button" onClick={() => setEditandoFianza(null)} className="px-2 py-1 rounded-md border border-blue-200 text-blue-800 text-[10px] font-bold cursor-pointer">Cancelar</button>
+                      </span>
+                    ) : (
+                      <span className="flex items-center gap-2">
+                        <span>{selectedReserva.fianza != null && selectedReserva.fianza > 0 ? `${selectedReserva.fianza.toFixed(2)} €` : 'Sin fianza'}</span>
+                        {selectedReserva.estado !== 'cancelada' && (
+                          <button type="button" onClick={() => setEditandoFianza({ valor: String(selectedReserva.fianza ?? 0), error: '' })}
+                            className="text-[10px] font-bold text-blue-800 underline cursor-pointer">Cambiar</button>
+                        )}
+                      </span>
+                    )}
+                  </div>
+                  {editandoFianza?.error && <p role="alert" className="text-[11px] text-rose-600 font-medium">{editandoFianza.error}</p>}
                   <div className="flex justify-between border-t border-blue-200 pt-1.5 text-xs font-bold text-blue-800">
                     <span>LIQUIDACIÓN TOTAL:</span>
                     <span>{selectedReserva.totalCobrado.toFixed(2)} €</span>
@@ -1150,6 +1190,8 @@ export default function RentalsTab({
                       onChange={(val) => {
                         setFormVehiculoId(val);
                         const veh = vehiculos.find(v => v.id === val);
+                        // Al cambiar de coche, la fianza vuelve a su importe habitual (se puede volver a cambiar).
+                        setFormFianza(fianzaSugerida(veh));
                         const precio = veh?.tarifasAlquiler?.[`temporada${formTemporada.charAt(0).toUpperCase() + formTemporada.slice(1)}` as 'temporadaAlta' | 'temporadaMedia' | 'temporadaBaja'];
                         if (precio !== undefined) setFormTarifa(precio);
                         // El seguro depende del coche: se marca por defecto si lo ofrece y se quita si no.
@@ -1320,9 +1362,27 @@ export default function RentalsTab({
                     </div>
                   </div>
 
-                  {vehiculoElegido && (vehiculoElegido.fianza ?? 0) > 0 && (
-                    <p className="text-[11px] text-slate-500">Fianza a dejar al recoger el coche: <strong className="text-slate-700">{vehiculoElegido.fianza} €</strong>{vehiculoElegido.transmision ? ` · Cambio ${etiquetaTransmision(vehiculoElegido.transmision).toLowerCase()}` : ''}</p>
-                  )}
+                  {/* Fianza: la fija el taller en cada reserva; se propone la habitual del vehículo */}
+                  <div>
+                    <label htmlFor="reserva-fianza" className="block text-xs font-bold text-slate-500 uppercase">Fianza a dejar al recoger (€) *</label>
+                    <input
+                      id="reserva-fianza"
+                      type="number"
+                      min="0"
+                      step="0.01"
+                      inputMode="decimal"
+                      className="w-full mt-1 px-3 h-[38px] border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-1 focus:ring-blue-500"
+                      value={formFianza}
+                      onChange={e => { setFormFianza(e.target.value); if (formError) setFormError(''); }}
+                      placeholder="0"
+                    />
+                    <p className="text-[11px] text-slate-400 mt-1">
+                      {vehiculoElegido
+                        ? `Importe habitual de este vehículo: ${vehiculoElegido.fianza ?? 0} €. Cámbialo si para esta reserva se pide otro; pon 0 si no hay fianza.`
+                        : 'Elige un vehículo para ver su importe habitual.'}
+                      {vehiculoElegido?.transmision ? ` · Cambio ${etiquetaTransmision(vehiculoElegido.transmision).toLowerCase()}` : ''}
+                    </p>
+                  </div>
 
                   {(() => {
                     const cli = clientes.find(c => c.id === formClienteId);

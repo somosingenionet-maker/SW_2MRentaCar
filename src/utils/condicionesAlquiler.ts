@@ -15,3 +15,17 @@ export const etiquetaTransmision = (t?: Vehiculo['transmision']): string =>
 
 /** Valores por defecto al marcar un coche como de alquiler (los habituales de un turismo de 2M). */
 export const CONDICIONES_POR_DEFECTO = { transmision: 'manual', fianza: 500, seguroAmpliadoDia: 15 } as const;
+
+/** Texto inicial del campo «Fianza» de una reserva: el importe habitual del vehículo (0 si no tiene). */
+export const fianzaSugerida = (v?: Pick<Vehiculo, 'fianza'> | null): string => String(v?.fianza ?? 0);
+
+/**
+ * Interpreta lo escrito en el campo «Fianza (€)». Acepta coma o punto decimal y redondea a céntimos.
+ * Devuelve null si está vacío, no es un número o es negativo. El 0 es válido: «sin fianza».
+ */
+export function parseFianza(texto: string): number | null {
+  const limpio = texto.trim().replace(',', '.');
+  if (!/^\d+(\.\d+)?$/.test(limpio)) return null;
+  const n = Math.round(Number(limpio) * 100) / 100;
+  return Number.isFinite(n) ? n : null;
+}

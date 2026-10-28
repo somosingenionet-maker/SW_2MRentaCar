@@ -469,7 +469,7 @@ export default function VehiclesTab({
                 <div className="grid grid-cols-3 gap-2">
                   {[
                     { label: 'Transmisión', valor: etiquetaTransmision(selectedVehiculo.transmision) },
-                    { label: 'Fianza', valor: selectedVehiculo.fianza ? `${selectedVehiculo.fianza} €` : '—' },
+                    { label: 'Fianza habitual', valor: selectedVehiculo.fianza ? `${selectedVehiculo.fianza} €` : '—' },
                     { label: 'Seguro ampliado', valor: selectedVehiculo.seguroAmpliadoDia != null ? `${selectedVehiculo.seguroAmpliadoDia} €/día` : 'No ofrece' },
                   ].map(({ label, valor }) => (
                     <div key={label} className="bg-white rounded-lg border border-blue-100 p-2 text-center">

@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { ofreceSeguro, totalAlquiler, etiquetaTransmision } from './condicionesAlquiler';
+import { ofreceSeguro, totalAlquiler, etiquetaTransmision, parseFianza, fianzaSugerida } from './condicionesAlquiler';
 
 describe('totalAlquiler', () => {
   it('sin seguro: días por tarifa', () => {
@@ -30,5 +30,36 @@ describe('etiquetaTransmision', () => {
     expect(etiquetaTransmision('automatico')).toBe('Automático');
     expect(etiquetaTransmision('manual')).toBe('Manual');
     expect(etiquetaTransmision(undefined)).toBe('—');
+  });
+});
+
+describe('parseFianza', () => {
+  it('acepta un importe entero, con coma o con punto', () => {
+    expect(parseFianza('500')).toBe(500);
+    expect(parseFianza('150,5')).toBe(150.5);
+    expect(parseFianza('150.50')).toBe(150.5);
+  });
+
+  it('el 0 es válido (sin fianza)', () => {
+    expect(parseFianza('0')).toBe(0);
+    expect(parseFianza(' 0,00 ')).toBe(0);
+  });
+
+  it('redondea a céntimos', () => {
+    expect(parseFianza('100,456')).toBe(100.46);
+    expect(parseFianza('0.1')).toBe(0.1);
+  });
+
+  it('rechaza vacío, texto y negativos', () => {
+    for (const t of ['', '  ', 'abc', '-50', '12e3', '1,2,3', '€500', '500 €']) expect(parseFianza(t)).toBeNull();
+  });
+});
+
+describe('fianzaSugerida', () => {
+  it('es la fianza habitual del vehículo, o 0 si no tiene', () => {
+    expect(fianzaSugerida({ fianza: 600 })).toBe('600');
+    expect(fianzaSugerida({ fianza: undefined })).toBe('0');
+    expect(fianzaSugerida(null)).toBe('0');
+    expect(fianzaSugerida(undefined)).toBe('0');
   });
 });
