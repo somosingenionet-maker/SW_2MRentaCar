@@ -284,6 +284,10 @@ export interface DatosRegistro {
   direccion: string;
   ciudad: string;
   pais: string;
+  /** Carnet de conducir. Los enlaces enviados antes de pedirlo no lo traen. */
+  carnetNumero?: string;
+  carnetExpedicion?: string;
+  carnetVencimiento?: string;
   consentimientoEn: string;
 }
 

@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { documentoValido, normalizarDocumento, TipoDocumento } from '../utils/documento';
+import { hoyISO } from '../utils/fechas';
 
 // Página pública de autorregistro: la abre el cliente desde el enlace que le
 // manda el personal (/?registro=<token>). No hay sesión ni acceso a la base de
@@ -22,6 +23,10 @@ const T = {
     documento: 'Número de documento',
     correo: 'Correo electrónico', telefono: 'Teléfono (con prefijo)',
     direccion: 'Dirección', ciudad: 'Ciudad', pais: 'País',
+    carnet: 'Carnet de conducir',
+    carnetAyuda: 'En un permiso de la UE: el número está en el apartado 5, la expedición en 4a y el vencimiento en 4b.',
+    carnetNumero: 'Número', carnetExpedicion: 'Expedición', carnetVencimiento: 'Vencimiento',
+    errExpFutura: 'La fecha de expedición no puede ser futura', errVenAntes: 'El vencimiento no puede ser anterior a la expedición',
     consentimiento: (e: string) => `Acepto que ${e} trate estos datos para gestionar mi alquiler y cumplir las obligaciones legales del contrato.`,
     responsable: (r: string, nif: string, dir: string, mail: string) =>
       `Responsable: ${r}${nif ? ` (NIF ${nif})` : ''}${dir ? `, ${dir}` : ''}. Puedes ejercer tus derechos de acceso, rectificación y supresión escribiendo a ${mail}.`,
@@ -47,6 +52,10 @@ const T = {
     documento: 'Document number',
     correo: 'Email', telefono: 'Phone (with country code)',
     direccion: 'Address', ciudad: 'City', pais: 'Country',
+    carnet: 'Driving licence',
+    carnetAyuda: 'On an EU licence: the number is in box 5, the issue date in 4a and the expiry date in 4b.',
+    carnetNumero: 'Number', carnetExpedicion: 'Issue date', carnetVencimiento: 'Expiry date',
+    errExpFutura: 'The issue date cannot be in the future', errVenAntes: 'The expiry date cannot be before the issue date',
     consentimiento: (e: string) => `I agree that ${e} processes this data to manage my rental and meet the legal requirements of the contract.`,
     responsable: (r: string, nif: string, dir: string, mail: string) =>
       `Controller: ${r}${nif ? ` (Tax ID ${nif})` : ''}${dir ? `, ${dir}` : ''}. You can exercise your rights of access, rectification and erasure by writing to ${mail}.`,
@@ -61,7 +70,7 @@ const T = {
 } as const;
 
 interface Empresa { nombre: string; color: string; telefono: string; correo: string; razonSocial: string; nif: string; direccion: string }
-interface Previo { nombre?: string; apellidos?: string; correo?: string; telefono?: string; direccion?: string; ciudad?: string; pais?: string }
+interface Previo { nombre?: string; apellidos?: string; correo?: string; telefono?: string; direccion?: string; ciudad?: string; pais?: string; carnet_numero?: string; carnet_expedicion?: string; carnet_vencimiento?: string }
 type Carga =
   | { estado: 'cargando' }
   | { estado: 'invalido' | 'usado' | 'expirado' | 'red' }
@@ -86,7 +95,8 @@ export default function RegistroPublico({ token }: { token: string }) {
 
   const [f, setF] = useState({
     nombre: '', apellidos: '', tipoDocumento: 'dni' as TipoDocumento, documento: '',
-    correo: '', telefono: '', direccion: '', ciudad: '', pais: '', consentimiento: false,
+    correo: '', telefono: '', direccion: '', ciudad: '', pais: '',
+    carnetNumero: '', carnetExpedicion: '', carnetVencimiento: '', consentimiento: false,
   });
   const set = <K extends keyof typeof f>(k: K, v: (typeof f)[K]) => setF(prev => ({ ...prev, [k]: v }));
 
@@ -107,6 +117,7 @@ export default function RegistroPublico({ token }: { token: string }) {
             ...prev,
             nombre: d.cliente.nombre ?? '', apellidos: d.cliente.apellidos ?? '', correo: d.cliente.correo ?? '',
             telefono: d.cliente.telefono ?? '', direccion: d.cliente.direccion ?? '', ciudad: d.cliente.ciudad ?? '', pais: d.cliente.pais ?? '',
+            carnetNumero: d.cliente.carnet_numero ?? '', carnetExpedicion: d.cliente.carnet_expedicion ?? '', carnetVencimiento: d.cliente.carnet_vencimiento ?? '',
           }));
         }
       })
@@ -124,6 +135,11 @@ export default function RegistroPublico({ token }: { token: string }) {
   if (!f.direccion.trim()) errores.direccion = t.errCampo;
   if (!f.ciudad.trim()) errores.ciudad = t.errCampo;
   if (!f.pais.trim()) errores.pais = t.errCampo;
+  if (!f.carnetNumero.trim()) errores.carnetNumero = t.errCampo;
+  if (!f.carnetExpedicion) errores.carnetExpedicion = t.errCampo;
+  else if (f.carnetExpedicion > hoyISO()) errores.carnetExpedicion = t.errExpFutura;
+  if (!f.carnetVencimiento) errores.carnetVencimiento = t.errCampo;
+  else if (f.carnetExpedicion && f.carnetVencimiento < f.carnetExpedicion) errores.carnetVencimiento = t.errVenAntes;
   if (!f.consentimiento) errores.consentimiento = t.errConsent;
 
   const enviar = async (e: React.FormEvent) => {
@@ -251,6 +267,27 @@ export default function RegistroPublico({ token }: { token: string }) {
                   <input className={campo('pais')} autoComplete="country-name" value={f.pais} onChange={e => set('pais', e.target.value)} />
                   {msgError('pais')}
                 </label>
+              </div>
+
+              <div className="space-y-2 pt-1">
+                <div>
+                  <h2 className="text-base font-extrabold">{t.carnet}</h2>
+                  <p className="text-xs text-slate-500 mt-0.5">{t.carnetAyuda}</p>
+                </div>
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 items-start">
+                  <label className="block text-sm font-semibold">{t.carnetNumero}
+                    <input className={campo('carnetNumero')} autoCapitalize="characters" autoComplete="off" value={f.carnetNumero} onChange={e => set('carnetNumero', e.target.value)} />
+                    {msgError('carnetNumero')}
+                  </label>
+                  <label className="block text-sm font-semibold">{t.carnetExpedicion}
+                    <input type="date" max={hoyISO()} className={campo('carnetExpedicion')} value={f.carnetExpedicion} onChange={e => set('carnetExpedicion', e.target.value)} />
+                    {msgError('carnetExpedicion')}
+                  </label>
+                  <label className="block text-sm font-semibold">{t.carnetVencimiento}
+                    <input type="date" min={f.carnetExpedicion || undefined} className={campo('carnetVencimiento')} value={f.carnetVencimiento} onChange={e => set('carnetVencimiento', e.target.value)} />
+                    {msgError('carnetVencimiento')}
+                  </label>
+                </div>
               </div>
 
               <div className={`rounded-xl border p-3 ${intentado && errores.consentimiento ? 'border-rose-400 bg-rose-50/40' : 'border-slate-200 bg-slate-50'}`}>

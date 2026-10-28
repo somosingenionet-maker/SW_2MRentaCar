@@ -37,3 +37,36 @@ export function resumenCarnet(d: DatosCarnet, fmt: (iso: string) => string): str
   ].filter(Boolean);
   return partes.join(' · ');
 }
+
+export interface AvisoCarnet {
+  /** critico: el carnet no vale (vencido o vence durante el alquiler); aviso: falta el dato. */
+  nivel: 'critico' | 'aviso';
+  texto: string;
+}
+
+/**
+ * Qué decirle al personal al reservar según el carnet del cliente. Solo avisa, no bloquea:
+ * la decisión de entregar o no el coche es suya.
+ * `fmt` da formato a las fechas (p. ej. dd/mm/aaaa); `finAlquiler` es AAAA-MM-DD.
+ */
+export function avisoCarnetReserva(
+  d: DatosCarnet | null, finAlquiler: string, fmt: (iso: string) => string, hoy: string = hoyISO(),
+): AvisoCarnet | null {
+  if (!d) return null;
+  const ven = d.carnetVencimiento || '';
+  if (!ven) {
+    return {
+      nivel: 'aviso',
+      texto: d.carnetNumero?.trim()
+        ? 'Falta la fecha de vencimiento del carnet de conducir. Anótala en la ficha del cliente.'
+        : 'No hay datos del carnet de conducir de este cliente. Anótalos en su ficha antes de entregar el coche.',
+    };
+  }
+  if (ven < hoy) {
+    return { nivel: 'critico', texto: `El carnet de conducir de este cliente venció el ${fmt(ven)}. No debería entregarse el coche.` };
+  }
+  if (finAlquiler && ven < finAlquiler) {
+    return { nivel: 'critico', texto: `El carnet de conducir vence el ${fmt(ven)}, antes de que termine el alquiler (${fmt(finAlquiler)}).` };
+  }
+  return null;
+}

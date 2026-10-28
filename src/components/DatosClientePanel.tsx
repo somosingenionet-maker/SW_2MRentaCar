@@ -156,6 +156,12 @@ export function RevisarDatosModal({ invitacion, cliente, onAplicar, onDescartar,
     { campo: 'Dirección', actual: cliente?.direccion ?? '', nuevo: d.direccion },
     { campo: 'Ciudad', actual: cliente?.ciudad ?? '', nuevo: d.ciudad },
     { campo: 'País', actual: cliente?.pais ?? '', nuevo: d.pais },
+    // Los enlaces antiguos no traen el carnet: la fila solo aparece si el cliente lo envió.
+    ...(d.carnetNumero || d.carnetExpedicion || d.carnetVencimiento ? [
+      { campo: 'Carnet de conducir: número', actual: cliente?.carnetNumero ?? '', nuevo: d.carnetNumero ?? '' },
+      { campo: 'Carnet: expedición', actual: cliente?.carnetExpedicion ? formatDate(cliente.carnetExpedicion) : '', nuevo: d.carnetExpedicion ? formatDate(d.carnetExpedicion) : '' },
+      { campo: 'Carnet: vencimiento', actual: cliente?.carnetVencimiento ? formatDate(cliente.carnetVencimiento) : '', nuevo: d.carnetVencimiento ? formatDate(d.carnetVencimiento) : '' },
+    ] : []),
   ];
 
   const ejecutar = async (accion: (inv: InvitacionCliente) => Promise<void>) => {

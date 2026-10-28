@@ -7,7 +7,9 @@ interface Props {
   onChange: (cambio: DatosCarnet) => void;
 }
 
-const INPUT = 'w-full mt-1 px-3 py-2 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-1 focus:ring-blue-500';
+// Misma altura fija en los tres (un campo de fecha es más alto que uno de texto en algunos navegadores).
+const INPUT = 'w-full mt-1 px-3 h-[38px] border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-1 focus:ring-blue-500';
+const LABEL = 'block text-xs font-bold text-slate-500 uppercase whitespace-nowrap';
 
 /** Número, fecha de expedición y fecha de vencimiento del carnet de conducir del cliente. */
 export default function CarnetConducirFields({ value, onChange }: Props) {
@@ -16,9 +18,9 @@ export default function CarnetConducirFields({ value, onChange }: Props) {
       <h4 className="text-xs font-bold text-slate-400 uppercase tracking-widest font-display flex items-center gap-1.5">
         <IdCard className="w-3.5 h-3.5" /> Carnet de conducir
       </h4>
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 items-start">
         <div>
-          <label className="block text-xs font-bold text-slate-500 uppercase">Número</label>
+          <label className={LABEL}>Número</label>
           <input
             type="text"
             className={`${INPUT} font-mono`}
@@ -29,7 +31,7 @@ export default function CarnetConducirFields({ value, onChange }: Props) {
           />
         </div>
         <div>
-          <label className="block text-xs font-bold text-slate-500 uppercase">Fecha de expedición</label>
+          <label className={LABEL}>Expedición</label>
           <input
             type="date"
             className={INPUT}
@@ -39,7 +41,7 @@ export default function CarnetConducirFields({ value, onChange }: Props) {
           />
         </div>
         <div>
-          <label className="block text-xs font-bold text-slate-500 uppercase">Fecha de vencimiento</label>
+          <label className={LABEL}>Vencimiento</label>
           <input
             type="date"
             className={INPUT}

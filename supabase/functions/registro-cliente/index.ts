@@ -47,6 +47,14 @@ function documentoValido(tipo: string, doc: string): boolean {
 const limpia = (v: unknown, max: number): string =>
   typeof v === 'string' ? v.replace(/\s+/g, ' ').trim().slice(0, max) : '';
 
+// Fecha AAAA-MM-DD que existe de verdad (no 2026-02-31).
+function fechaValida(f: string): boolean {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(f)) return false;
+  const [a, m, d] = f.split('-').map(Number);
+  const x = new Date(Date.UTC(a, m - 1, d));
+  return x.getUTCFullYear() === a && x.getUTCMonth() === m - 1 && x.getUTCDate() === d;
+}
+
 Deno.serve(async (req: Request) => {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: cors });
 
@@ -78,7 +86,7 @@ Deno.serve(async (req: Request) => {
       let cliente: Record<string, string> | null = null;
       if (r.inv.cliente_id) {
         const { data: c } = await admin
-          .from('clientes').select('nombre, apellidos, correo, telefono, direccion, ciudad, pais').eq('id', r.inv.cliente_id).maybeSingle();
+          .from('clientes').select('nombre, apellidos, correo, telefono, direccion, ciudad, pais, carnet_numero, carnet_expedicion, carnet_vencimiento').eq('id', r.inv.cliente_id).maybeSingle();
         cliente = c;
       }
       return json({
@@ -115,6 +123,13 @@ Deno.serve(async (req: Request) => {
         pais: limpia(d.pais, 60),
       };
 
+      // Carnet de conducir. Compatible con la página antigua (que no lo envía): si no llega
+      // ninguno de los tres datos se acepta como antes; si llega alguno, se exigen los tres.
+      const carnetNumero = limpia(d.carnetNumero, 30).toUpperCase();
+      const carnetExpedicion = limpia(d.carnetExpedicion, 10);
+      const carnetVencimiento = limpia(d.carnetVencimiento, 10);
+      const traeCarnet = !!(carnetNumero || carnetExpedicion || carnetVencimiento);
+
       const errores: string[] = [];
       if (!datos.nombre) errores.push('nombre');
       if (!datos.apellidos) errores.push('apellidos');
@@ -124,6 +139,12 @@ Deno.serve(async (req: Request) => {
       if (!datos.direccion) errores.push('direccion');
       if (!datos.ciudad) errores.push('ciudad');
       if (!datos.pais) errores.push('pais');
+      if (traeCarnet) {
+        const hoyMas1 = new Date(Date.now() + 24 * 3600 * 1000).toISOString().slice(0, 10); // margen por huso horario
+        if (!/^[A-Z0-9][A-Z0-9 ./-]{1,28}[A-Z0-9]$/.test(carnetNumero)) errores.push('carnetNumero');
+        if (!fechaValida(carnetExpedicion) || carnetExpedicion > hoyMas1 || carnetExpedicion < '1940-01-01') errores.push('carnetExpedicion');
+        if (!fechaValida(carnetVencimiento) || carnetVencimiento < carnetExpedicion || carnetVencimiento > '2100-12-31') errores.push('carnetVencimiento');
+      }
       if (d.consentimiento !== true) errores.push('consentimiento');
       if (errores.length) return json({ error: 'validacion', campos: errores }, 422);
 
@@ -131,7 +152,7 @@ Deno.serve(async (req: Request) => {
       // El `.eq('estado','pendiente')` evita que dos envíos simultáneos con el mismo enlace se pisen.
       const { data: actualizadas, error } = await admin
         .from('invitaciones_cliente')
-        .update({ datos: { ...datos, consentimientoEn: new Date().toISOString() }, estado: 'completada', completada_en: new Date().toISOString(), idioma })
+        .update({ datos: { ...datos, ...(traeCarnet ? { carnetNumero, carnetExpedicion, carnetVencimiento } : {}), consentimientoEn: new Date().toISOString() }, estado: 'completada', completada_en: new Date().toISOString(), idioma })
         .eq('id', r.inv.id).eq('estado', 'pendiente')
         .select('id');
       if (error) { console.error('registro-cliente', error.message); return json({ error: 'no_guardado' }, 500); }

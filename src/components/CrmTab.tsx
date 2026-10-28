@@ -492,6 +492,7 @@ export default function CrmTab({
                   </div>
                 </div>
 
+                {selectedCliente.esClienteAlquiler && (
                 <div className="flex items-center gap-3 text-xs" id="cliente-carnet">
                   <IdCard className="w-4 h-4 text-slate-400 shrink-0" />
                   <div>
@@ -517,6 +518,7 @@ export default function CrmTab({
                     )}
                   </div>
                 </div>
+                )}
 
                 <div className="flex items-center gap-3 text-xs">
                   <Mail className="w-4 h-4 text-slate-400 shrink-0" />
@@ -896,7 +898,9 @@ export default function CrmTab({
                   </div>
                 </div>
 
-                <CarnetConducirFields value={formData} onChange={c => setFormData({ ...formData, ...c })} />
+                {formData.esClienteAlquiler && (
+                  <CarnetConducirFields value={formData} onChange={c => setFormData({ ...formData, ...c })} />
+                )}
 
                 <div>
                   <label className="block text-xs font-bold text-slate-500 uppercase">Correo Electrónico</label>
@@ -1104,7 +1108,9 @@ export default function CrmTab({
                   </div>
                 </div>
 
-                <CarnetConducirFields value={editFormData} onChange={c => { setEditFormData({ ...editFormData, ...c }); if (editFormError) setEditFormError(''); }} />
+                {editFormData.esClienteAlquiler && (
+                  <CarnetConducirFields value={editFormData} onChange={c => { setEditFormData({ ...editFormData, ...c }); if (editFormError) setEditFormError(''); }} />
+                )}
 
                 <div>
                   <label className="block text-xs font-bold text-slate-500 uppercase">Correo Electrónico</label>

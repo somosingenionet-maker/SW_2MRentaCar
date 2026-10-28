@@ -307,6 +307,10 @@ export default function App() {
     const campos = {
       nombre: d.nombre, apellidos: d.apellidos, nifNiePasaporte: d.documento, correo: d.correo,
       telefono: d.telefono, direccion: d.direccion, ciudad: d.ciudad, pais: d.pais,
+      // El carnet solo se toca si el cliente lo envió (los enlaces antiguos no lo piden).
+      ...(d.carnetNumero ? { carnetNumero: d.carnetNumero } : {}),
+      ...(d.carnetExpedicion ? { carnetExpedicion: d.carnetExpedicion } : {}),
+      ...(d.carnetVencimiento ? { carnetVencimiento: d.carnetVencimiento } : {}),
     };
     const cliente: Cliente = existente
       ? { ...existente, ...campos }

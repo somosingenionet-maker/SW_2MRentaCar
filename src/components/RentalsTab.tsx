@@ -15,7 +15,7 @@ import ConfirmDialog from './ConfirmDialog';
 import Pagination from './Pagination';
 import { formatDate } from '../utils/dateFormat';
 import { formatEuros } from '../utils/moneda';
-import { resumenCarnet } from '../utils/carnet';
+import { resumenCarnet, avisoCarnetReserva } from '../utils/carnet';
 import { downloadCsv, slugify } from '../utils/csvExport';
 import { genId } from '../utils/id';
 import { getEmpresaConfig } from '../data/empresaConfig';
@@ -1225,6 +1225,16 @@ export default function RentalsTab({
                     <p className="text-[11px] text-slate-500">Fianza a dejar al recoger el coche: <strong className="text-slate-700">{vehiculoElegido.fianza} €</strong>{vehiculoElegido.transmision ? ` · Cambio ${etiquetaTransmision(vehiculoElegido.transmision).toLowerCase()}` : ''}</p>
                   )}
 
+                  {(() => {
+                    const cli = clientes.find(c => c.id === formClienteId);
+                    const aviso = avisoCarnetReserva(cli ?? null, formFechaFin, formatDate);
+                    if (!aviso) return null;
+                    return (
+                      <p role="status" data-testid="aviso-carnet" className={`text-xs rounded-lg px-3 py-2 font-medium border ${aviso.nivel === 'critico' ? 'text-rose-700 bg-rose-50 border-rose-200' : 'text-amber-700 bg-amber-50 border-amber-200'}`}>
+                        ⚠ {aviso.texto}
+                      </p>
+                    );
+                  })()}
                   {formError && (
                     <p className="text-xs text-rose-600 bg-rose-50 border border-rose-200 rounded-lg px-3 py-2 font-medium">{formError}</p>
                   )}

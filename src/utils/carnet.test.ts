@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { validarCarnet, estadoCarnet, resumenCarnet, DIAS_AVISO_CARNET } from './carnet';
+import { validarCarnet, estadoCarnet, resumenCarnet, avisoCarnetReserva, DIAS_AVISO_CARNET } from './carnet';
 
 const HOY = '2026-10-28';
 
@@ -57,5 +57,37 @@ describe('resumenCarnet', () => {
   it('omite lo que falta', () => {
     expect(resumenCarnet({ carnetVencimiento: '2030-03-01' }, fmt)).toBe('vence 01/03/2030');
     expect(resumenCarnet({}, fmt)).toBe('');
+  });
+});
+
+describe('avisoCarnetReserva', () => {
+  const fmt = (iso: string) => iso.split('-').reverse().join('/');
+  const aviso = (d: Parameters<typeof avisoCarnetReserva>[0], fin = '2026-11-05') => avisoCarnetReserva(d, fin, fmt, HOY);
+
+  it('no avisa si no hay cliente elegido', () => {
+    expect(aviso(null)).toBeNull();
+  });
+
+  it('no avisa si el carnet vale durante todo el alquiler, incluido el último día', () => {
+    expect(aviso({ carnetNumero: 'X1', carnetVencimiento: '2030-01-01' })).toBeNull();
+    expect(aviso({ carnetNumero: 'X1', carnetVencimiento: '2026-11-05' })).toBeNull();
+  });
+
+  it('aviso crítico si ya está vencido', () => {
+    const a = aviso({ carnetNumero: 'X1', carnetVencimiento: '2026-10-01' });
+    expect(a?.nivel).toBe('critico');
+    expect(a?.texto).toMatch(/venció el 01\/10\/2026/);
+  });
+
+  it('aviso crítico si vence antes de terminar el alquiler', () => {
+    const a = aviso({ carnetNumero: 'X1', carnetVencimiento: '2026-11-02' });
+    expect(a?.nivel).toBe('critico');
+    expect(a?.texto).toMatch(/vence el 02\/11\/2026.*05\/11\/2026/);
+  });
+
+  it('aviso suave si faltan los datos', () => {
+    expect(aviso({})?.nivel).toBe('aviso');
+    expect(aviso({})?.texto).toMatch(/No hay datos del carnet/);
+    expect(aviso({ carnetNumero: 'X1' })?.texto).toMatch(/fecha de vencimiento/);
   });
 });
