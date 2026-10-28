@@ -18,3 +18,18 @@ export function validarHorasReserva(d: { fechaInicio: string; fechaFin: string; 
 export function fechaConHora(fecha: string, hora: string | undefined, fmt: (iso: string) => string): string {
   return hora ? `${fmt(fecha)} · ${hora}` : fmt(fecha);
 }
+
+type ConInicio = { fechaInicio: string; horaInicio?: string };
+
+/** Clave para ordenar por momento de entrega: fecha y, si la hay, hora (AAAA-MM-DDTHH:mm). */
+const momentoEntrega = (r: ConInicio): string => `${r.fechaInicio}T${r.horaInicio || '00:00'}`;
+
+/** Reservas activas y próximas: la entrega más cercana primero y la más lejana al final. */
+export function ordenarProximas<T extends ConInicio>(reservas: T[]): T[] {
+  return [...reservas].sort((a, b) => momentoEntrega(a).localeCompare(momentoEntrega(b)));
+}
+
+/** Historial: lo más reciente primero. */
+export function ordenarHistorial<T extends ConInicio>(reservas: T[]): T[] {
+  return [...reservas].sort((a, b) => momentoEntrega(b).localeCompare(momentoEntrega(a)));
+}

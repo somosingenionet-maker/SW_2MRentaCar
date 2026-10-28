@@ -16,7 +16,7 @@ import Pagination from './Pagination';
 import { formatDate } from '../utils/dateFormat';
 import { formatEuros } from '../utils/moneda';
 import { resumenCarnet, avisoCarnetReserva } from '../utils/carnet';
-import { validarHorasReserva, fechaConHora } from '../utils/horaReserva';
+import { validarHorasReserva, fechaConHora, ordenarProximas, ordenarHistorial } from '../utils/horaReserva';
 import Hora24Field from './Hora24Field';
 import { downloadCsv, slugify } from '../utils/csvExport';
 import { genId } from '../utils/id';
@@ -313,7 +313,6 @@ export default function RentalsTab({
     downloadCsv(`${slugify(empresaCfg.nombre)}_alquileres_${new Date().toISOString().slice(0, 10)}.csv`, [headers, ...rows]);
   };
 
-  const sortedReservas = [...reservas].sort((a, b) => b.fechaInicio.localeCompare(a.fechaInicio));
 
   // Solo vehículos marcados como alquiler
   const vehiculosAlquiler = vehiculos.filter(v => v.esFlotaAlquiler);
@@ -345,8 +344,9 @@ export default function RentalsTab({
   // Histórica = anulada o devuelta (o terminada por fechas sin haberse llegado a entregar).
   // Un coche entregado que aún no ha vuelto sigue activo aunque haya pasado su fecha de fin.
   const esHistorica = (r: Reserva) => esHistoricaReserva(r, todayIso);
-  const reservasActivas = sortedReservas.filter(r => !esHistorica(r));
-  const reservasHistorial = sortedReservas.filter(esHistorica);
+  // Activas y próximas: la entrega más cercana primero. Historial: lo más reciente primero.
+  const reservasActivas = ordenarProximas(reservas.filter(r => !esHistorica(r)));
+  const reservasHistorial = ordenarHistorial(reservas.filter(esHistorica));
   const reservasVista = reservaView === 'historial' ? reservasHistorial : reservasActivas;
   const paginacion = usePaginacion(reservasVista, 'reservas');
   const pagedReservas = paginacion.items;
