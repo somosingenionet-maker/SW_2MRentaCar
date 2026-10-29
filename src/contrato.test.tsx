@@ -33,6 +33,13 @@ describe('declaración final del contrato', () => {
     );
   });
 
+  it('el texto en inglés es exactamente el que facilitó el cliente', () => {
+    expect(DECLARACION_EN).toBe(
+      'I declare that I have read the conditions described above, as well as the Conditions that I receive separately and declare that I accept their terms and conditions. ' +
+      'If the payment of this rent is made by bank card or cash, my signature confirms and accepts payments made on the card added to the contract.',
+    );
+  });
+
   it('aparece en el contrato en español, justo antes de las firmas, y ya no están las cláusulas antiguas', () => {
     const t = texto('es');
     expect(t).toContain(DECLARACION_ES);

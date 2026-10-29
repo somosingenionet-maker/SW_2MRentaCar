@@ -9,16 +9,16 @@ export const IDIOMAS_CONTRATO: { id: IdiomaContrato; etiqueta: string }[] = [
 ];
 
 /**
- * Declaración final que firma el cliente. El texto en español es el que pidió el cliente (2M);
- * la versión inglesa es una traducción fiel que conviene que revise un profesional.
+ * Declaración final que firma el cliente. Los dos textos los facilitó el cliente (2M) y se usan
+ * tal cual: no se retocan sin que ellos lo pidan.
  */
 export const DECLARACION_ES =
   'Declaro haber leído las condiciones descritas anteriormente, así como las Condiciones que recibo por separado y declaro que acepto los términos y condiciones de las mismas. ' +
   'Si el pago de este alquiler se realiza mediante tarjeta bancaria o efectivo, mi firma confirma y acepta los pagos realizados mediante la tarjeta anotada.';
 
 export const DECLARACION_EN =
-  'I declare that I have read the conditions described above, as well as the Conditions that I receive separately, and I declare that I accept the terms and conditions thereof. ' +
-  'If payment for this rental is made by bank card or cash, my signature confirms and accepts the payments made using the card noted.';
+  'I declare that I have read the conditions described above, as well as the Conditions that I receive separately and declare that I accept their terms and conditions. ' +
+  'If the payment of this rent is made by bank card or cash, my signature confirms and accepts payments made on the card added to the contract.';
 
 /** Todos los textos fijos del contrato. Si falta uno en un idioma, el código no compila. */
 export interface TextosContrato {
