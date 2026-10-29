@@ -30,7 +30,7 @@ export default function ContratoAlquiler({ reserva, cliente, vehiculo, empresa, 
           {empresa.logoBase64 && <img src={empresa.logoBase64} alt={empresa.nombre} className="h-16 max-w-[10rem] object-contain" />}
           <div>
             <h1 className="text-xl font-extrabold tracking-tight text-slate-900 uppercase font-display">{tx.titulo}</h1>
-            <p className="text-xs font-semibold text-slate-500 mt-1">{tx.subtitulo(empresa.nombre)}</p>
+            <p className="text-xs font-semibold text-slate-500 mt-1">{tx.subtitulo}</p>
           </div>
         </div>
         <div className="text-right">
@@ -186,11 +186,6 @@ export default function ContratoAlquiler({ reserva, cliente, vehiculo, empresa, 
             <span className="block text-[11px] font-bold uppercase tracking-wide text-slate-900">{titulo}</span>
           </div>
         ))}
-      </div>
-
-      {/* Pie solo al imprimir */}
-      <div className="text-center text-[10px] text-slate-300 italic pt-6 mt-12 border-t border-slate-100 hidden print:block">
-        {tx.pie(empresa.razonSocial)}
       </div>
     </div>
   );

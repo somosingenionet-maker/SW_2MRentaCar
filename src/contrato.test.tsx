@@ -158,3 +158,11 @@ describe('logo de la empresa', () => {
     expect(con('')).not.toContain('<img');
   });
 });
+
+describe('cabecera y pie sin marca del programa', () => {
+  it.each(['es', 'en'] as const)('no menciona CRM ni Flotas/Fleet (%s) y el subtítulo es solo "sin conductor"', idioma => {
+    const t = texto(idioma);
+    expect(t).not.toMatch(/CRM|Flotas &|Fleet &|Copia legal|Certified legal/);
+    expect(t).toContain(idioma === 'es' ? 'Sin conductor' : 'Without driver');
+  });
+});

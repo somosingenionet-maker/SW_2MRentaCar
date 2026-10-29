@@ -25,7 +25,7 @@ export interface TextosContrato {
   /** Configuración regional para fechas y números. */
   locale: string;
   titulo: string;
-  subtitulo: (empresa: string) => string;
+  subtitulo: string;
   numero: string;
   ciudadExpedicion: string;
   fechaFirma: string;
@@ -84,7 +84,6 @@ export interface TextosContrato {
   /** Título de la caja de firma de la empresa y de la del conductor (se muestra en mayúsculas). */
   firmaArrendador: (empresa: string) => string;
   firmaConductor: string;
-  pie: (razonSocial: string) => string;
   // Mensaje que acompaña al contrato
   asuntoCorreo: (empresa: string) => string;
   mensaje: (d: { nombre: string; vehiculo: string; matricula: string; desde: string; hasta: string; dias: number; total: string; empresa: string }) => string;
@@ -93,7 +92,7 @@ export interface TextosContrato {
 const ES: TextosContrato = {
   locale: 'es-ES',
   titulo: 'Contrato de Alquiler de Vehículo',
-  subtitulo: empresa => `Sin conductor • Serie de Flotas & CRM ${empresa}`,
+  subtitulo: 'Sin conductor',
   numero: 'CONTRATO NÚMERO',
   ciudadExpedicion: 'Ciudad de expedición',
   fechaFirma: 'Fecha de firma',
@@ -144,7 +143,6 @@ const ES: TextosContrato = {
   declaracion: DECLARACION_ES,
   firmaArrendador: empresa => `Firma arrendador (${empresa})`,
   firmaConductor: 'Firma conductor',
-  pie: razon => `Copia legal autenticada por ${razon} CRM & Flotas. Emitido cronológicamente.`,
   asuntoCorreo: empresa => `Contrato de Alquiler - ${empresa}`,
   mensaje: d =>
     `Hola ${d.nombre},\n\nAdjuntamos el contrato de alquiler del vehículo ${d.vehiculo} (${d.matricula}) desde el ${d.desde} hasta el ${d.hasta} (${d.dias} días). Total: ${d.total} €.\n\nUn saludo,\n${d.empresa}`,
@@ -153,7 +151,7 @@ const ES: TextosContrato = {
 const EN: TextosContrato = {
   locale: 'en-GB',
   titulo: 'Vehicle Rental Agreement',
-  subtitulo: empresa => `Without driver • Fleet & CRM series ${empresa}`,
+  subtitulo: 'Without driver',
   numero: 'CONTRACT NUMBER',
   ciudadExpedicion: 'City of issue',
   fechaFirma: 'Date of signing',
@@ -204,7 +202,6 @@ const EN: TextosContrato = {
   declaracion: DECLARACION_EN,
   firmaArrendador: empresa => `Lessor's signature (${empresa})`,
   firmaConductor: "Driver's signature",
-  pie: razon => `Certified legal copy issued by ${razon} CRM & Fleet. Issued chronologically.`,
   asuntoCorreo: empresa => `Rental Agreement - ${empresa}`,
   mensaje: d =>
     `Hello ${d.nombre},\n\nPlease find attached the rental agreement for the vehicle ${d.vehiculo} (${d.matricula}) from ${d.desde} to ${d.hasta} (${d.dias} days). Total: ${d.total} €.\n\nKind regards,\n${d.empresa}`,
