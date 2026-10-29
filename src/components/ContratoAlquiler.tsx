@@ -176,16 +176,13 @@ export default function ContratoAlquiler({ reserva, cliente, vehiculo, empresa, 
         <p className="text-[11px] text-slate-700 leading-relaxed text-justify">{tx.declaracion}</p>
       </div>
 
-      {/* Firmas */}
-      <div className="grid grid-cols-2 gap-12 pt-6 pb-2" id="contract-signatures-visualizer">
-        <div className="text-center">
-          <div className="border-b border-dashed border-slate-300 pb-12 mb-3"></div>
-          <span className="block text-[10px] text-slate-700 font-bold">{tx.firmaArrendador(empresa.nombre)}</span>
-        </div>
-        <div className="text-center">
-          <div className="border-b border-dashed border-slate-300 pb-12 mb-3"></div>
-          <span className="block text-[10px] text-slate-700 font-bold">{tx.firmaArrendatario}</span>
-        </div>
+      {/* Firmas: una caja con borde lila por firmante, con el título dentro y espacio para firmar */}
+      <div className="grid grid-cols-2 gap-6 pt-4 pb-2" id="contract-signatures-visualizer">
+        {[tx.firmaArrendador(empresa.nombre), tx.firmaConductor].map(titulo => (
+          <div key={titulo} data-testid="caja-firma" className="h-36 border-[3px] px-3 pt-2 break-inside-avoid" style={{ borderColor: '#C48CD6' }}>
+            <span className="block text-[11px] font-bold uppercase tracking-wide text-slate-900">{titulo}</span>
+          </div>
+        ))}
       </div>
 
       {/* Pie solo al imprimir */}

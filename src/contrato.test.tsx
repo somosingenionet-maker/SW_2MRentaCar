@@ -43,7 +43,7 @@ describe('declaración final del contrato', () => {
   it('aparece en el contrato en español, justo antes de las firmas, y ya no están las cláusulas antiguas', () => {
     const t = texto('es');
     expect(t).toContain(DECLARACION_ES);
-    expect(t.indexOf(DECLARACION_ES)).toBeLessThan(t.indexOf('Por el Arrendador'));
+    expect(t.indexOf(DECLARACION_ES)).toBeLessThan(t.indexOf('Firma arrendador'));
     for (const viejo of ['CLÁUSULAS ADICIONALES', 'PRIMERA. Objeto', 'SEGUNDA. Combustible', 'TERCERA. Cobertura']) expect(t).not.toContain(viejo);
   });
 
@@ -51,7 +51,7 @@ describe('declaración final del contrato', () => {
     const t = texto('en');
     expect(t).toContain(DECLARACION_EN);
     expect(t).not.toContain(DECLARACION_ES);
-    expect(t.indexOf(DECLARACION_EN)).toBeLessThan(t.indexOf('Lessor ('));
+    expect(t.indexOf(DECLARACION_EN)).toBeLessThan(t.indexOf("Lessor's signature"));
   });
 });
 
@@ -83,7 +83,7 @@ describe('contrato en los dos idiomas', () => {
     expect(t).toContain('Automatic');
     expect(t).toContain('Deposit (refundable): 500.00 €');
     expect(t).toContain('3/4');
-    for (const espanol of ['DATOS DEL', 'Contrato de', 'Fecha y hora', 'Kilometraje', 'Matrícula', 'oct.', 'Arrendador', 'Arrendatario']) expect(t).not.toContain(espanol);
+    for (const espanol of ['DATOS DEL', 'Contrato de', 'Fecha y hora', 'Kilometraje', 'Matrícula', 'oct.', 'Arrendador', 'Arrendatario', 'conductor']) expect(t).not.toContain(espanol);
   });
 
   it('sin fianza no aparece su línea, en ningún idioma', () => {
@@ -119,5 +119,27 @@ describe('contrato en los dos idiomas', () => {
     expect(TEXTOS_CONTRATO.es.mensaje(d)).toContain('Adjuntamos el contrato de alquiler');
     expect(TEXTOS_CONTRATO.en.mensaje(d)).toContain('Please find attached the rental agreement');
     expect(TEXTOS_CONTRATO.en.asuntoCorreo('2M')).toBe('Rental Agreement - 2M');
+  });
+});
+
+describe('cajas de firma', () => {
+  const html = (idioma: IdiomaContrato) =>
+    renderToString(<ContratoAlquiler reserva={reserva} cliente={cliente} vehiculo={vehiculo} empresa={empresa} idioma={idioma} />);
+  const cajas = (idioma: IdiomaContrato) => [...html(idioma).matchAll(/data-testid="caja-firma"[^>]*>(.*?)<\/div>/g)].map(m => m[1].replace(/<[^>]*>/g, ''));
+
+  it('hay una caja por firmante, con el título en el idioma del contrato', () => {
+    expect(cajas('es')).toEqual(['Firma arrendador (2M Rent a Car)', 'Firma conductor']);
+    expect(cajas('en')).toEqual(["Lessor&#x27;s signature (2M Rent a Car)", "Driver&#x27;s signature"]);
+  });
+
+  it('las cajas llevan el borde lila de marca y ya no quedan las líneas de puntos antiguas', () => {
+    const h = html('es');
+    expect(h).toContain('border-color:#C48CD6');
+    expect(h).not.toContain('border-dashed border-slate-300 pb-12');
+    expect(texto('es')).not.toContain('Por el Arrendatario');
+  });
+
+  it('el título sale en mayúsculas al verse e imprimirse', () => {
+    expect(html('en')).toMatch(/uppercase[^>]*>Driver&#x27;s signature/);
   });
 });

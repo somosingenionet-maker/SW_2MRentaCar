@@ -81,8 +81,9 @@ export interface TextosContrato {
   niveles: Record<NivelCombustible, string>;
   // Final
   declaracion: string;
+  /** Título de la caja de firma de la empresa y de la del conductor (se muestra en mayúsculas). */
   firmaArrendador: (empresa: string) => string;
-  firmaArrendatario: string;
+  firmaConductor: string;
   pie: (razonSocial: string) => string;
   // Mensaje que acompaña al contrato
   asuntoCorreo: (empresa: string) => string;
@@ -141,8 +142,8 @@ const ES: TextosContrato = {
   ninguno: 'Ninguno',
   niveles: { lleno: 'Lleno', tres_cuartos: '3/4', medio: '1/2', cuarto: '1/4', reserva: 'Reserva' },
   declaracion: DECLARACION_ES,
-  firmaArrendador: empresa => `Por el Arrendador (${empresa})`,
-  firmaArrendatario: 'Por el Arrendatario (Cliente)',
+  firmaArrendador: empresa => `Firma arrendador (${empresa})`,
+  firmaConductor: 'Firma conductor',
   pie: razon => `Copia legal autenticada por ${razon} CRM & Flotas. Emitido cronológicamente.`,
   asuntoCorreo: empresa => `Contrato de Alquiler - ${empresa}`,
   mensaje: d =>
@@ -201,8 +202,8 @@ const EN: TextosContrato = {
   ninguno: 'None',
   niveles: { lleno: 'Full', tres_cuartos: '3/4', medio: '1/2', cuarto: '1/4', reserva: 'Reserve' },
   declaracion: DECLARACION_EN,
-  firmaArrendador: empresa => `Lessor (${empresa})`,
-  firmaArrendatario: 'Lessee (Customer)',
+  firmaArrendador: empresa => `Lessor's signature (${empresa})`,
+  firmaConductor: "Driver's signature",
   pie: razon => `Certified legal copy issued by ${razon} CRM & Fleet. Issued chronologically.`,
   asuntoCorreo: empresa => `Rental Agreement - ${empresa}`,
   mensaje: d =>
