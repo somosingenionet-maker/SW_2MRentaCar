@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { renderToString } from 'react-dom/server';
 import ContratoAlquiler from './components/ContratoAlquiler';
+import ContratoVisor from './components/ContratoVisor';
 import { TEXTOS_CONTRATO, DECLARACION_ES, DECLARACION_EN, IDIOMAS_CONTRATO, type IdiomaContrato } from './utils/contratoTextos';
 import { DEFAULT_EMPRESA_CONFIG } from './data/empresaConfig';
 import type { Cliente, Reserva, SolicitudReserva, Vehiculo } from './types';
@@ -203,5 +204,28 @@ describe('número de reserva web, lugares y entrega/devolución', () => {
       expect(t).not.toMatch(/6\. |7\. |ENTREGA DEL VEHÍCULO|DEVOLUCIÓN DEL VEHÍCULO|VEHICLE HANDOVER|VEHICLE RETURN|Combustible|Fuel|Daños|Damage/);
     }
     expect(texto('es', { reserva: { entrega: undefined } })).toContain('DESCRIPCIÓN DEL VEHÍCULO');
+  });
+});
+
+describe('visor del contrato (Alquiler y ficha del cliente)', () => {
+  const visor = (cli: Cliente | undefined) =>
+    renderToString(<ContratoVisor reserva={reserva} cliente={cli} vehiculo={vehiculo} empresa={empresa} onClose={() => undefined} />);
+
+  it('muestra el contrato con el selector de idioma, imprimir y cerrar', () => {
+    const h = visor(cliente);
+    expect(h).toContain('Contrato de Alquiler de Vehículo');
+    expect(h).toContain('Descargar / Imprimir');
+    expect(h).toContain('Español');
+    expect(h).toContain('English');
+    expect(h).toContain('Cerrar');
+    expect(h).toContain('data-imprimible');
+  });
+
+  it('ofrece WhatsApp y correo solo si el cliente tiene teléfono y correo', () => {
+    expect(visor(cliente)).toContain('wa.me/34600111222');
+    expect(visor(cliente)).toContain('mailto:ana@example.com');
+    const h = visor(undefined);
+    expect(h).not.toContain('wa.me');
+    expect(h).not.toContain('mailto:');
   });
 });

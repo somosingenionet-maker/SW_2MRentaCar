@@ -8,9 +8,9 @@ import { useSeleccion } from '../utils/useSeleccion';
 import { Reserva, Vehiculo, Cliente, SolicitudReserva, MovimientoVehiculo } from '../types';
 import SearchableSelect from './SearchableSelect';
 import {
-  Calendar, Plus, User, Car, FileText, Check, X, Printer, Download, ChevronLeft, ChevronRight, MessageCircle, Mail as MailIcon, Globe, AlertTriangle
+  Calendar, Plus, User, Car, FileText, Check, X, Download, ChevronLeft, ChevronRight, Search, Globe, AlertTriangle
 } from 'lucide-react';
-import { motion, AnimatePresence } from 'motion/react';
+import { AnimatePresence } from 'motion/react';
 import ConfirmDialog from './ConfirmDialog';
 import Pagination from './Pagination';
 import { formatDate } from '../utils/dateFormat';
@@ -19,8 +19,8 @@ import { avisoCarnetReserva } from '../utils/carnet';
 import { validarHorasReserva, fechaConHora, ordenarProximas, ordenarHistorial } from '../utils/horaReserva';
 import Hora24Field from './Hora24Field';
 import { LUGARES_HABITUALES, lugaresReserva } from '../utils/lugarReserva';
-import ContratoAlquiler from './ContratoAlquiler';
-import { IDIOMAS_CONTRATO, TEXTOS_CONTRATO, type IdiomaContrato } from '../utils/contratoTextos';
+import { buscarReservas } from '../utils/buscarReservas';
+import ContratoVisor from './ContratoVisor';
 import { downloadCsv, slugify } from '../utils/csvExport';
 import { genId } from '../utils/id';
 import { getEmpresaConfig } from '../data/empresaConfig';
@@ -66,7 +66,6 @@ export default function RentalsTab({
   const [isAddingOpen, setIsAddingOpen] = useState(false);
   const [viewingContract, setViewingContract] = useState<Reserva | null>(null);
   // Idioma en que se ve, imprime y envía el contrato.
-  const [idiomaContrato, setIdiomaContrato] = useState<IdiomaContrato>('es');
 
   // Form states
   const [formVehiculoId, setFormVehiculoId] = useState('');
@@ -101,6 +100,8 @@ export default function RentalsTab({
   const [leyendaAbierta, setLeyendaAbierta] = useState(false);
   const [movimientoModal, setMovimientoModal] = useState<{ tipo: 'entrega' | 'devolucion'; reserva: Reserva } | null>(null);
   const [reservaView, setReservaView] = useState<'activas' | 'historial'>('activas');
+  // Buscador de la tabla: cliente, matrícula, número de reserva o de pedido web.
+  const [busqueda, setBusqueda] = useState('');
   const [dayModal, setDayModal] = useState<{ iso: string; reservations: Reserva[] } | null>(null);
   // Pedidos de la web ya pasados de un día del calendario (solo consulta).
   const [webDiaModal, setWebDiaModal] = useState<{ iso: string; pedidos: SolicitudReserva[] } | null>(null);
@@ -352,10 +353,6 @@ export default function RentalsTab({
     setEditandoLugares(null);
   };
 
-  const handlePrintContract = () => {
-    window.print();
-  };
-
   const handleExportCsv = () => {
     const headers = ['ID', 'Vehículo', 'Matrícula', 'Cliente', 'Fecha Inicio', 'Hora entrega', 'Fecha Fin', 'Hora devolución', 'Días', 'Tarifa/día (€)', 'Seguro', 'Total (€)', 'Estado'];
     const rows = reservas.map(res => {
@@ -415,8 +412,8 @@ export default function RentalsTab({
   // Activas y próximas: la entrega más cercana primero. Historial: lo más reciente primero.
   const reservasActivas = ordenarProximas(reservas.filter(r => !esHistorica(r)));
   const reservasHistorial = ordenarHistorial(reservas.filter(esHistorica));
-  const reservasVista = reservaView === 'historial' ? reservasHistorial : reservasActivas;
-  const paginacion = usePaginacion(reservasVista, 'reservas');
+  const reservasVista = buscarReservas(reservaView === 'historial' ? reservasHistorial : reservasActivas, { clientes, vehiculos, solicitudes }, busqueda);
+  const paginacion = usePaginacion(reservasVista, 'reservas', `${reservaView}|${busqueda}`);
   const pagedReservas = paginacion.items;
 
   // Etiqueta de estado de una reserva (anulada, por entregar, en curso, retrasada, finalizada…).
@@ -839,6 +836,23 @@ export default function RentalsTab({
               </div>
             </div>
 
+            <div className="relative">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-slate-400 pointer-events-none" />
+              <input
+                type="search"
+                aria-label="Buscar reservas"
+                placeholder="Buscar por cliente, matrícula, nº de reserva o pedido web..."
+                value={busqueda}
+                onChange={e => setBusqueda(e.target.value)}
+                className="w-full pl-9 pr-4 py-2 border border-slate-200 rounded-xl text-xs focus:outline-none focus:ring-2 focus:ring-blue-500 bg-slate-50 focus:bg-white transition font-sans"
+              />
+            </div>
+            {busqueda.trim() && (
+              <p className="text-[11px] text-slate-500 font-semibold" data-testid="resultados-busqueda">
+                {reservasVista.length} {reservasVista.length === 1 ? 'reserva encontrada' : 'reservas encontradas'} en {reservaView === 'historial' ? 'el historial' : 'activas y próximas'}
+              </p>
+            )}
+
             <div className="overflow-x-auto">
               <table className="w-full text-left text-xs table-auto border-collapse">
                 <thead>
@@ -857,7 +871,9 @@ export default function RentalsTab({
                       <td colSpan={6} className="py-10 text-center">
                         <Calendar className="w-8 h-8 text-slate-200 mx-auto mb-2" />
                         <p className="text-xs font-semibold text-slate-400">
-                          {reservaView === 'historial'
+                          {busqueda.trim()
+                            ? `Ninguna reserva de esta lista coincide con «${busqueda.trim()}».${reservaView === 'activas' ? ' Prueba en el Historial.' : ' Prueba en Activas y próximas.'}`
+                            : reservaView === 'historial'
                             ? 'No hay reservas finalizadas ni anuladas todavía.'
                             : 'No hay reservas activas ni próximas. Pulse «Nueva Reserva» para crear una.'}
                         </p>
@@ -1547,97 +1563,17 @@ export default function RentalsTab({
         onCancel={() => setConfirmAnular({ isOpen: false, resId: '' })}
       />
 
-      {/* MODAL / OVERLAY: PROFESSIONAL RENTAL LEGAL CONTRACT PDF VIEW */}
+      {/* Contrato de la reserva (visor con idioma, impresión y envío) */}
       <AnimatePresence>
         {viewingContract && (
-          <div data-imprimible data-hoja="contrato" className="fixed inset-0 bg-slate-900/80 backdrop-blur-xs flex items-start justify-center p-4 z-50 overflow-y-auto pt-10">
-            <motion.div 
-              initial={{ y: 20, opacity: 0 }}
-              animate={{ y: 0, opacity: 1 }}
-              exit={{ y: 20, opacity: 0 }}
-              className="bg-white rounded-2xl shadow-2xl max-w-3xl w-full border border-slate-200 overflow-hidden print:shadow-none print:border-none print:max-w-full my-6"
-              id="legal-contract-pdf-modal"
-            >
-              {/* Header inside overlay (Hidden on print) */}
-              <div className="px-6 py-4 bg-slate-800 text-white flex justify-between items-center print:hidden">
-                <div className="flex items-center gap-2">
-                  <FileText className="w-5 h-5 text-blue-400" />
-                  <span className="font-bold text-sm font-display">Visor de Contrato de Alquiler</span>
-                </div>
-                <div className="flex gap-2 flex-wrap">
-                  <button
-                    onClick={handlePrintContract}
-                    className="px-3 py-1.5 bg-blue-600 hover:bg-blue-500 text-white text-xs font-bold rounded-lg transition flex items-center gap-1 cursor-pointer font-sans"
-                  >
-                    <Printer className="w-3.5 h-3.5" /> Descargar / Imprimir
-                  </button>
-                  {/* Selector de idioma del contrato (también cambia el mensaje de WhatsApp y de correo) */}
-                  <div className="inline-flex rounded-lg border border-slate-600 overflow-hidden text-xs font-bold" role="group" aria-label="Idioma del contrato">
-                    {IDIOMAS_CONTRATO.map(i => (
-                      <button
-                        key={i.id}
-                        type="button"
-                        onClick={() => setIdiomaContrato(i.id)}
-                        aria-pressed={idiomaContrato === i.id}
-                        className={`px-3 py-1.5 transition cursor-pointer ${idiomaContrato === i.id ? 'bg-white text-slate-900' : 'bg-slate-700 text-slate-200 hover:bg-slate-600'}`}
-                      >
-                        {i.etiqueta}
-                      </button>
-                    ))}
-                  </div>
-                  {(() => {
-                    const tx = TEXTOS_CONTRATO[idiomaContrato];
-                    const fecha = (iso: string) => formatDate(iso, idiomaContrato);
-                    const cli = clientes.find(c => c.id === viewingContract.clienteId);
-                    const veh = vehiculos.find(v => v.id === viewingContract.vehiculoId);
-                    const texto = tx.mensaje({
-                      nombre: cli?.nombre ?? '',
-                      vehiculo: `${veh?.marca ?? ''} ${veh?.modelo ?? ''}`.trim(),
-                      matricula: veh?.matricula ?? '',
-                      desde: fechaConHora(viewingContract.fechaInicio, viewingContract.horaInicio, fecha),
-                      hasta: fechaConHora(viewingContract.fechaFin, viewingContract.horaFin, fecha),
-                      dias: calculateDays(viewingContract.fechaInicio, viewingContract.fechaFin),
-                      total: viewingContract.totalCobrado.toFixed(2),
-                      empresa: empresaCfg.nombre,
-                    });
-                    const tel = cli?.telefono?.replace(/\D/g, '') ?? '';
-                    return (
-                      <>
-                        {cli?.telefono && (
-                          <a href={`https://wa.me/${tel}?text=${encodeURIComponent(texto)}`} target="_blank" rel="noreferrer"
-                            className="px-3 py-1.5 bg-green-600 hover:bg-green-500 text-white text-xs font-bold rounded-lg transition flex items-center gap-1">
-                            <MessageCircle className="w-3.5 h-3.5" /> WhatsApp
-                          </a>
-                        )}
-                        {cli?.correo && (
-                          <a href={`mailto:${cli.correo}?subject=${encodeURIComponent(tx.asuntoCorreo(empresaCfg.nombre))}&body=${encodeURIComponent(texto)}`}
-                            className="px-3 py-1.5 bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-bold rounded-lg transition flex items-center gap-1">
-                            <MailIcon className="w-3.5 h-3.5" /> Email
-                          </a>
-                        )}
-                      </>
-                    );
-                  })()}
-                  <button
-                    onClick={() => setViewingContract(null)}
-                    className="px-3 py-1.5 bg-slate-700 hover:bg-slate-600 text-slate-200 text-xs font-bold rounded-lg transition cursor-pointer font-sans"
-                  >
-                    Cerrar
-                  </button>
-                </div>
-              </div>
-
-              {/* Cuerpo imprimible del contrato, en el idioma elegido */}
-              <ContratoAlquiler
-                reserva={viewingContract}
-                cliente={clientes.find(c => c.id === viewingContract.clienteId)}
-                vehiculo={vehiculos.find(v => v.id === viewingContract.vehiculoId)}
-                empresa={empresaCfg}
-                idioma={idiomaContrato}
-                solicitud={solicitudes.find(s => s.reservaId === viewingContract.id)}
-              />
-            </motion.div>
-          </div>
+          <ContratoVisor
+            reserva={viewingContract}
+            cliente={clientes.find(c => c.id === viewingContract.clienteId)}
+            vehiculo={vehiculos.find(v => v.id === viewingContract.vehiculoId)}
+            solicitud={solicitudes.find(s => s.reservaId === viewingContract.id)}
+            empresa={empresaCfg}
+            onClose={() => setViewingContract(null)}
+          />
         )}
       </AnimatePresence>
     </div>

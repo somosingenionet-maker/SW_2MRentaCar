@@ -146,6 +146,14 @@ describe('contenido que no debe perderse', () => {
     expect(t).toContain('Reservas de la web');
   });
 
+  it('Alquileres tiene un buscador por cliente, matrícula, reserva o pedido web', () => {
+    const Tab = alquileres[1] as ComponentType<Record<string, unknown>>;
+    const html = renderToString(<Tab {...alquileres[2]} />);
+    expect(html).toContain('aria-label="Buscar reservas"');
+    expect(html).toContain('Buscar por cliente, matrícula, nº de reserva o pedido web');
+    expect(html).not.toContain('resultados-busqueda');
+  });
+
   it('Vehículos muestra las matrículas de la flota', () => {
     const v = pestanas.find(p => p[0] === 'Vehículos')!;
     const t = texto(v[1], v[2]);

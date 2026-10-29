@@ -10,7 +10,7 @@ import { Cliente, Reserva, InteraccionCliente, Vehiculo, OrdenTrabajo, Factura, 
 import { canceladaEnWeb, estadoWebMeta, soloFecha } from '../utils/solicitudes';
 import { getEmpresaConfig } from '../data/empresaConfig';
 import {
-  Users, UserPlus, Search, Mail, Phone, MapPin, CreditCard, Clock, MessageSquare, Plus, Trash2, X, Check, Save, Download, PenTool, Car, Wrench, Receipt, ChevronDown, ChevronRight, Link2, IdCard
+  Users, UserPlus, Search, Mail, Phone, MapPin, CreditCard, Clock, MessageSquare, Plus, Trash2, X, Check, Save, Download, PenTool, Car, Wrench, Receipt, ChevronDown, ChevronRight, Link2, IdCard, FileText
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import ConfirmDialog from './ConfirmDialog';
@@ -19,6 +19,7 @@ import { formatDate } from '../utils/dateFormat';
 import { downloadCsv, slugify } from '../utils/csvExport';
 import { genId } from '../utils/id';
 import { PedirDatosModal, RevisarDatosModal, PanelDatosRecibidos } from './DatosClientePanel';
+import ContratoVisor from './ContratoVisor';
 
 interface CrmTabProps {
   clientes: Cliente[];
@@ -75,6 +76,8 @@ export default function CrmTab({
   onAddInteraccion
 }: CrmTabProps) {
   const [searchTerm, setSearchTerm] = useState('');
+  // Contrato de un alquiler abierto desde la ficha del cliente.
+  const [contratoAbierto, setContratoAbierto] = useState<Reserva | null>(null);
   const [selectedCliente, setSelectedCliente] = useSeleccion(clientes);
   // Autorregistro: modal para generar el enlace (cliente null = persona nueva) y revisión de lo recibido.
   const [pedirDatos, setPedirDatos] = useState<{ cliente: Cliente | null } | null>(null);
@@ -748,6 +751,14 @@ export default function CrmTab({
                                 const e = ESTADO_META[estadoReserva(res, hoyISO())];
                                 return <span className={`inline-block text-[9px] font-bold uppercase rounded px-1.5 ${e.cls}`}>{e.label}</span>;
                               })()}
+                              <button
+                                type="button"
+                                onClick={() => setContratoAbierto(res)}
+                                title="Ver contrato"
+                                className="mt-1 ml-1 px-2 py-0.5 bg-white hover:bg-slate-100 border border-slate-200 text-slate-700 rounded text-[10px] font-bold transition inline-flex items-center gap-0.5 cursor-pointer"
+                              >
+                                <FileText className="w-3 h-3 text-blue-600" /> Contrato
+                              </button>
                             </div>
                           </div>
                         );
@@ -1257,6 +1268,19 @@ export default function CrmTab({
           onClose={() => setRevisando(null)}
         />
       )}
+
+      <AnimatePresence>
+        {contratoAbierto && (
+          <ContratoVisor
+            reserva={contratoAbierto}
+            cliente={clientes.find(c => c.id === contratoAbierto.clienteId)}
+            vehiculo={vehiculos.find(v => v.id === contratoAbierto.vehiculoId)}
+            solicitud={solicitudes.find(s => s.reservaId === contratoAbierto.id)}
+            empresa={getEmpresaConfig()}
+            onClose={() => setContratoAbierto(null)}
+          />
+        )}
+      </AnimatePresence>
     </div>
   );
 }
