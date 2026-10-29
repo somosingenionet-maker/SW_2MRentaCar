@@ -28,10 +28,7 @@ export default function ContratoAlquiler({ reserva, cliente, vehiculo, empresa, 
       <div className="flex justify-between items-start border-b-2 border-slate-950 pb-5">
         <div className="flex items-center gap-4">
           {empresa.logoBase64 && <img src={empresa.logoBase64} alt={empresa.nombre} className="h-16 max-w-[10rem] object-contain" />}
-          <div>
-            <h1 className="text-xl font-extrabold tracking-tight text-slate-900 uppercase font-display">{tx.titulo}</h1>
-            <p className="text-xs font-semibold text-slate-500 mt-1">{tx.subtitulo}</p>
-          </div>
+          <h1 className="text-xl font-extrabold tracking-tight text-slate-900 uppercase font-display">{tx.titulo}</h1>
         </div>
         <div className="text-right">
           <span className="text-xs font-mono font-bold block text-slate-500">{tx.numero}</span>

@@ -25,7 +25,6 @@ export interface TextosContrato {
   /** Configuración regional para fechas y números. */
   locale: string;
   titulo: string;
-  subtitulo: string;
   numero: string;
   ciudadExpedicion: string;
   fechaFirma: string;
@@ -92,7 +91,6 @@ export interface TextosContrato {
 const ES: TextosContrato = {
   locale: 'es-ES',
   titulo: 'Contrato de Alquiler de Vehículo',
-  subtitulo: 'Sin conductor',
   numero: 'CONTRATO NÚMERO',
   ciudadExpedicion: 'Ciudad de expedición',
   fechaFirma: 'Fecha de firma',
@@ -151,7 +149,6 @@ const ES: TextosContrato = {
 const EN: TextosContrato = {
   locale: 'en-GB',
   titulo: 'Vehicle Rental Agreement',
-  subtitulo: 'Without driver',
   numero: 'CONTRACT NUMBER',
   ciudadExpedicion: 'City of issue',
   fechaFirma: 'Date of signing',

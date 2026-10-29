@@ -160,9 +160,7 @@ describe('logo de la empresa', () => {
 });
 
 describe('cabecera y pie sin marca del programa', () => {
-  it.each(['es', 'en'] as const)('no menciona CRM ni Flotas/Fleet (%s) y el subtítulo es solo "sin conductor"', idioma => {
-    const t = texto(idioma);
-    expect(t).not.toMatch(/CRM|Flotas &|Fleet &|Copia legal|Certified legal/);
-    expect(t).toContain(idioma === 'es' ? 'Sin conductor' : 'Without driver');
+  it.each(['es', 'en'] as const)('no menciona CRM, Flotas/Fleet ni "sin conductor" (%s)', idioma => {
+    expect(texto(idioma)).not.toMatch(/CRM|Flotas &|Fleet &|Copia legal|Certified legal|Sin conductor|Without driver/);
   });
 });
