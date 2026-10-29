@@ -143,3 +143,18 @@ describe('cajas de firma', () => {
     expect(html('en')).toMatch(/uppercase[^>]*>Driver&#x27;s signature/);
   });
 });
+
+describe('logo de la empresa', () => {
+  const con = (logoBase64: string) =>
+    renderToString(<ContratoAlquiler reserva={reserva} cliente={cliente} vehiculo={vehiculo} empresa={{ ...empresa, logoBase64 }} idioma="es" />);
+
+  it('muestra el logo subido en la cabecera, antes del título', () => {
+    const h = con('data:image/png;base64,AAAA');
+    expect(h).toContain('src="data:image/png;base64,AAAA"');
+    expect(h.indexOf('data:image/png;base64,AAAA')).toBeLessThan(h.indexOf('Contrato de Alquiler'));
+  });
+
+  it('sin logo subido no deja imagen rota', () => {
+    expect(con('')).not.toContain('<img');
+  });
+});
