@@ -132,7 +132,7 @@ const ES: TextosContrato = {
   firmaConductor: 'Firma conductor',
   asuntoCorreo: empresa => `Contrato de Alquiler - ${empresa}`,
   mensaje: d =>
-    `Hola ${d.nombre},\n\nAdjuntamos el contrato de alquiler del vehículo ${d.vehiculo} (${d.matricula}) desde el ${d.desde} hasta el ${d.hasta} (${d.dias} días). Total: ${d.total} €.\n\nUn saludo,\n${d.empresa}`,
+    `Hola ${d.nombre},\n\nLe enviamos los datos del contrato de alquiler del vehículo ${d.vehiculo} (${d.matricula}) desde el ${d.desde} hasta el ${d.hasta} (${d.dias} días). Total: ${d.total} €.\n\nUn saludo,\n${d.empresa}`,
 };
 
 const EN: TextosContrato = {
@@ -185,7 +185,7 @@ const EN: TextosContrato = {
   firmaConductor: "Driver's signature",
   asuntoCorreo: empresa => `Rental Agreement - ${empresa}`,
   mensaje: d =>
-    `Hello ${d.nombre},\n\nPlease find attached the rental agreement for the vehicle ${d.vehiculo} (${d.matricula}) from ${d.desde} to ${d.hasta} (${d.dias} days). Total: ${d.total} €.\n\nKind regards,\n${d.empresa}`,
+    `Hello ${d.nombre},\n\nHere are the details of the rental agreement for the vehicle ${d.vehiculo} (${d.matricula}) from ${d.desde} to ${d.hasta} (${d.dias} days). Total: ${d.total} €.\n\nKind regards,\n${d.empresa}`,
 };
 
 export const TEXTOS_CONTRATO: Record<IdiomaContrato, TextosContrato> = { es: ES, en: EN };

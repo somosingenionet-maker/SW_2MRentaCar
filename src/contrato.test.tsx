@@ -116,8 +116,10 @@ describe('contrato en los dos idiomas', () => {
 
   it('el mensaje que acompaña al contrato sale en el idioma elegido', () => {
     const d = { nombre: 'Ana', vehiculo: 'Seat Ibiza', matricula: '5612HDR', desde: '31 Oct 2026 · 10:00', hasta: '2 Nov 2026 · 09:30', dias: 2, total: '76.00', empresa: '2M Rent a Car' };
-    expect(TEXTOS_CONTRATO.es.mensaje(d)).toContain('Adjuntamos el contrato de alquiler');
-    expect(TEXTOS_CONTRATO.en.mensaje(d)).toContain('Please find attached the rental agreement');
+    expect(TEXTOS_CONTRATO.es.mensaje(d)).toContain('Le enviamos los datos del contrato de alquiler');
+    expect(TEXTOS_CONTRATO.en.mensaje(d)).toContain('Here are the details of the rental agreement');
+    // Los enlaces de correo y WhatsApp no pueden adjuntar archivos: el texto no debe prometerlo.
+    for (const idioma of ['es', 'en'] as const) expect(TEXTOS_CONTRATO[idioma].mensaje(d)).not.toMatch(/adjunt|attach/i);
     expect(TEXTOS_CONTRATO.en.asuntoCorreo('2M')).toBe('Rental Agreement - 2M');
   });
 });
