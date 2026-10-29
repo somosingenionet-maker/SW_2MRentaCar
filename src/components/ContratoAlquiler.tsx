@@ -47,7 +47,7 @@ export default function ContratoAlquiler({ reserva, cliente, vehiculo, empresa, 
         <span>{tx.fechaFirma}: {fecha(reserva.fechaInicio)}</span>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-6 pt-2">
+      <div className="grid grid-cols-1 md:grid-cols-2 print:grid-cols-2 gap-6 pt-2">
         {/* Arrendador */}
         <div className="space-y-1.5 text-xs text-slate-700">
           <h5 className="font-bold text-slate-900 uppercase border-b border-slate-200 pb-1 text-[10px]">{tx.s1}</h5>
@@ -80,10 +80,10 @@ export default function ContratoAlquiler({ reserva, cliente, vehiculo, empresa, 
       </div>
 
       {/* Vehículo */}
-      <div className="p-4 bg-slate-50 border border-slate-200 rounded-xl space-y-1.5 text-xs text-slate-700" id="contract-vehicle-specs">
+      <div className="p-4 bg-slate-50 border border-slate-200 rounded-xl space-y-1.5 text-xs text-slate-700 break-inside-avoid" id="contract-vehicle-specs">
         <h5 className="font-bold text-slate-900 uppercase text-[10px] pb-1 border-b border-slate-200">{tx.s3}</h5>
         {v ? (
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+          <div className="grid grid-cols-2 md:grid-cols-4 print:grid-cols-4 gap-4">
             <div>
               <span className="text-slate-400 block text-[9px] uppercase font-semibold">{tx.marcaModelo}</span>
               <strong className="font-bold text-slate-800">{v.marca} {v.modelo}</strong>
@@ -117,7 +117,7 @@ export default function ContratoAlquiler({ reserva, cliente, vehiculo, empresa, 
       </div>
 
       {/* Plazos y liquidación */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-6 text-xs text-slate-700">
+      <div className="grid grid-cols-1 md:grid-cols-2 print:grid-cols-2 gap-6 text-xs text-slate-700">
         <div className="space-y-1.5">
           <h5 className="font-bold text-slate-900 uppercase text-[10px] pb-1 border-b border-slate-200">{tx.s4}</h5>
           <p><strong>{tx.fechaHoraEntrega}:</strong> {fechaConHora(reserva.fechaInicio, reserva.horaInicio, fecha)}</p>
@@ -128,7 +128,7 @@ export default function ContratoAlquiler({ reserva, cliente, vehiculo, empresa, 
           <p className="text-slate-500 italic text-[10px]">{tx.retraso}</p>
         </div>
 
-        <div className="p-4 bg-blue-50/50 border border-blue-200 rounded-xl space-y-1.5" id="contract-financial-specs">
+        <div className="p-4 bg-blue-50/50 border border-blue-200 rounded-xl space-y-1.5 break-inside-avoid" id="contract-financial-specs">
           <h5 className="font-bold text-blue-950 uppercase text-[10px] pb-1 border-b border-blue-200">{tx.s5}</h5>
           <div className="flex justify-between font-sans">
             <span>{tx.precioBase}:</span>
@@ -156,7 +156,7 @@ export default function ContratoAlquiler({ reserva, cliente, vehiculo, empresa, 
       </div>
 
       {/* Firmas: una caja con borde lila por firmante, con el título dentro y espacio para firmar */}
-      <div className="grid grid-cols-2 gap-6 pt-4 pb-2" id="contract-signatures-visualizer">
+      <div className="grid grid-cols-2 gap-6 pt-4 pb-2 break-inside-avoid" id="contract-signatures-visualizer">
         {[tx.firmaArrendador(empresa.nombre), tx.firmaConductor].map(titulo => (
           <div key={titulo} data-testid="caja-firma" className="h-36 border-[3px] px-3 pt-2 break-inside-avoid" style={{ borderColor: '#C48CD6' }}>
             <span className="block text-[11px] font-bold uppercase tracking-wide text-slate-900">{titulo}</span>
@@ -165,7 +165,7 @@ export default function ContratoAlquiler({ reserva, cliente, vehiculo, empresa, 
       </div>
 
       {/* Declaración final del cliente, debajo de las firmas */}
-      <div className="pt-2" id="contract-declaration">
+      <div className="pt-2 break-inside-avoid" id="contract-declaration">
         <p className="text-[11px] text-slate-700 leading-relaxed text-justify">{tx.declaracion}</p>
       </div>
     </div>

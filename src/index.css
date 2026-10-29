@@ -50,4 +50,9 @@
     box-shadow: none !important;
   }
   [data-imprimible] .overflow-y-auto { overflow: visible !important; }
+  /* Sin esto el navegador quita los fondos y colores al imprimir y el documento sale distinto al de pantalla. */
+  [data-imprimible], [data-imprimible] * {
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
 }
