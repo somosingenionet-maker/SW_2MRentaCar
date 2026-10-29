@@ -40,10 +40,10 @@ describe('declaración final del contrato', () => {
     );
   });
 
-  it('aparece en el contrato en español, justo antes de las firmas, y ya no están las cláusulas antiguas', () => {
+  it('aparece en el contrato en español, justo debajo de las firmas, y ya no están las cláusulas antiguas', () => {
     const t = texto('es');
     expect(t).toContain(DECLARACION_ES);
-    expect(t.indexOf(DECLARACION_ES)).toBeLessThan(t.indexOf('Firma arrendador'));
+    expect(t.indexOf('Firma conductor')).toBeLessThan(t.indexOf(DECLARACION_ES));
     for (const viejo of ['CLÁUSULAS ADICIONALES', 'PRIMERA. Objeto', 'SEGUNDA. Combustible', 'TERCERA. Cobertura']) expect(t).not.toContain(viejo);
   });
 
@@ -51,7 +51,7 @@ describe('declaración final del contrato', () => {
     const t = texto('en');
     expect(t).toContain(DECLARACION_EN);
     expect(t).not.toContain(DECLARACION_ES);
-    expect(t.indexOf(DECLARACION_EN)).toBeLessThan(t.indexOf("Lessor's signature"));
+    expect(t.indexOf("Driver's signature")).toBeLessThan(t.indexOf(DECLARACION_EN));
   });
 });
 

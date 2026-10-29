@@ -155,11 +155,6 @@ export default function ContratoAlquiler({ reserva, cliente, vehiculo, empresa, 
         </div>
       </div>
 
-      {/* Declaración final del cliente */}
-      <div className="border-t border-slate-100 pt-4" id="contract-declaration">
-        <p className="text-[11px] text-slate-700 leading-relaxed text-justify">{tx.declaracion}</p>
-      </div>
-
       {/* Firmas: una caja con borde lila por firmante, con el título dentro y espacio para firmar */}
       <div className="grid grid-cols-2 gap-6 pt-4 pb-2" id="contract-signatures-visualizer">
         {[tx.firmaArrendador(empresa.nombre), tx.firmaConductor].map(titulo => (
@@ -167,6 +162,11 @@ export default function ContratoAlquiler({ reserva, cliente, vehiculo, empresa, 
             <span className="block text-[11px] font-bold uppercase tracking-wide text-slate-900">{titulo}</span>
           </div>
         ))}
+      </div>
+
+      {/* Declaración final del cliente, debajo de las firmas */}
+      <div className="pt-2" id="contract-declaration">
+        <p className="text-[11px] text-slate-700 leading-relaxed text-justify">{tx.declaracion}</p>
       </div>
     </div>
   );
