@@ -26,10 +26,10 @@ export default function ContratoAlquiler({ reserva, cliente, vehiculo, empresa, 
   const lugares = lugaresReserva(reserva, solicitud);
 
   return (
-    <div className="p-8 md:p-12 space-y-6 text-slate-800 font-sans print:p-0" id="contract-printable-area" lang={idioma}>
+    <div className="p-8 md:p-12 space-y-6 text-slate-800 font-sans print:p-0 print:space-y-3" id="contract-printable-area" lang={idioma}>
 
       {/* Cabecera */}
-      <div className="flex justify-between items-start border-b-2 border-slate-950 pb-5">
+      <div className="flex justify-between items-start border-b-2 border-slate-950 pb-5 print:pb-3">
         <div className="flex items-center gap-4">
           {empresa.logoBase64 && <img src={empresa.logoBase64} alt={empresa.nombre} className="h-16 max-w-[10rem] object-contain" />}
           <h1 className="text-xl font-extrabold tracking-tight text-slate-900 uppercase font-display">{tx.titulo}</h1>
@@ -80,7 +80,7 @@ export default function ContratoAlquiler({ reserva, cliente, vehiculo, empresa, 
       </div>
 
       {/* Vehículo */}
-      <div className="p-4 bg-slate-50 border border-slate-200 rounded-xl space-y-1.5 text-xs text-slate-700 break-inside-avoid" id="contract-vehicle-specs">
+      <div className="p-4 print:p-3 bg-slate-50 border border-slate-200 rounded-xl space-y-1.5 text-xs text-slate-700 break-inside-avoid" id="contract-vehicle-specs">
         <h5 className="font-bold text-slate-900 uppercase text-[10px] pb-1 border-b border-slate-200">{tx.s3}</h5>
         {v ? (
           <div className="grid grid-cols-2 md:grid-cols-4 print:grid-cols-4 gap-4">
@@ -128,7 +128,7 @@ export default function ContratoAlquiler({ reserva, cliente, vehiculo, empresa, 
           <p className="text-slate-500 italic text-[10px]">{tx.retraso}</p>
         </div>
 
-        <div className="p-4 bg-blue-50/50 border border-blue-200 rounded-xl space-y-1.5 break-inside-avoid" id="contract-financial-specs">
+        <div className="p-4 print:p-3 bg-blue-50/50 border border-blue-200 rounded-xl space-y-1.5 break-inside-avoid" id="contract-financial-specs">
           <h5 className="font-bold text-blue-950 uppercase text-[10px] pb-1 border-b border-blue-200">{tx.s5}</h5>
           <div className="flex justify-between font-sans">
             <span>{tx.precioBase}:</span>
@@ -156,9 +156,9 @@ export default function ContratoAlquiler({ reserva, cliente, vehiculo, empresa, 
       </div>
 
       {/* Firmas: una caja con borde lila por firmante, con el título dentro y espacio para firmar */}
-      <div className="grid grid-cols-2 gap-6 pt-4 pb-2 break-inside-avoid" id="contract-signatures-visualizer">
+      <div className="grid grid-cols-2 gap-6 pt-4 pb-2 print:pt-2 print:pb-0 break-inside-avoid" id="contract-signatures-visualizer">
         {[tx.firmaArrendador(empresa.nombre), tx.firmaConductor].map(titulo => (
-          <div key={titulo} data-testid="caja-firma" className="h-36 border-[3px] px-3 pt-2 break-inside-avoid" style={{ borderColor: '#C48CD6' }}>
+          <div key={titulo} data-testid="caja-firma" className="h-36 print:h-28 border-[3px] px-3 pt-2 break-inside-avoid" style={{ borderColor: '#C48CD6' }}>
             <span className="block text-[11px] font-bold uppercase tracking-wide text-slate-900">{titulo}</span>
           </div>
         ))}

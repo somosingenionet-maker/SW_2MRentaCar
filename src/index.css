@@ -30,7 +30,7 @@
    Al imprimir solo debe salir el documento: se oculta todo lo que no lo contiene
    y se saca la capa de su posición fija para que fluya en páginas normales.
    Cada documento imprimible lleva el atributo data-imprimible. */
-@page { margin: 12mm; }
+@page { size: A4; margin: 12mm; }
 
 @media print {
   body:has([data-imprimible]) :is(#root, #root *):not(:has([data-imprimible])):not([data-imprimible]):not([data-imprimible] *) {
