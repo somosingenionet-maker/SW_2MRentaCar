@@ -26,7 +26,7 @@ export default function ContratoAlquiler({ reserva, cliente, vehiculo, empresa, 
   const lugares = lugaresReserva(reserva, solicitud);
 
   return (
-    <div className="p-8 md:p-12 space-y-6 text-slate-800 font-sans print:p-0 print:space-y-3" id="contract-printable-area" lang={idioma}>
+    <div className="p-8 md:p-12 space-y-6 text-slate-800 font-sans print:p-[12mm] print:space-y-3" id="contract-printable-area" lang={idioma}>
 
       {/* Cabecera */}
       <div className="flex justify-between items-start border-b-2 border-slate-950 pb-5 print:pb-3">
