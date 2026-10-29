@@ -29,11 +29,13 @@ export function estadoCarnet(vencimiento: string | undefined, hoy: string = hoyI
 }
 
 /** Línea de texto para el contrato: «12345678 · expedido 01/03/2020 · vence 01/03/2030». */
-export function resumenCarnet(d: DatosCarnet, fmt: (iso: string) => string): string {
+export function resumenCarnet(
+  d: DatosCarnet, fmt: (iso: string) => string, palabras: { expedido: string; vence: string } = { expedido: 'expedido', vence: 'vence' },
+): string {
   const partes = [
     d.carnetNumero?.trim() || '',
-    d.carnetExpedicion ? `expedido ${fmt(d.carnetExpedicion)}` : '',
-    d.carnetVencimiento ? `vence ${fmt(d.carnetVencimiento)}` : '',
+    d.carnetExpedicion ? `${palabras.expedido} ${fmt(d.carnetExpedicion)}` : '',
+    d.carnetVencimiento ? `${palabras.vence} ${fmt(d.carnetVencimiento)}` : '',
   ].filter(Boolean);
   return partes.join(' · ');
 }

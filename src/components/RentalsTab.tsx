@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import RegistroMovimientoModal, { TarjetaMovimiento } from './RegistroMovimientoModal';
-import { COMBUSTIBLES, estadoReserva as estadoDeReserva, esHistorica as esHistoricaReserva, finEfectivo, kmRecorridos, ESTADO_META } from '../utils/entregaDevolucion';
+import { estadoReserva as estadoDeReserva, esHistorica as esHistoricaReserva, finEfectivo, kmRecorridos, ESTADO_META } from '../utils/entregaDevolucion';
 import ModalShell from './ModalShell';
 import { usePaginacion } from '../utils/usePaginacion';
 import { ofreceSeguro, totalAlquiler, etiquetaTransmision, parseFianza, fianzaSugerida } from '../utils/condicionesAlquiler';
@@ -15,9 +15,11 @@ import ConfirmDialog from './ConfirmDialog';
 import Pagination from './Pagination';
 import { formatDate } from '../utils/dateFormat';
 import { formatEuros } from '../utils/moneda';
-import { resumenCarnet, avisoCarnetReserva } from '../utils/carnet';
+import { avisoCarnetReserva } from '../utils/carnet';
 import { validarHorasReserva, fechaConHora, ordenarProximas, ordenarHistorial } from '../utils/horaReserva';
 import Hora24Field from './Hora24Field';
+import ContratoAlquiler from './ContratoAlquiler';
+import { IDIOMAS_CONTRATO, TEXTOS_CONTRATO, type IdiomaContrato } from '../utils/contratoTextos';
 import { downloadCsv, slugify } from '../utils/csvExport';
 import { genId } from '../utils/id';
 import { getEmpresaConfig } from '../data/empresaConfig';
@@ -62,6 +64,8 @@ export default function RentalsTab({
   const [selectedReserva, setSelectedReserva] = useSeleccion(reservas);
   const [isAddingOpen, setIsAddingOpen] = useState(false);
   const [viewingContract, setViewingContract] = useState<Reserva | null>(null);
+  // Idioma en que se ve, imprime y envía el contrato.
+  const [idiomaContrato, setIdiomaContrato] = useState<IdiomaContrato>('es');
 
   // Form states
   const [formVehiculoId, setFormVehiculoId] = useState('');
@@ -1483,12 +1487,35 @@ export default function RentalsTab({
                   >
                     <Printer className="w-3.5 h-3.5" /> Descargar / Imprimir
                   </button>
+                  {/* Selector de idioma del contrato (también cambia el mensaje de WhatsApp y de correo) */}
+                  <div className="inline-flex rounded-lg border border-slate-600 overflow-hidden text-xs font-bold" role="group" aria-label="Idioma del contrato">
+                    {IDIOMAS_CONTRATO.map(i => (
+                      <button
+                        key={i.id}
+                        type="button"
+                        onClick={() => setIdiomaContrato(i.id)}
+                        aria-pressed={idiomaContrato === i.id}
+                        className={`px-3 py-1.5 transition cursor-pointer ${idiomaContrato === i.id ? 'bg-white text-slate-900' : 'bg-slate-700 text-slate-200 hover:bg-slate-600'}`}
+                      >
+                        {i.etiqueta}
+                      </button>
+                    ))}
+                  </div>
                   {(() => {
-                    const empresa = getEmpresaConfig();
+                    const tx = TEXTOS_CONTRATO[idiomaContrato];
+                    const fecha = (iso: string) => formatDate(iso, idiomaContrato);
                     const cli = clientes.find(c => c.id === viewingContract.clienteId);
                     const veh = vehiculos.find(v => v.id === viewingContract.vehiculoId);
-                    const dias = calculateDays(viewingContract.fechaInicio, viewingContract.fechaFin);
-                    const texto = `Hola ${cli?.nombre ?? ''},\n\nAdjuntamos el contrato de alquiler del vehículo ${veh?.marca ?? ''} ${veh?.modelo ?? ''} (${veh?.matricula ?? ''}) desde el ${fechaConHora(viewingContract.fechaInicio, viewingContract.horaInicio, formatDate)} hasta el ${fechaConHora(viewingContract.fechaFin, viewingContract.horaFin, formatDate)} (${dias} días). Total: ${viewingContract.totalCobrado.toFixed(2)} €.\n\nUn saludo,\n${empresa.nombre}`;
+                    const texto = tx.mensaje({
+                      nombre: cli?.nombre ?? '',
+                      vehiculo: `${veh?.marca ?? ''} ${veh?.modelo ?? ''}`.trim(),
+                      matricula: veh?.matricula ?? '',
+                      desde: fechaConHora(viewingContract.fechaInicio, viewingContract.horaInicio, fecha),
+                      hasta: fechaConHora(viewingContract.fechaFin, viewingContract.horaFin, fecha),
+                      dias: calculateDays(viewingContract.fechaInicio, viewingContract.fechaFin),
+                      total: viewingContract.totalCobrado.toFixed(2),
+                      empresa: empresaCfg.nombre,
+                    });
                     const tel = cli?.telefono?.replace(/\D/g, '') ?? '';
                     return (
                       <>
@@ -1499,7 +1526,7 @@ export default function RentalsTab({
                           </a>
                         )}
                         {cli?.correo && (
-                          <a href={`mailto:${cli.correo}?subject=${encodeURIComponent(`Contrato de Alquiler - ${empresa.nombre}`)}&body=${encodeURIComponent(texto)}`}
+                          <a href={`mailto:${cli.correo}?subject=${encodeURIComponent(tx.asuntoCorreo(empresaCfg.nombre))}&body=${encodeURIComponent(texto)}`}
                             className="px-3 py-1.5 bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-bold rounded-lg transition flex items-center gap-1">
                             <MailIcon className="w-3.5 h-3.5" /> Email
                           </a>
@@ -1516,195 +1543,14 @@ export default function RentalsTab({
                 </div>
               </div>
 
-              {/* Printable Area represents Professional Contract */}
-              <div className="p-8 md:p-12 space-y-6 text-slate-800 font-sans print:p-0" id="contract-printable-area">
-                
-                {/* Legal Header */}
-                <div className="flex justify-between items-start border-b-2 border-slate-950 pb-5">
-                  <div>
-                    <h1 className="text-xl font-extrabold tracking-tight text-slate-900 uppercase font-display">Contrato de Alquiler de Vehículo</h1>
-                    <p className="text-xs font-semibold text-slate-500 mt-1">Sin conductor • Serie de Flotas &amp; CRM {empresaCfg.nombre}</p>
-                  </div>
-                  <div className="text-right">
-                    <span className="text-xs font-mono font-bold block text-slate-500">CONTRATO NÚMERO</span>
-                    <strong className="text-lg font-mono font-black text-blue-600">{viewingContract.id.slice(-8).toUpperCase()}</strong>
-                  </div>
-                </div>
-
-                {/* Date and Place */}
-                <div className="text-xs text-slate-500 border-b border-rose-100 pb-2 flex justify-between font-semibold">
-                  <span>Ciudad de expedición: {empresaCfg.ciudad}</span>
-                  <span>Fecha de firma: {formatDate(viewingContract.fechaInicio)}</span>
-                </div>
-
-                {/* Declarations / Client vs Vehicle */}
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6 pt-2">
-                  
-                  {/* First Party: Landlord (The workshop backoffice) */}
-                  <div className="space-y-1.5 text-xs text-slate-700">
-                    <h5 className="font-bold text-slate-900 uppercase border-b border-slate-200 pb-1 text-[10px]">1. DATOS DEL ARRENDADOR</h5>
-                    <p className="font-bold">{empresaCfg.razonSocial}</p>
-                    <p className="text-slate-500">NIF: {empresaCfg.nif} • CIF de Operaciones</p>
-                    <p className="text-slate-500">Sede Fiscal: {empresaCfg.direccionFiscal}</p>
-                    {(empresaCfg.ciudad || empresaCfg.pais) && (
-                      <p className="text-slate-500">{[empresaCfg.ciudad, empresaCfg.pais].filter(Boolean).join(' · ')}</p>
-                    )}
-                    <p className="text-slate-500">Teléfono central: {empresaCfg.telefono}</p>
-                  </div>
-
-                  {/* Second Party: Tenant */}
-                  <div className="space-y-1.5 text-xs text-slate-700" id="contract-client-specs">
-                    <h5 className="font-bold text-slate-900 uppercase border-b border-slate-200 pb-1 text-[10px]">2. DATOS DEL ARRENDATARIO (CLIENTE)</h5>
-                    {(() => {
-                      const c = clientes.find(cli => cli.id === viewingContract.clienteId);
-                      return c ? (
-                        <>
-                          <p className="font-bold">{c.nombre} {c.apellidos}</p>
-                          <p className="text-slate-500 font-mono">DNI/NIF/NIE: {c.nifNiePasaporte}</p>
-                          <p className="text-slate-500">Carnet de conducir: {resumenCarnet(c, formatDate) || 'No informado'}</p>
-                          <p className="text-slate-500">Email: {c.correo || 'No informado'}</p>
-                          <p className="text-slate-500">Teléfono: {c.telefono}</p>
-                          <p className="text-slate-500">Domicilio: {c.direccion || 'No informado'}</p>
-                          {(c.ciudad || c.pais) && <p className="text-slate-500">{[c.ciudad, c.pais].filter(Boolean).join(' · ')}</p>}
-                        </>
-                      ) : (
-                        <p className="text-rose-600 italic font-semibold">Ficha del cliente no disponible en el CRM.</p>
-                      );
-                    })()}
-                  </div>
-                </div>
-
-                {/* Vehicle specifications */}
-                <div className="p-4 bg-slate-50 border border-slate-200 rounded-xl space-y-1.5 text-xs text-slate-700" id="contract-vehicle-specs">
-                  <h5 className="font-bold text-slate-900 uppercase text-[10px] pb-1 border-b border-slate-200">3. DESCRIPCIÓN DEL VEHÍCULO DE FLOTA</h5>
-                  {(() => {
-                    const v = vehiculos.find(veh => veh.id === viewingContract.vehiculoId);
-                    return v ? (
-                      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                        <div>
-                          <span className="text-slate-400 block text-[9px] uppercase font-semibold">Marca y Modelo</span>
-                          <strong className="font-bold text-slate-800">{v.marca} {v.modelo}</strong>
-                        </div>
-                        <div>
-                          <span className="text-slate-400 block text-[9px] uppercase font-semibold">Matrícula Nacional</span>
-                          <strong className="font-mono font-bold text-slate-800">{v.matricula}</strong>
-                        </div>
-                        <div>
-                          <span className="text-slate-400 block text-[9px] uppercase font-semibold">Nº de Bastidor</span>
-                          <strong className="font-mono text-slate-500 text-[10px]">{v.bastidor}</strong>
-                        </div>
-                        <div>
-                          <span className="text-slate-400 block text-[9px] uppercase font-semibold">Transmisión</span>
-                          <strong className="font-bold text-slate-800">{etiquetaTransmision(v.transmision)}</strong>
-                        </div>
-                        {v.aseguradora && (
-                          <div>
-                            <span className="text-slate-400 block text-[9px] uppercase font-semibold">Aseguradora</span>
-                            <strong className="font-bold text-slate-800">{v.aseguradora}</strong>
-                          </div>
-                        )}
-                        <div>
-                          <span className="text-slate-400 block text-[9px] uppercase font-semibold">Kilometraje Entrada</span>
-                          <strong className="font-mono font-bold text-slate-800">{v.kilometraje.toLocaleString()} km</strong>
-                        </div>
-                      </div>
-                    ) : (
-                      <p className="text-rose-600 italic font-semibold">Vehículo desasociado de la flota.</p>
-                    );
-                  })()}
-                </div>
-
-                {/* Contract duration and financial liquidations */}
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6 text-xs text-slate-700">
-                  <div className="space-y-1.5">
-                    <h5 className="font-bold text-slate-900 uppercase text-[10px] pb-1 border-b border-slate-200">4. VIGENCIA Y PLAZOS</h5>
-                    <p><strong>Fecha y hora de entrega:</strong> {fechaConHora(viewingContract.fechaInicio, viewingContract.horaInicio, formatDate)}</p>
-                    <p><strong>Fecha y hora acordadas de retorno:</strong> {fechaConHora(viewingContract.fechaFin, viewingContract.horaFin, formatDate)}</p>
-                    <p><strong>Número total de jornadas:</strong> {calculateDays(viewingContract.fechaInicio, viewingContract.fechaFin)} días naturales</p>
-                    <p className="text-slate-500 italic text-[10px]">El retraso superior a 59 minutos en la devolución facultará el cobro de un día adicional con penalización.</p>
-                  </div>
-
-                  <div className="p-4 bg-blue-50/50 border border-blue-200 rounded-xl space-y-1.5" id="contract-financial-specs">
-                    <h5 className="font-bold text-blue-950 uppercase text-[10px] pb-1 border-b border-blue-200">5. LIQUIDACIÓN DE TARIFAS (I.V.A. INCLUIDO)</h5>
-                    <div className="flex justify-between font-sans">
-                      <span>Precio unitario base:</span>
-                      <strong className="font-mono">{viewingContract.tarifaDiaria.toFixed(2)} € / día</strong>
-                    </div>
-                    <div className="flex justify-between font-sans">
-                      <span>Seguro Técnico Completo:</span>
-                      <strong className="font-mono">{viewingContract.incluyeSeguroTodoRiesgo ? (viewingContract.seguroDia != null ? `${viewingContract.seguroDia.toFixed(2)} € / día` : 'Incluido') : 'Póliza Terceros Básica'}</strong>
-                    </div>
-                    {viewingContract.fianza != null && viewingContract.fianza > 0 && (
-                      <div className="flex justify-between font-sans">
-                        <span>Fianza (depósito reembolsable):</span>
-                        <strong className="font-mono">{viewingContract.fianza.toFixed(2)} €</strong>
-                      </div>
-                    )}
-                    <div className="flex justify-between border-t border-blue-300 pt-1 text-blue-900 font-extrabold font-sans">
-                      <span>IMPORTE FACTURADO NETO:</span>
-                      <strong className="font-mono text-blue-950">{viewingContract.totalCobrado.toFixed(2)} €</strong>
-                    </div>
-                  </div>
-                </div>
-
-                {/* Estado del coche a la entrega y a la devolución (registrado, o líneas para rellenar a mano) */}
-                <div className="grid grid-cols-2 gap-4" id="contract-delivery-return">
-                  {([
-                    { titulo: '6. ENTREGA DEL VEHÍCULO', mov: viewingContract.entrega },
-                    { titulo: '7. DEVOLUCIÓN DEL VEHÍCULO', mov: viewingContract.devolucion },
-                  ] as const).map(({ titulo, mov }) => (
-                    <div key={titulo} className="p-4 bg-slate-50 border border-slate-200 rounded-xl space-y-1.5 text-xs text-slate-700">
-                      <h5 className="font-bold text-slate-900 uppercase text-[10px] pb-1 border-b border-slate-200">{titulo}</h5>
-                      {([
-                        ['Fecha y hora', mov ? new Date(mov.fechaHora).toLocaleString('es-ES', { day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' }) : null],
-                        ['Kilometraje', mov ? `${mov.km.toLocaleString('es-ES')} km` : null],
-                        ['Combustible', mov ? (COMBUSTIBLES.find(c => c.valor === mov.combustible)?.etiqueta ?? '—') : null],
-                        ['Daños', mov ? (mov.danos || 'Ninguno') : null],
-                      ] as const).map(([etiqueta, valor]) => (
-                        <div key={etiqueta} className="flex justify-between gap-2">
-                          <span className="text-slate-400">{etiqueta}:</span>
-                          {valor != null ? <strong className="text-right">{valor}</strong> : <span className="flex-1 border-b border-dashed border-slate-300 mb-1" />}
-                        </div>
-                      ))}
-                    </div>
-                  ))}
-                </div>
-
-                {/* Terms conditions text in Spanish */}
-                <div className="space-y-2 border-t border-slate-100 pt-4 text-[9px] text-slate-400 leading-normal text-justify" id="contract-terms-spanish">
-                  <h5 className="font-bold text-slate-700 uppercase text-[10px]">CLÁUSULAS ADICIONALES DEL ACUERDO</h5>
-                  <p>
-                    <strong>PRIMERA. Objeto del Contrato.</strong> El Arrendador cede en arrendamiento al Arrendatario el vehículo descrito en la cláusula 3, en perfectas condiciones de funcionamiento, conservación y carrocería, comprometiéndose el Arrendatario a conservarlo y conducirlo cumpliendo estrictamente con el Código de Circulación Vigente de España.
-                  </p>
-                  <p>
-                    <strong>SEGUNDA. Combustible e Infracciones.</strong> El vehículo se entrega con el tanque de combustible completo, debiendo retornarse en iguales circunstancias. Corresponden en exclusiva al arrendatario todas las sanciones administrativas derivadas de la conducción del vehículo durante el periodo de vigencia del presente contrato.
-                  </p>
-                  <p>
-                    {viewingContract.incluyeSeguroTodoRiesgo ? (
-                      <span><strong>TERCERA. Cobertura del Seguro.</strong> Al haber contratado la póliza de SEGURO A TODO RIESGO, se exime al cliente de cualquier responsabilidad por siniestros fortuitos, colisiones, daños superficiales de pintura, ralladuras o robo del coche en vía pública{viewingContract.fianza ? `, sujeto a fianza de depósito de ${viewingContract.fianza.toFixed(2)} €` : ''}.</span>
-                    ) : (
-                      <span><strong>TERCERA. Cobertura Restringida.</strong> Se suscribe únicamente el SEGURO OBLIGATORIO DE RESPONSABILIDAD CIVIL a terceros. Cualquier avería por negligencia, daño en chapa, lunas o interior será responsabilidad íntegra del cliente arrendatario y liquidada en base al baremo de taller oficial.{viewingContract.fianza ? ` El arrendatario deja en depósito una fianza de ${viewingContract.fianza.toFixed(2)} €.` : ''}</span>
-                    )}
-                  </p>
-                </div>
-
-                {/* Signatures visualizer */}
-                <div className="grid grid-cols-2 gap-12 pt-6 pb-2" id="contract-signatures-visualizer">
-                  <div className="text-center">
-                    <div className="border-b border-dashed border-slate-300 pb-12 mb-3"></div>
-                    <span className="block text-[10px] text-slate-700 font-bold">Por el Arrendador ({empresaCfg.nombre})</span>
-                  </div>
-                  <div className="text-center">
-                    <div className="border-b border-dashed border-slate-300 pb-12 mb-3"></div>
-                    <span className="block text-[10px] text-slate-700 font-bold">Por el Arrendatario (Cliente)</span>
-                  </div>
-                </div>
-
-                {/* Print footnotes */}
-                <div className="text-center text-[10px] text-slate-300 italic pt-6 mt-12 border-t border-slate-100 hidden print:block">
-                  Copia legal autenticada por {empresaCfg.razonSocial} CRM &amp; Flotas. Emitido cronológicamente.
-                </div>
-              </div>
+              {/* Cuerpo imprimible del contrato, en el idioma elegido */}
+              <ContratoAlquiler
+                reserva={viewingContract}
+                cliente={clientes.find(c => c.id === viewingContract.clienteId)}
+                vehiculo={vehiculos.find(v => v.id === viewingContract.vehiculoId)}
+                empresa={empresaCfg}
+                idioma={idiomaContrato}
+              />
             </motion.div>
           </div>
         )}

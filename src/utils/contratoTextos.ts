@@ -1,0 +1,217 @@
+import type { NivelCombustible, Vehiculo } from '../types';
+
+/** Idiomas en los que se puede ver, imprimir y enviar el contrato. */
+export type IdiomaContrato = 'es' | 'en';
+
+export const IDIOMAS_CONTRATO: { id: IdiomaContrato; etiqueta: string }[] = [
+  { id: 'es', etiqueta: 'Español' },
+  { id: 'en', etiqueta: 'English' },
+];
+
+/**
+ * Declaración final que firma el cliente. El texto en español es el que pidió el cliente (2M);
+ * la versión inglesa es una traducción fiel que conviene que revise un profesional.
+ */
+export const DECLARACION_ES =
+  'Declaro haber leído las condiciones descritas anteriormente, así como las Condiciones que recibo por separado y declaro que acepto los términos y condiciones de las mismas. ' +
+  'Si el pago de este alquiler se realiza mediante tarjeta bancaria o efectivo, mi firma confirma y acepta los pagos realizados mediante la tarjeta anotada.';
+
+export const DECLARACION_EN =
+  'I declare that I have read the conditions described above, as well as the Conditions that I receive separately, and I declare that I accept the terms and conditions thereof. ' +
+  'If payment for this rental is made by bank card or cash, my signature confirms and accepts the payments made using the card noted.';
+
+/** Todos los textos fijos del contrato. Si falta uno en un idioma, el código no compila. */
+export interface TextosContrato {
+  /** Configuración regional para fechas y números. */
+  locale: string;
+  titulo: string;
+  subtitulo: (empresa: string) => string;
+  numero: string;
+  ciudadExpedicion: string;
+  fechaFirma: string;
+  // 1. Arrendador
+  s1: string;
+  nif: (nif: string) => string;
+  sedeFiscal: string;
+  telefonoCentral: string;
+  // 2. Arrendatario
+  s2: string;
+  documento: string;
+  carnet: string;
+  noInformado: string;
+  email: string;
+  telefono: string;
+  domicilio: string;
+  fichaNoDisponible: string;
+  carnetPalabras: { expedido: string; vence: string };
+  // 3. Vehículo
+  s3: string;
+  marcaModelo: string;
+  matricula: string;
+  bastidor: string;
+  transmision: string;
+  aseguradora: string;
+  kmEntrada: string;
+  vehiculoDesasociado: string;
+  transmisiones: { manual: string; automatico: string; sinDato: string };
+  // 4. Plazos
+  s4: string;
+  fechaHoraEntrega: string;
+  fechaHoraRetorno: string;
+  jornadas: string;
+  diasNaturales: (n: number) => string;
+  retraso: string;
+  // 5. Tarifas
+  s5: string;
+  precioBase: string;
+  porDia: string;
+  seguroCompleto: string;
+  incluido: string;
+  polizaTerceros: string;
+  fianza: string;
+  importeNeto: string;
+  // 6 y 7. Entrega y devolución
+  s6: string;
+  s7: string;
+  fechaHora: string;
+  kilometraje: string;
+  combustible: string;
+  danos: string;
+  ninguno: string;
+  niveles: Record<NivelCombustible, string>;
+  // Final
+  declaracion: string;
+  firmaArrendador: (empresa: string) => string;
+  firmaArrendatario: string;
+  pie: (razonSocial: string) => string;
+  // Mensaje que acompaña al contrato
+  asuntoCorreo: (empresa: string) => string;
+  mensaje: (d: { nombre: string; vehiculo: string; matricula: string; desde: string; hasta: string; dias: number; total: string; empresa: string }) => string;
+}
+
+const ES: TextosContrato = {
+  locale: 'es-ES',
+  titulo: 'Contrato de Alquiler de Vehículo',
+  subtitulo: empresa => `Sin conductor • Serie de Flotas & CRM ${empresa}`,
+  numero: 'CONTRATO NÚMERO',
+  ciudadExpedicion: 'Ciudad de expedición',
+  fechaFirma: 'Fecha de firma',
+  s1: '1. DATOS DEL ARRENDADOR',
+  nif: nif => `NIF: ${nif} • CIF de Operaciones`,
+  sedeFiscal: 'Sede Fiscal',
+  telefonoCentral: 'Teléfono central',
+  s2: '2. DATOS DEL ARRENDATARIO (CLIENTE)',
+  documento: 'DNI/NIF/NIE',
+  carnet: 'Carnet de conducir',
+  noInformado: 'No informado',
+  email: 'Email',
+  telefono: 'Teléfono',
+  domicilio: 'Domicilio',
+  fichaNoDisponible: 'Ficha del cliente no disponible en el CRM.',
+  carnetPalabras: { expedido: 'expedido', vence: 'vence' },
+  s3: '3. DESCRIPCIÓN DEL VEHÍCULO DE FLOTA',
+  marcaModelo: 'Marca y Modelo',
+  matricula: 'Matrícula Nacional',
+  bastidor: 'Nº de Bastidor',
+  transmision: 'Transmisión',
+  aseguradora: 'Aseguradora',
+  kmEntrada: 'Kilometraje Entrada',
+  vehiculoDesasociado: 'Vehículo desasociado de la flota.',
+  transmisiones: { manual: 'Manual', automatico: 'Automático', sinDato: '—' },
+  s4: '4. VIGENCIA Y PLAZOS',
+  fechaHoraEntrega: 'Fecha y hora de entrega',
+  fechaHoraRetorno: 'Fecha y hora acordadas de retorno',
+  jornadas: 'Número total de jornadas',
+  diasNaturales: n => `${n} días naturales`,
+  retraso: 'El retraso superior a 59 minutos en la devolución facultará el cobro de un día adicional con penalización.',
+  s5: '5. LIQUIDACIÓN DE TARIFAS (I.V.A. INCLUIDO)',
+  precioBase: 'Precio unitario base',
+  porDia: '€ / día',
+  seguroCompleto: 'Seguro Técnico Completo',
+  incluido: 'Incluido',
+  polizaTerceros: 'Póliza Terceros Básica',
+  fianza: 'Fianza (depósito reembolsable)',
+  importeNeto: 'IMPORTE FACTURADO NETO',
+  s6: '6. ENTREGA DEL VEHÍCULO',
+  s7: '7. DEVOLUCIÓN DEL VEHÍCULO',
+  fechaHora: 'Fecha y hora',
+  kilometraje: 'Kilometraje',
+  combustible: 'Combustible',
+  danos: 'Daños',
+  ninguno: 'Ninguno',
+  niveles: { lleno: 'Lleno', tres_cuartos: '3/4', medio: '1/2', cuarto: '1/4', reserva: 'Reserva' },
+  declaracion: DECLARACION_ES,
+  firmaArrendador: empresa => `Por el Arrendador (${empresa})`,
+  firmaArrendatario: 'Por el Arrendatario (Cliente)',
+  pie: razon => `Copia legal autenticada por ${razon} CRM & Flotas. Emitido cronológicamente.`,
+  asuntoCorreo: empresa => `Contrato de Alquiler - ${empresa}`,
+  mensaje: d =>
+    `Hola ${d.nombre},\n\nAdjuntamos el contrato de alquiler del vehículo ${d.vehiculo} (${d.matricula}) desde el ${d.desde} hasta el ${d.hasta} (${d.dias} días). Total: ${d.total} €.\n\nUn saludo,\n${d.empresa}`,
+};
+
+const EN: TextosContrato = {
+  locale: 'en-GB',
+  titulo: 'Vehicle Rental Agreement',
+  subtitulo: empresa => `Without driver • Fleet & CRM series ${empresa}`,
+  numero: 'CONTRACT NUMBER',
+  ciudadExpedicion: 'City of issue',
+  fechaFirma: 'Date of signing',
+  s1: '1. LESSOR DETAILS',
+  nif: nif => `Tax ID (NIF/CIF): ${nif}`,
+  sedeFiscal: 'Registered office',
+  telefonoCentral: 'Main phone',
+  s2: '2. LESSEE (CUSTOMER) DETAILS',
+  documento: 'ID / NIF / NIE / Passport',
+  carnet: 'Driving licence',
+  noInformado: 'Not provided',
+  email: 'Email',
+  telefono: 'Phone',
+  domicilio: 'Address',
+  fichaNoDisponible: 'Customer record not available in the CRM.',
+  carnetPalabras: { expedido: 'issued', vence: 'expires' },
+  s3: '3. FLEET VEHICLE DESCRIPTION',
+  marcaModelo: 'Make and model',
+  matricula: 'Registration plate',
+  bastidor: 'Chassis (VIN) no.',
+  transmision: 'Transmission',
+  aseguradora: 'Insurer',
+  kmEntrada: 'Mileage at pick-up',
+  vehiculoDesasociado: 'Vehicle no longer in the fleet.',
+  transmisiones: { manual: 'Manual', automatico: 'Automatic', sinDato: '—' },
+  s4: '4. TERM AND SCHEDULE',
+  fechaHoraEntrega: 'Pick-up date and time',
+  fechaHoraRetorno: 'Agreed return date and time',
+  jornadas: 'Total number of rental days',
+  diasNaturales: n => `${n} calendar days`,
+  retraso: 'A delay of more than 59 minutes in returning the vehicle entitles the Lessor to charge an additional day with a penalty.',
+  s5: '5. RATES AND CHARGES (VAT INCLUDED)',
+  precioBase: 'Base unit price',
+  porDia: '€ / day',
+  seguroCompleto: 'Comprehensive insurance',
+  incluido: 'Included',
+  polizaTerceros: 'Basic third-party policy',
+  fianza: 'Deposit (refundable)',
+  importeNeto: 'NET INVOICED AMOUNT',
+  s6: '6. VEHICLE HANDOVER',
+  s7: '7. VEHICLE RETURN',
+  fechaHora: 'Date and time',
+  kilometraje: 'Mileage',
+  combustible: 'Fuel',
+  danos: 'Damage',
+  ninguno: 'None',
+  niveles: { lleno: 'Full', tres_cuartos: '3/4', medio: '1/2', cuarto: '1/4', reserva: 'Reserve' },
+  declaracion: DECLARACION_EN,
+  firmaArrendador: empresa => `Lessor (${empresa})`,
+  firmaArrendatario: 'Lessee (Customer)',
+  pie: razon => `Certified legal copy issued by ${razon} CRM & Fleet. Issued chronologically.`,
+  asuntoCorreo: empresa => `Rental Agreement - ${empresa}`,
+  mensaje: d =>
+    `Hello ${d.nombre},\n\nPlease find attached the rental agreement for the vehicle ${d.vehiculo} (${d.matricula}) from ${d.desde} to ${d.hasta} (${d.dias} days). Total: ${d.total} €.\n\nKind regards,\n${d.empresa}`,
+};
+
+export const TEXTOS_CONTRATO: Record<IdiomaContrato, TextosContrato> = { es: ES, en: EN };
+
+/** Etiqueta del cambio (manual o automático) en el idioma del contrato. */
+export function etiquetaTransmisionContrato(t: Vehiculo['transmision'], tx: TextosContrato): string {
+  return t === 'automatico' ? tx.transmisiones.automatico : t === 'manual' ? tx.transmisiones.manual : tx.transmisiones.sinDato;
+}
