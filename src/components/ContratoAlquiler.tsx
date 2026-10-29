@@ -1,9 +1,10 @@
-import type { Reserva, Cliente, Vehiculo } from '../types';
+import type { Reserva, Cliente, Vehiculo, SolicitudReserva } from '../types';
 import type { EmpresaConfig } from '../data/empresaConfig';
 import { formatDate } from '../utils/dateFormat';
 import { diasAlquiler } from '../utils/solicitudes';
 import { fechaConHora } from '../utils/horaReserva';
 import { resumenCarnet } from '../utils/carnet';
+import { lugaresReserva } from '../utils/lugarReserva';
 import { TEXTOS_CONTRATO, etiquetaTransmisionContrato, type IdiomaContrato } from '../utils/contratoTextos';
 
 interface Props {
@@ -12,14 +13,17 @@ interface Props {
   vehiculo?: Vehiculo;
   empresa: EmpresaConfig;
   idioma: IdiomaContrato;
+  /** Pedido de la web del que viene la reserva, si lo hay (aporta el número de reserva web y el lugar si falta). */
+  solicitud?: SolicitudReserva;
 }
 
 /** Cuerpo imprimible del contrato de alquiler, en español o en inglés. */
-export default function ContratoAlquiler({ reserva, cliente, vehiculo, empresa, idioma }: Props) {
+export default function ContratoAlquiler({ reserva, cliente, vehiculo, empresa, idioma, solicitud }: Props) {
   const tx = TEXTOS_CONTRATO[idioma];
   const fecha = (iso: string) => formatDate(iso, idioma);
   const c = cliente;
   const v = vehiculo;
+  const lugares = lugaresReserva(reserva, solicitud);
 
   return (
     <div className="p-8 md:p-12 space-y-6 text-slate-800 font-sans print:p-0" id="contract-printable-area" lang={idioma}>
@@ -39,6 +43,7 @@ export default function ContratoAlquiler({ reserva, cliente, vehiculo, empresa, 
       {/* Fecha y lugar */}
       <div className="text-xs text-slate-500 border-b border-rose-100 pb-2 flex justify-between font-semibold">
         <span>{tx.ciudadExpedicion}: {empresa.ciudad}</span>
+        {solicitud?.referenciaExterna && <span data-testid="reserva-web">{tx.reservaWeb} {solicitud.referenciaExterna}</span>}
         <span>{tx.fechaFirma}: {fecha(reserva.fechaInicio)}</span>
       </div>
 
@@ -116,7 +121,9 @@ export default function ContratoAlquiler({ reserva, cliente, vehiculo, empresa, 
         <div className="space-y-1.5">
           <h5 className="font-bold text-slate-900 uppercase text-[10px] pb-1 border-b border-slate-200">{tx.s4}</h5>
           <p><strong>{tx.fechaHoraEntrega}:</strong> {fechaConHora(reserva.fechaInicio, reserva.horaInicio, fecha)}</p>
+          <p><strong>{tx.lugarEntrega}:</strong> {lugares.recogida || tx.noInformado}</p>
           <p><strong>{tx.fechaHoraRetorno}:</strong> {fechaConHora(reserva.fechaFin, reserva.horaFin, fecha)}</p>
+          <p><strong>{tx.lugarDevolucion}:</strong> {lugares.devolucion || tx.noInformado}</p>
           <p><strong>{tx.jornadas}:</strong> {tx.diasNaturales(diasAlquiler(reserva.fechaInicio, reserva.fechaFin))}</p>
           <p className="text-slate-500 italic text-[10px]">{tx.retraso}</p>
         </div>
@@ -146,29 +153,6 @@ export default function ContratoAlquiler({ reserva, cliente, vehiculo, empresa, 
             <strong className="font-mono text-blue-950">{reserva.totalCobrado.toFixed(2)} €</strong>
           </div>
         </div>
-      </div>
-
-      {/* Estado del coche a la entrega y a la devolución (registrado, o líneas para rellenar a mano) */}
-      <div className="grid grid-cols-2 gap-4" id="contract-delivery-return">
-        {([
-          { titulo: tx.s6, mov: reserva.entrega },
-          { titulo: tx.s7, mov: reserva.devolucion },
-        ] as const).map(({ titulo, mov }) => (
-          <div key={titulo} className="p-4 bg-slate-50 border border-slate-200 rounded-xl space-y-1.5 text-xs text-slate-700">
-            <h5 className="font-bold text-slate-900 uppercase text-[10px] pb-1 border-b border-slate-200">{titulo}</h5>
-            {([
-              [tx.fechaHora, mov ? new Date(mov.fechaHora).toLocaleString(tx.locale, { day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit', hour12: false }) : null],
-              [tx.kilometraje, mov ? `${mov.km.toLocaleString(tx.locale)} km` : null],
-              [tx.combustible, mov ? (tx.niveles[mov.combustible] ?? '—') : null],
-              [tx.danos, mov ? (mov.danos || tx.ninguno) : null],
-            ] as const).map(([etiqueta, valor]) => (
-              <div key={etiqueta} className="flex justify-between gap-2">
-                <span className="text-slate-400">{etiqueta}:</span>
-                {valor != null ? <strong className="text-right">{valor}</strong> : <span className="flex-1 border-b border-dashed border-slate-300 mb-1" />}
-              </div>
-            ))}
-          </div>
-        ))}
       </div>
 
       {/* Declaración final del cliente */}

@@ -3,7 +3,7 @@ import { renderToString } from 'react-dom/server';
 import ContratoAlquiler from './components/ContratoAlquiler';
 import { TEXTOS_CONTRATO, DECLARACION_ES, DECLARACION_EN, IDIOMAS_CONTRATO, type IdiomaContrato } from './utils/contratoTextos';
 import { DEFAULT_EMPRESA_CONFIG } from './data/empresaConfig';
-import type { Cliente, Reserva, Vehiculo } from './types';
+import type { Cliente, Reserva, SolicitudReserva, Vehiculo } from './types';
 
 const empresa = DEFAULT_EMPRESA_CONFIG;
 const cliente = {
@@ -19,10 +19,10 @@ const reserva = {
   entrega: { fechaHora: '2026-10-31T10:05:00', km: 120100, combustible: 'tres_cuartos', danos: '', responsable: 'Daniel' },
 } as Reserva;
 
-const texto = (idioma: IdiomaContrato, extra: { reserva?: Partial<Reserva>; cliente?: Cliente | undefined; vehiculo?: Vehiculo | undefined } = {}) =>
+const texto = (idioma: IdiomaContrato, extra: { reserva?: Partial<Reserva>; cliente?: Cliente | undefined; vehiculo?: Vehiculo | undefined; solicitud?: SolicitudReserva } = {}) =>
   renderToString(
     <ContratoAlquiler reserva={{ ...reserva, ...extra.reserva }} cliente={'cliente' in extra ? extra.cliente : cliente}
-      vehiculo={'vehiculo' in extra ? extra.vehiculo : vehiculo} empresa={empresa} idioma={idioma} />,
+      vehiculo={'vehiculo' in extra ? extra.vehiculo : vehiculo} empresa={empresa} idioma={idioma} solicitud={extra.solicitud} />,
   ).replace(/<[^>]*>/g, ' ').replace(/&amp;/g, '&').replace(/&#x27;/g, "'").replace(/\s+/g, ' ').replace(/ :/g, ':');
 
 describe('declaración final del contrato', () => {
@@ -58,7 +58,6 @@ describe('declaración final del contrato', () => {
 describe('contrato en los dos idiomas', () => {
   it('los dos idiomas tienen exactamente los mismos textos', () => {
     expect(Object.keys(TEXTOS_CONTRATO.en).sort()).toEqual(Object.keys(TEXTOS_CONTRATO.es).sort());
-    expect(Object.keys(TEXTOS_CONTRATO.en.niveles).sort()).toEqual(Object.keys(TEXTOS_CONTRATO.es.niveles).sort());
     expect(IDIOMAS_CONTRATO.map(i => i.id)).toEqual(['es', 'en']);
   });
 
@@ -73,7 +72,7 @@ describe('contrato en los dos idiomas', () => {
     expect(t).toContain('Fianza (depósito reembolsable): 500.00 €');
   });
 
-  it('en inglés traduce títulos, etiquetas, fechas y combustible, y conserva las horas', () => {
+  it('en inglés traduce títulos, etiquetas y fechas, y conserva las horas', () => {
     const t = texto('en');
     expect(t).toContain('Vehicle Rental Agreement');
     expect(t).toContain('LESSOR DETAILS');
@@ -82,7 +81,6 @@ describe('contrato en los dos idiomas', () => {
     expect(t).toContain('Driving licence: ABC12345 · issued 1 Mar 2018 · expires 1 Mar 2028');
     expect(t).toContain('Automatic');
     expect(t).toContain('Deposit (refundable): 500.00 €');
-    expect(t).toContain('3/4');
     for (const espanol of ['DATOS DEL', 'Contrato de', 'Fecha y hora', 'Kilometraje', 'Matrícula', 'oct.', 'Arrendador', 'Arrendatario', 'conductor']) expect(t).not.toContain(espanol);
   });
 
@@ -107,7 +105,8 @@ describe('contrato en los dos idiomas', () => {
 
   it('una reserva antigua sin horas se imprime solo con la fecha', () => {
     const t = texto('es', { reserva: { horaInicio: undefined, horaFin: undefined } });
-    expect(t).toContain('Fecha y hora de entrega: 31 oct. 2026 Fecha y hora acordadas de retorno: 2 nov. 2026 Número');
+    expect(t).toContain('Fecha y hora de entrega: 31 oct. 2026 Lugar de entrega:');
+    expect(t).toContain('Fecha y hora acordadas de retorno: 2 nov. 2026 Lugar de devolución:');
   });
 
   it('en ningún idioma aparece NaN, undefined ni [object Object]', () => {
@@ -162,5 +161,47 @@ describe('logo de la empresa', () => {
 describe('cabecera y pie sin marca del programa', () => {
   it.each(['es', 'en'] as const)('no menciona CRM, Flotas/Fleet ni "sin conductor" (%s)', idioma => {
     expect(texto(idioma)).not.toMatch(/CRM|Flotas &|Fleet &|Copia legal|Certified legal|Sin conductor|Without driver/);
+  });
+});
+
+const pedidoWeb = { referenciaExterna: '4821', lugarRecogida: 'Aeropuerto, Palma de Mallorca', lugarDevolucion: 'Cami de son Gotleu, 8 bajos, 07008' } as SolicitudReserva;
+
+describe('número de reserva web, lugares y entrega/devolución', () => {
+  it('muestra el número de la reserva de la web cuando la reserva viene de un pedido', () => {
+    expect(texto('es', { solicitud: pedidoWeb })).toContain('Reserva web nº 4821');
+    expect(texto('en', { solicitud: pedidoWeb })).toContain('Web booking no. 4821');
+  });
+
+  it('una reserva manual no muestra número de reserva web', () => {
+    expect(texto('es')).not.toContain('Reserva web');
+    expect(texto('en')).not.toContain('Web booking');
+  });
+
+  it('muestra el lugar de entrega y de devolución guardados en la reserva', () => {
+    const t = texto('es', { reserva: { lugarRecogida: 'Hotel Sol, Palma', lugarDevolucion: 'Aeropuerto' } });
+    expect(t).toContain('Lugar de entrega: Hotel Sol, Palma');
+    expect(t).toContain('Lugar de devolución: Aeropuerto');
+    const e = texto('en', { reserva: { lugarRecogida: 'Hotel Sol, Palma', lugarDevolucion: 'Aeropuerto' } });
+    expect(e).toContain('Pick-up location: Hotel Sol, Palma');
+    expect(e).toContain('Return location: Aeropuerto');
+  });
+
+  it('si la reserva no guarda el lugar, usa el del pedido de la web', () => {
+    const t = texto('es', { solicitud: pedidoWeb });
+    expect(t).toContain('Lugar de entrega: Aeropuerto, Palma de Mallorca');
+    expect(t).toContain('Lugar de devolución: Cami de son Gotleu, 8 bajos, 07008');
+  });
+
+  it('sin lugar en ninguna parte dice «No informado» en vez de dejarlo vacío', () => {
+    expect(texto('es')).toContain('Lugar de entrega: No informado');
+    expect(texto('en')).toContain('Pick-up location: Not provided');
+  });
+
+  it('ya no incluye los cuadros de entrega y devolución del vehículo (se dan al cliente al reservar)', () => {
+    for (const idioma of ['es', 'en'] as const) {
+      const t = texto(idioma);
+      expect(t).not.toMatch(/6\. |7\. |ENTREGA DEL VEHÍCULO|DEVOLUCIÓN DEL VEHÍCULO|VEHICLE HANDOVER|VEHICLE RETURN|Combustible|Fuel|Daños|Damage/);
+    }
+    expect(texto('es', { reserva: { entrega: undefined } })).toContain('DESCRIPCIÓN DEL VEHÍCULO');
   });
 });

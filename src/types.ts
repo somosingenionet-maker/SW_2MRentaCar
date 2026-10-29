@@ -141,6 +141,9 @@ export interface Reserva {
   horaInicio?: string;
   /** Hora de devolución del coche (HH:mm, hora local). */
   horaFin?: string;
+  /** Dónde se entrega el coche al cliente y dónde se devuelve (texto libre). */
+  lugarRecogida?: string;
+  lugarDevolucion?: string;
   temporada: TemporadaAlquiler;
   /** Tarifa aplicada en el momento de crear la reserva. No cambia si se editan las tarifas del vehículo. */
   tarifaDiaria: number;

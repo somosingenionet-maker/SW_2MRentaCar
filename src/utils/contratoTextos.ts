@@ -1,4 +1,4 @@
-import type { NivelCombustible, Vehiculo } from '../types';
+import type { Vehiculo } from '../types';
 
 /** Idiomas en los que se puede ver, imprimir y enviar el contrato. */
 export type IdiomaContrato = 'es' | 'en';
@@ -57,6 +57,9 @@ export interface TextosContrato {
   s4: string;
   fechaHoraEntrega: string;
   fechaHoraRetorno: string;
+  lugarEntrega: string;
+  lugarDevolucion: string;
+  reservaWeb: string;
   jornadas: string;
   diasNaturales: (n: number) => string;
   retraso: string;
@@ -69,15 +72,6 @@ export interface TextosContrato {
   polizaTerceros: string;
   fianza: string;
   importeNeto: string;
-  // 6 y 7. Entrega y devolución
-  s6: string;
-  s7: string;
-  fechaHora: string;
-  kilometraje: string;
-  combustible: string;
-  danos: string;
-  ninguno: string;
-  niveles: Record<NivelCombustible, string>;
   // Final
   declaracion: string;
   /** Título de la caja de firma de la empresa y de la del conductor (se muestra en mayúsculas). */
@@ -119,6 +113,9 @@ const ES: TextosContrato = {
   s4: '4. VIGENCIA Y PLAZOS',
   fechaHoraEntrega: 'Fecha y hora de entrega',
   fechaHoraRetorno: 'Fecha y hora acordadas de retorno',
+  lugarEntrega: 'Lugar de entrega',
+  lugarDevolucion: 'Lugar de devolución',
+  reservaWeb: 'Reserva web nº',
   jornadas: 'Número total de jornadas',
   diasNaturales: n => `${n} días naturales`,
   retraso: 'El retraso superior a 59 minutos en la devolución facultará el cobro de un día adicional con penalización.',
@@ -130,14 +127,6 @@ const ES: TextosContrato = {
   polizaTerceros: 'Póliza Terceros Básica',
   fianza: 'Fianza (depósito reembolsable)',
   importeNeto: 'IMPORTE FACTURADO NETO',
-  s6: '6. ENTREGA DEL VEHÍCULO',
-  s7: '7. DEVOLUCIÓN DEL VEHÍCULO',
-  fechaHora: 'Fecha y hora',
-  kilometraje: 'Kilometraje',
-  combustible: 'Combustible',
-  danos: 'Daños',
-  ninguno: 'Ninguno',
-  niveles: { lleno: 'Lleno', tres_cuartos: '3/4', medio: '1/2', cuarto: '1/4', reserva: 'Reserva' },
   declaracion: DECLARACION_ES,
   firmaArrendador: empresa => `Firma arrendador (${empresa})`,
   firmaConductor: 'Firma conductor',
@@ -177,6 +166,9 @@ const EN: TextosContrato = {
   s4: '4. TERM AND SCHEDULE',
   fechaHoraEntrega: 'Pick-up date and time',
   fechaHoraRetorno: 'Agreed return date and time',
+  lugarEntrega: 'Pick-up location',
+  lugarDevolucion: 'Return location',
+  reservaWeb: 'Web booking no.',
   jornadas: 'Total number of rental days',
   diasNaturales: n => `${n} calendar days`,
   retraso: 'A delay of more than 59 minutes in returning the vehicle entitles the Lessor to charge an additional day with a penalty.',
@@ -188,14 +180,6 @@ const EN: TextosContrato = {
   polizaTerceros: 'Basic third-party policy',
   fianza: 'Deposit (refundable)',
   importeNeto: 'NET INVOICED AMOUNT',
-  s6: '6. VEHICLE HANDOVER',
-  s7: '7. VEHICLE RETURN',
-  fechaHora: 'Date and time',
-  kilometraje: 'Mileage',
-  combustible: 'Fuel',
-  danos: 'Damage',
-  ninguno: 'None',
-  niveles: { lleno: 'Full', tres_cuartos: '3/4', medio: '1/2', cuarto: '1/4', reserva: 'Reserve' },
   declaracion: DECLARACION_EN,
   firmaArrendador: empresa => `Lessor's signature (${empresa})`,
   firmaConductor: "Driver's signature",

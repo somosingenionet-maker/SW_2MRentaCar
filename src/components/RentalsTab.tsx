@@ -18,6 +18,7 @@ import { formatEuros } from '../utils/moneda';
 import { avisoCarnetReserva } from '../utils/carnet';
 import { validarHorasReserva, fechaConHora, ordenarProximas, ordenarHistorial } from '../utils/horaReserva';
 import Hora24Field from './Hora24Field';
+import { LUGARES_HABITUALES, lugaresReserva } from '../utils/lugarReserva';
 import ContratoAlquiler from './ContratoAlquiler';
 import { IDIOMAS_CONTRATO, TEXTOS_CONTRATO, type IdiomaContrato } from '../utils/contratoTextos';
 import { downloadCsv, slugify } from '../utils/csvExport';
@@ -75,12 +76,15 @@ export default function RentalsTab({
   // Horas de entrega y de devolución: obligatorias, sin valor por defecto para que se elijan a propósito.
   const [formHoraInicio, setFormHoraInicio] = useState('');
   const [formHoraFin, setFormHoraFin] = useState('');
+  const [formLugarRecogida, setFormLugarRecogida] = useState('');
+  const [formLugarDevolucion, setFormLugarDevolucion] = useState('');
   // Fianza de la reserva: parte del importe habitual del vehículo, pero el taller la puede cambiar.
   const [formFianza, setFormFianza] = useState('');
   // Cambio de la fianza de una reserva ya creada (desde la ficha de gestión).
   const [editandoFianza, setEditandoFianza] = useState<{ valor: string; error: string } | null>(null);
   // Edición de las horas de una reserva ya creada (desde la ficha de gestión).
   const [editandoHoras, setEditandoHoras] = useState<{ inicio: string; fin: string; error: string } | null>(null);
+  const [editandoLugares, setEditandoLugares] = useState<{ recogida: string; devolucion: string } | null>(null);
   const [formTarifa, setFormTarifa] = useState<number>(45.00);
   const [formTemporada, setFormTemporada] = useState<'alta' | 'media' | 'baja'>('media');
   const [formSeguro, setFormSeguro] = useState(true);
@@ -124,6 +128,8 @@ export default function RentalsTab({
     setFormFechaFin(new Date(Date.now() + 5 * 24 * 60 * 60 * 1000).toISOString().split('T')[0]);
     setFormHoraInicio('');
     setFormHoraFin('');
+    setFormLugarRecogida('');
+    setFormLugarDevolucion('');
     setFormTemporada('media');
     setFormTarifa(vehiculos[0]?.tarifasAlquiler?.temporadaMedia ?? 45);
     setFormSeguro(ofreceSeguro(vehiculos[0]));
@@ -142,6 +148,8 @@ export default function RentalsTab({
         fechaFin: formFechaFin,
         horaInicio: formHoraInicio,
         horaFin: formHoraFin,
+        lugarRecogida: formLugarRecogida.trim() || undefined,
+        lugarDevolucion: formLugarDevolucion.trim() || undefined,
         temporada: formTemporada,
         tarifaDiaria: Math.round((solicitudActiva.vehiculoTotal / duration) * 100) / 100,
         totalCobrado: solicitudActiva.total,
@@ -161,6 +169,8 @@ export default function RentalsTab({
       fechaFin: formFechaFin,
       horaInicio: formHoraInicio,
       horaFin: formHoraFin,
+      lugarRecogida: formLugarRecogida.trim() || undefined,
+      lugarDevolucion: formLugarDevolucion.trim() || undefined,
       temporada: formTemporada,
       tarifaDiaria: Number(formTarifa),
       totalCobrado: total,
@@ -275,6 +285,8 @@ export default function RentalsTab({
     // La web ya trae la hora de recogida y de devolución del pedido.
     setFormHoraInicio(soloHora(sol.fechaRecogida));
     setFormHoraFin(soloHora(sol.fechaDevolucion));
+    setFormLugarRecogida(sol.lugarRecogida ?? '');
+    setFormLugarDevolucion(sol.lugarDevolucion ?? '');
     setFormTemporada('media');
     setFormSeguro(incluyeCobertura(sol.extras));
     setFormError('');
@@ -301,7 +313,7 @@ export default function RentalsTab({
   };
 
   // Al elegir otra reserva se descarta una edición de horas a medias.
-  useEffect(() => { setEditandoHoras(null); setEditandoFianza(null); }, [selectedReserva?.id]);
+  useEffect(() => { setEditandoHoras(null); setEditandoFianza(null); setEditandoLugares(null); }, [selectedReserva?.id]);
 
   const handleGuardarFianza = () => {
     if (!selectedReserva || !editandoFianza) return;
@@ -326,6 +338,18 @@ export default function RentalsTab({
     onUpdateReserva(actualizada);
     setSelectedReserva(actualizada);
     setEditandoHoras(null);
+  };
+
+  const handleGuardarLugares = () => {
+    if (!selectedReserva || !editandoLugares) return;
+    const actualizada = {
+      ...selectedReserva,
+      lugarRecogida: editandoLugares.recogida.trim() || undefined,
+      lugarDevolucion: editandoLugares.devolucion.trim() || undefined,
+    };
+    onUpdateReserva(actualizada);
+    setSelectedReserva(actualizada);
+    setEditandoLugares(null);
   };
 
   const handlePrintContract = () => {
@@ -1002,6 +1026,43 @@ export default function RentalsTab({
                       {!selectedReserva.horaInicio || !selectedReserva.horaFin ? 'Indicar la hora de entrega y de devolución' : 'Cambiar las horas'}
                     </button>
                   ))}
+                  {(() => {
+                    const lugares = lugaresReserva(selectedReserva, solicitudes.find(s => s.reservaId === selectedReserva.id));
+                    return (
+                      <div className="border-t border-slate-100/50 pt-1.5 space-y-1.5" data-testid="lugares-ficha">
+                        <div className="flex justify-between gap-2">
+                          <span className="text-slate-400">Lugar de entrega:</span>
+                          <strong className="font-bold text-slate-700 text-right">{lugares.recogida || <span className="text-[10px] font-semibold text-amber-600">sin indicar</span>}</strong>
+                        </div>
+                        <div className="flex justify-between gap-2">
+                          <span className="text-slate-400">Lugar de devolución:</span>
+                          <strong className="font-bold text-slate-700 text-right">{lugares.devolucion || <span className="text-[10px] font-semibold text-amber-600">sin indicar</span>}</strong>
+                        </div>
+                        {selectedReserva.estado !== 'cancelada' && (editandoLugares ? (
+                          <div className="space-y-2" data-testid="editar-lugares">
+                            <input type="text" list="lugares-habituales-ficha" aria-label="Lugar de entrega" placeholder="Lugar de entrega"
+                              className="w-full px-3 h-[34px] border border-slate-200 rounded-lg text-xs bg-white focus:outline-none focus:ring-1 focus:ring-blue-500"
+                              value={editandoLugares.recogida} onChange={e => setEditandoLugares({ ...editandoLugares, recogida: e.target.value })} />
+                            <input type="text" list="lugares-habituales-ficha" aria-label="Lugar de devolución" placeholder="Lugar de devolución"
+                              className="w-full px-3 h-[34px] border border-slate-200 rounded-lg text-xs bg-white focus:outline-none focus:ring-1 focus:ring-blue-500"
+                              value={editandoLugares.devolucion} onChange={e => setEditandoLugares({ ...editandoLugares, devolucion: e.target.value })} />
+                            <datalist id="lugares-habituales-ficha">
+                              {LUGARES_HABITUALES.map(l => <option key={l} value={l} />)}
+                            </datalist>
+                            <div className="flex justify-end gap-2 text-[11px] font-bold">
+                              <button type="button" onClick={() => setEditandoLugares(null)} className="px-3 py-1.5 border border-slate-200 rounded-lg text-slate-500 hover:bg-slate-50 cursor-pointer">Cancelar</button>
+                              <button type="button" onClick={handleGuardarLugares} className="px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded-lg cursor-pointer">Guardar lugares</button>
+                            </div>
+                          </div>
+                        ) : (
+                          <button type="button" onClick={() => setEditandoLugares({ recogida: lugares.recogida, devolucion: lugares.devolucion })}
+                            className={`w-full py-1.5 rounded-lg text-[11px] font-bold transition cursor-pointer ${!lugares.recogida || !lugares.devolucion ? 'bg-amber-50 text-amber-700 border border-amber-200 hover:bg-amber-100' : 'bg-white text-slate-500 border border-slate-200 hover:bg-slate-50'}`}>
+                            {!lugares.recogida || !lugares.devolucion ? 'Indicar el lugar de entrega y de devolución' : 'Cambiar los lugares'}
+                          </button>
+                        ))}
+                      </div>
+                    );
+                  })()}
                   <div className="flex justify-between border-t border-slate-100/50 pt-1.5 text-[11px] font-semibold text-slate-600">
                     <span>Días de devengo:</span>
                     <span>{calculateDays(selectedReserva.fechaInicio, selectedReserva.fechaFin)} días</span>
@@ -1272,6 +1333,29 @@ export default function RentalsTab({
                         value={formHoraFin}
                         onChange={v => { setFormHoraFin(v); if (formError) setFormError(''); }}
                       />
+                    </div>
+
+                    <div>
+                      <label htmlFor="reserva-lugar-recogida" className="block text-xs font-bold text-slate-500 uppercase whitespace-nowrap">Lugar de entrega</label>
+                      <input
+                        id="reserva-lugar-recogida" list="lugares-habituales" type="text"
+                        className="w-full mt-1 px-3 h-[38px] border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-1 focus:ring-blue-500"
+                        value={formLugarRecogida}
+                        onChange={e => setFormLugarRecogida(e.target.value)}
+                      />
+                    </div>
+
+                    <div>
+                      <label htmlFor="reserva-lugar-devolucion" className="block text-xs font-bold text-slate-500 uppercase whitespace-nowrap">Lugar de devolución</label>
+                      <input
+                        id="reserva-lugar-devolucion" list="lugares-habituales" type="text"
+                        className="w-full mt-1 px-3 h-[38px] border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-1 focus:ring-blue-500"
+                        value={formLugarDevolucion}
+                        onChange={e => setFormLugarDevolucion(e.target.value)}
+                      />
+                      <datalist id="lugares-habituales">
+                        {LUGARES_HABITUALES.map(l => <option key={l} value={l} />)}
+                      </datalist>
                     </div>
                   </div>
 
@@ -1550,6 +1634,7 @@ export default function RentalsTab({
                 vehiculo={vehiculos.find(v => v.id === viewingContract.vehiculoId)}
                 empresa={empresaCfg}
                 idioma={idiomaContrato}
+                solicitud={solicitudes.find(s => s.reservaId === viewingContract.id)}
               />
             </motion.div>
           </div>
