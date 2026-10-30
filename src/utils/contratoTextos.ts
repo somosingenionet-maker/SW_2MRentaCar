@@ -77,6 +77,21 @@ export interface TextosContrato {
   /** Título de la caja de firma de la empresa y de la del conductor (se muestra en mayúsculas). */
   firmaArrendador: (empresa: string) => string;
   firmaConductor: string;
+  /** Línea bajo la firma del cliente: «Firmado electrónicamente el 30 oct. 2026 14:05 · Ref. 1A2B3C4D». */
+  firmadoElectronicamente: (fecha: string, ref: string) => string;
+  /** Textos de la pantalla donde el cliente firma. */
+  pantallaFirma: {
+    titulo: string;
+    instruccion: string;
+    aceptar: string;
+    firmeAqui: string;
+    borrar: string;
+    confirmar: string;
+    guardando: string;
+    cancelar: string;
+    errorGuardar: string;
+    firmaCorta: string;
+  };
   // Mensaje que acompaña al contrato
   asuntoCorreo: (empresa: string) => string;
   mensaje: (d: { nombre: string; vehiculo: string; matricula: string; desde: string; hasta: string; dias: number; total: string; empresa: string }) => string;
@@ -130,6 +145,19 @@ const ES: TextosContrato = {
   declaracion: DECLARACION_ES,
   firmaArrendador: empresa => `Firma arrendador (${empresa})`,
   firmaConductor: 'Firma conductor',
+  firmadoElectronicamente: (fecha, ref) => `Firmado electrónicamente el ${fecha} · Ref. ${ref}`,
+  pantallaFirma: {
+    titulo: 'Firma del contrato',
+    instruccion: 'Revise el contrato, marque la casilla y firme con el dedo en el recuadro.',
+    aceptar: 'He leído el contrato y acepto sus condiciones',
+    firmeAqui: 'Firme aquí con el dedo',
+    borrar: 'Borrar',
+    confirmar: 'Firmar y guardar',
+    guardando: 'Guardando…',
+    cancelar: 'Cancelar',
+    errorGuardar: 'No se pudo guardar la firma. Compruebe la conexión e inténtelo de nuevo.',
+    firmaCorta: 'La firma es demasiado corta. Bórrela y firme de nuevo.',
+  },
   asuntoCorreo: empresa => `Contrato de Alquiler - ${empresa}`,
   mensaje: d =>
     `Hola ${d.nombre},\n\nLe enviamos los datos del contrato de alquiler del vehículo ${d.vehiculo} (${d.matricula}) desde el ${d.desde} hasta el ${d.hasta} (${d.dias} días). Total: ${d.total} €.\n\nUn saludo,\n${d.empresa}`,
@@ -183,6 +211,19 @@ const EN: TextosContrato = {
   declaracion: DECLARACION_EN,
   firmaArrendador: empresa => `Lessor's signature (${empresa})`,
   firmaConductor: "Driver's signature",
+  firmadoElectronicamente: (fecha, ref) => `Electronically signed on ${fecha} · Ref. ${ref}`,
+  pantallaFirma: {
+    titulo: 'Contract signature',
+    instruccion: 'Please review the agreement, tick the box and sign with your finger in the box.',
+    aceptar: 'I have read the agreement and accept its terms',
+    firmeAqui: 'Sign here with your finger',
+    borrar: 'Clear',
+    confirmar: 'Sign and save',
+    guardando: 'Saving…',
+    cancelar: 'Cancel',
+    errorGuardar: 'The signature could not be saved. Check the connection and try again.',
+    firmaCorta: 'The signature is too short. Clear it and sign again.',
+  },
   asuntoCorreo: empresa => `Rental Agreement - ${empresa}`,
   mensaje: d =>
     `Hello ${d.nombre},\n\nHere are the details of the rental agreement for the vehicle ${d.vehiculo} (${d.matricula}) from ${d.desde} to ${d.hasta} (${d.dias} days). Total: ${d.total} €.\n\nKind regards,\n${d.empresa}`,

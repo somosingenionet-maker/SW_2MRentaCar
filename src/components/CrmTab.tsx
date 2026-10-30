@@ -39,6 +39,10 @@ interface CrmTabProps {
   onUpdateCliente: (cliente: Cliente) => void;
   onDeleteCliente: (id: string) => void;
   onAddInteraccion: (clienteId: string, interaccion: InteraccionCliente) => void;
+  /** Reservas con el contrato firmado en pantalla → fecha de la firma. */
+  firmasVigentes?: Record<string, string>;
+  onFirmaCambiada?: () => void;
+  puedeAnularFirma?: boolean;
 }
 
 const OT_ESTADO_META: Record<OTEstado, { label: string; cls: string }> = {
@@ -70,6 +74,9 @@ export default function CrmTab({
   onCrearInvitacion,
   onAplicarInvitacion,
   onCancelarInvitacion,
+  firmasVigentes = {},
+  onFirmaCambiada,
+  puedeAnularFirma = false,
   onAddCliente,
   onUpdateCliente,
   onDeleteCliente,
@@ -751,6 +758,9 @@ export default function CrmTab({
                                 const e = ESTADO_META[estadoReserva(res, hoyISO())];
                                 return <span className={`inline-block text-[9px] font-bold uppercase rounded px-1.5 ${e.cls}`}>{e.label}</span>;
                               })()}
+                              {firmasVigentes[res.id] && (
+                                <span className="ml-1 inline-block text-[9px] font-bold uppercase rounded px-1.5 bg-emerald-50 text-emerald-700">Firmado</span>
+                              )}
                               <button
                                 type="button"
                                 onClick={() => setContratoAbierto(res)}
@@ -1277,6 +1287,8 @@ export default function CrmTab({
             vehiculo={vehiculos.find(v => v.id === contratoAbierto.vehiculoId)}
             solicitud={solicitudes.find(s => s.reservaId === contratoAbierto.id)}
             empresa={getEmpresaConfig()}
+            puedeAnularFirma={puedeAnularFirma}
+            onFirmaCambiada={onFirmaCambiada}
             onClose={() => setContratoAbierto(null)}
           />
         )}

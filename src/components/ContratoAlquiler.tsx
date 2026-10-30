@@ -1,29 +1,38 @@
-import type { Reserva, Cliente, Vehiculo, SolicitudReserva } from '../types';
-import type { EmpresaConfig } from '../data/empresaConfig';
+import type { SnapshotContrato } from '../types';
 import { formatDate } from '../utils/dateFormat';
 import { diasAlquiler } from '../utils/solicitudes';
 import { fechaConHora } from '../utils/horaReserva';
 import { resumenCarnet } from '../utils/carnet';
 import { lugaresReserva } from '../utils/lugarReserva';
+import { fechaHoraFirma, referenciaCorta } from '../utils/firmaContrato';
 import { TEXTOS_CONTRATO, etiquetaTransmisionContrato, type IdiomaContrato } from '../utils/contratoTextos';
 
+/** Firma del cliente ya registrada: se dibuja dentro de su caja. */
+interface FirmaVisible {
+  png: string;
+  firmadoEn: string;
+  huella: string;
+}
+
 interface Props {
-  reserva: Reserva;
-  cliente?: Cliente;
-  vehiculo?: Vehiculo;
-  empresa: EmpresaConfig;
+  reserva: SnapshotContrato['reserva'];
+  cliente?: SnapshotContrato['cliente'] | null;
+  vehiculo?: SnapshotContrato['vehiculo'] | null;
+  /** El logo no forma parte de lo firmado: se muestra el que tenga la empresa en ese momento. */
+  empresa: SnapshotContrato['empresa'] & { logoBase64?: string };
   idioma: IdiomaContrato;
   /** Pedido de la web del que viene la reserva, si lo hay (aporta el número de reserva web y el lugar si falta). */
-  solicitud?: SolicitudReserva;
+  solicitud?: SnapshotContrato['solicitud'] | null;
+  firma?: FirmaVisible;
 }
 
 /** Cuerpo imprimible del contrato de alquiler, en español o en inglés. */
-export default function ContratoAlquiler({ reserva, cliente, vehiculo, empresa, idioma, solicitud }: Props) {
+export default function ContratoAlquiler({ reserva, cliente, vehiculo, empresa, idioma, solicitud, firma }: Props) {
   const tx = TEXTOS_CONTRATO[idioma];
   const fecha = (iso: string) => formatDate(iso, idioma);
   const c = cliente;
   const v = vehiculo;
-  const lugares = lugaresReserva(reserva, solicitud);
+  const lugares = lugaresReserva(reserva, solicitud ?? undefined);
 
   return (
     <div className="p-8 md:p-12 space-y-6 text-slate-800 font-sans print:p-[12mm] print:space-y-3" id="contract-printable-area" lang={idioma}>
@@ -157,9 +166,17 @@ export default function ContratoAlquiler({ reserva, cliente, vehiculo, empresa, 
 
       {/* Firmas: una caja con borde lila por firmante, con el título dentro y espacio para firmar */}
       <div className="grid grid-cols-2 gap-6 pt-4 pb-2 print:pt-2 print:pb-0 break-inside-avoid" id="contract-signatures-visualizer">
-        {[tx.firmaArrendador(empresa.nombre), tx.firmaConductor].map(titulo => (
-          <div key={titulo} data-testid="caja-firma" className="h-36 print:h-28 border-[3px] px-3 pt-2 break-inside-avoid" style={{ borderColor: '#C48CD6' }}>
+        {[{ titulo: tx.firmaArrendador(empresa.nombre), conductor: false }, { titulo: tx.firmaConductor, conductor: true }].map(({ titulo, conductor }) => (
+          <div key={titulo} data-testid="caja-firma" className="relative h-36 print:h-28 border-[3px] px-3 pt-2 break-inside-avoid" style={{ borderColor: '#C48CD6' }}>
             <span className="block text-[11px] font-bold uppercase tracking-wide text-slate-900">{titulo}</span>
+            {conductor && firma && (
+              <>
+                <img src={firma.png} alt={tx.firmaConductor} data-testid="firma-cliente" className="absolute left-3 right-3 top-7 bottom-5 w-[calc(100%-1.5rem)] h-[calc(100%-3rem)] object-contain" />
+                <span className="absolute bottom-1 left-3 right-3 text-[8px] text-slate-500 truncate">
+                  {tx.firmadoElectronicamente(fechaHoraFirma(firma.firmadoEn, idioma), referenciaCorta(firma.huella))}
+                </span>
+              </>
+            )}
           </div>
         ))}
       </div>

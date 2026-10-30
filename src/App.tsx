@@ -10,6 +10,7 @@ import { fetchVehiculos, upsertVehiculo, deleteVehiculoDb } from './data/vehicul
 import { fetchAll, upsertOne, deleteOne } from './data/db';
 import { sinClienteFlota } from './utils/flota';
 import { fetchSolicitudes, updateGestionSolicitud } from './data/solicitudesDb';
+import { fetchFirmasVigentes } from './data/contratosFirmadosDb';
 import { fetchInvitaciones, crearInvitacion, updateEstadoInvitacion } from './data/invitacionesDb';
 import LoginScreen from './components/LoginScreen';
 import {
@@ -60,6 +61,8 @@ export default function App() {
   const [citas, setCitas] = useState<Cita[]>([]);
   const [solicitudes, setSolicitudes] = useState<SolicitudReserva[]>([]);
   const [invitaciones, setInvitaciones] = useState<InvitacionCliente[]>([]);
+  // Reservas con el contrato firmado en pantalla → fecha de la firma (para la marca «Firmado» de las listas).
+  const [firmasVigentes, setFirmasVigentes] = useState<Record<string, string>>({});
 
   // Check session on mount (Supabase)
   useEffect(() => {
@@ -97,17 +100,24 @@ export default function App() {
     fetchAll<Cita>('citas').then(setCitas).catch(log('citas'));
     fetchSolicitudes().then(setSolicitudes).catch(log('solicitudes de reserva'));
     fetchInvitaciones().then(setInvitaciones).catch(log('invitaciones de clientes'));
+    fetchFirmasVigentes().then(setFirmasVigentes).catch(log('contratos firmados'));
     loadEmpresaConfig().then(setEmpresaConfig).catch(log('configuración de empresa'));
   }, [cargarClientes]);
 
   useEffect(() => {
     if (!currentUser) {
       setVehiculos([]); setClientes([]); setReservas([]);
-      setAlertas([]); setNotificaciones([]); setFacturas([]); setOrdenesTrabajo([]); setTecnicos([]); setCitas([]); setSolicitudes([]); setInvitaciones([]);
+      setAlertas([]); setNotificaciones([]); setFacturas([]); setOrdenesTrabajo([]); setTecnicos([]); setCitas([]); setSolicitudes([]); setInvitaciones([]); setFirmasVigentes({});
       return;
     }
     cargarTodo();
   }, [currentUser, cargarTodo]);
+
+  const recargarFirmas = useCallback(() => {
+    fetchFirmasVigentes().then(setFirmasVigentes).catch(err => console.error('Error recargando contratos firmados', err));
+  }, []);
+  // Solo los administradores pueden anular la firma de un contrato.
+  const puedeAnularFirma = currentUser?.rol === 'admin' || currentUser?.rol === 'super_admin';
 
   // Los cambios se pintan al instante y se guardan en segundo plano. Si el
   // guardado falla (sesión caducada, permiso, restricción de la base de datos),
@@ -834,6 +844,9 @@ export default function App() {
             onUpdateCliente={handleUpdateCliente}
             onDeleteCliente={handleDeleteCliente}
             onAddInteraccion={handleAddInteraccion}
+            firmasVigentes={firmasVigentes}
+            onFirmaCambiada={recargarFirmas}
+            puedeAnularFirma={puedeAnularFirma}
           />
         )}
 
@@ -848,6 +861,9 @@ export default function App() {
             onConvertirSolicitud={handleConvertirSolicitud}
             onDescartarSolicitud={handleDescartarSolicitud}
             usuarioNombre={currentUser?.nombre ?? ''}
+            firmasVigentes={firmasVigentes}
+            onFirmaCambiada={recargarFirmas}
+            puedeAnularFirma={puedeAnularFirma}
           />
         )}
 

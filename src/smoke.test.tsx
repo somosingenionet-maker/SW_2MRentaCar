@@ -1,7 +1,7 @@
 // Prueba de humo: dibuja cada pestaña principal con datos de ejemplo completos y comprueba que no
 // se rompe ni deja a la vista valores de error (NaN, undefined, Invalid Date, [object Object]).
 // Solo cubre lo que se ve nada más abrir cada pestaña; no abre cuadros ni pulsa botones.
-import { describe, it, expect, beforeAll } from 'vitest';
+import { describe, it, expect, beforeAll, vi } from 'vitest';
 import { renderToString } from 'react-dom/server';
 import type { ComponentType } from 'react';
 import VehiclesTab from './components/VehiclesTab';
@@ -14,6 +14,15 @@ import AlertsNotificationsTab from './components/AlertsNotificationsTab';
 import AnalyticsTab from './components/AnalyticsTab';
 import { formatDate } from './utils/dateFormat';
 import type { Vehiculo, Cliente, Reserva, OrdenTrabajo, Factura, Alerta, Cita, Tecnico, SolicitudReserva, InvitacionCliente } from './types';
+
+// El visor del contrato carga la firma de la base de datos: en los tests no hay conexión.
+vi.mock('./data/contratosFirmadosDb', () => ({
+  fetchContratoFirmado: async () => null,
+  guardarContratoFirmado: async () => undefined,
+  anularContratoFirmado: async () => undefined,
+  fetchFirmasVigentes: async () => ({}),
+}));
+
 
 // Sin navegador: un localStorage mínimo en memoria, que es lo único que las pestañas tocan al dibujarse.
 beforeAll(() => {
@@ -83,7 +92,8 @@ const alertas: Alerta[] = [
   { id: 'a2', vehiculoId: 'v1', tipo: 'mantenimiento', descripcion: 'Revisión a 135000 km', estado: 'activa', kilometrajeLimite: 135000 },
 ] as Alerta[];
 const tecnicos: Tecnico[] = [{ id: 't1', nombre: 'Carlos', especialidad: 'Motor', activo: true }];
-const citas: Cita[] = [{ id: 'ci1', fechaHora: '2026-10-30T09:00:00.000Z', duracionMinutos: 60, clienteId: 'c3', vehiculoId: 'v4', motivo: 'Revisión', tecnicoId: 't1', estado: 'programada' } as unknown as Cita];
+// Una cita de hoy, que es el día que enseña la Agenda al abrirse: así se prueba que se dibuja.
+const citas: Cita[] = [{ id: 'ci1', fechaHora: new Date().toISOString(), duracionMinutos: 60, clienteId: 'c3', vehiculoId: 'v4', motivo: 'Revisión', tecnicoId: 't1', estado: 'pendiente' } as Cita];
 const invitaciones: InvitacionCliente[] = [{ id: 'inv1', estado: 'pendiente', expiraEn: '2099-01-01T00:00:00.000Z', creadaEn: '2026-10-27T00:00:00.000Z' }];
 
 const nop = () => {};

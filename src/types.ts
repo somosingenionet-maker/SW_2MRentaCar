@@ -352,3 +352,43 @@ export interface Factura {
   totalIva: number;
   total: number;
 }
+
+/** Datos de la empresa que aparecen en el contrato. */
+export interface EmpresaContrato {
+  nombre: string;
+  razonSocial: string;
+  nif: string;
+  direccionFiscal: string;
+  ciudad: string;
+  pais: string;
+  telefono: string;
+}
+
+/** Copia congelada de lo que el cliente firmó: el contrato no cambia aunque se editen la reserva, el cliente o el coche. */
+export interface SnapshotContrato {
+  reserva: Pick<Reserva, 'id' | 'vehiculoId' | 'clienteId' | 'fechaInicio' | 'fechaFin' | 'horaInicio' | 'horaFin' | 'lugarRecogida' | 'lugarDevolucion' | 'tarifaDiaria' | 'totalCobrado' | 'incluyeSeguroTodoRiesgo' | 'fianza' | 'seguroDia'>;
+  cliente: Pick<Cliente, 'nombre' | 'apellidos' | 'nifNiePasaporte' | 'correo' | 'telefono' | 'direccion' | 'ciudad' | 'pais' | 'carnetNumero' | 'carnetExpedicion' | 'carnetVencimiento'> | null;
+  vehiculo: Pick<Vehiculo, 'marca' | 'modelo' | 'matricula' | 'bastidor' | 'transmision' | 'aseguradora' | 'kilometraje'> | null;
+  empresa: EmpresaContrato;
+  /** Pedido de la web del que viene la reserva, si lo hay. */
+  solicitud: Pick<SolicitudReserva, 'referenciaExterna' | 'lugarRecogida' | 'lugarDevolucion'> | null;
+}
+
+/** Contrato firmado en pantalla por el cliente. Lo firmado no se edita: solo se anula. */
+export interface ContratoFirmado {
+  id: string;
+  reservaId: string;
+  idioma: 'es' | 'en';
+  contrato: SnapshotContrato;
+  /** Imagen de la firma (PNG en data URL). */
+  firmaPng: string;
+  /** SHA-256 (hex, mayúsculas) del contrato, el idioma, la firma y la fecha. */
+  huella: string;
+  /** Fecha y hora de la firma (ISO). */
+  firmadoEn: string;
+  firmadoPor?: string;
+  dispositivo?: string;
+  anuladoEn?: string | null;
+  anuladoPor?: string | null;
+  anuladoMotivo?: string | null;
+}

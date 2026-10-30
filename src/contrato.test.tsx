@@ -1,10 +1,21 @@
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, vi } from 'vitest';
 import { renderToString } from 'react-dom/server';
 import ContratoAlquiler from './components/ContratoAlquiler';
-import ContratoVisor from './components/ContratoVisor';
+import { ContratoVisorVista, type EstadoFirma } from './components/ContratoVisor';
+import FirmaPantalla from './components/FirmaPantalla';
+import { crearSnapshot, calcularHuella } from './utils/firmaContrato';
 import { TEXTOS_CONTRATO, DECLARACION_ES, DECLARACION_EN, IDIOMAS_CONTRATO, type IdiomaContrato } from './utils/contratoTextos';
 import { DEFAULT_EMPRESA_CONFIG } from './data/empresaConfig';
-import type { Cliente, Reserva, SolicitudReserva, Vehiculo } from './types';
+import type { Cliente, ContratoFirmado, Reserva, SolicitudReserva, Vehiculo } from './types';
+
+// El visor del contrato carga la firma de la base de datos: en los tests no hay conexión.
+vi.mock('./data/contratosFirmadosDb', () => ({
+  fetchContratoFirmado: async () => null,
+  guardarContratoFirmado: async () => undefined,
+  anularContratoFirmado: async () => undefined,
+  fetchFirmasVigentes: async () => ({}),
+}));
+
 
 const empresa = DEFAULT_EMPRESA_CONFIG;
 const cliente = {
@@ -209,12 +220,87 @@ describe('número de reserva web, lugares y entrega/devolución', () => {
   });
 });
 
+const FIRMA_PNG = 'data:image/png;base64,iVBORw0KGgo=';
+
+describe('firma dentro de la caja del conductor', () => {
+  const html = (idioma: IdiomaContrato, firma?: { png: string; firmadoEn: string; huella: string }) =>
+    renderToString(<ContratoAlquiler reserva={reserva} cliente={cliente} vehiculo={vehiculo} empresa={empresa} idioma={idioma} firma={firma} />);
+  const f = { png: FIRMA_PNG, firmadoEn: '2026-10-30T13:05:00.000Z', huella: 'ABCDEF0123456789'.repeat(4) };
+
+  it('sin firma no hay imagen en la caja', () => {
+    expect(html('es')).not.toContain('firma-cliente');
+  });
+
+  it('con firma dibuja la imagen y la línea «firmado electrónicamente» con la referencia, en cada idioma', () => {
+    const es = html('es', f);
+    expect(es).toContain(`src="${FIRMA_PNG}"`);
+    expect(es).toContain('Firmado electrónicamente el');
+    expect(es).toContain('Ref. ABCDEF01');
+    const en = html('en', f);
+    expect(en).toContain('Electronically signed on');
+    expect(en).toContain('Ref. ABCDEF01');
+    expect(en).not.toContain('Firmado electrónicamente');
+  });
+
+  it('la firma va en la caja del conductor, no en la de la empresa', () => {
+    const h = html('es', f);
+    expect(h.indexOf('Firma conductor')).toBeLessThan(h.indexOf('firma-cliente'));
+    expect(h.indexOf('Firma arrendador')).toBeLessThan(h.indexOf('Firma conductor'));
+  });
+});
+
+describe('pantalla de firma del cliente', () => {
+  const contrato = crearSnapshot(reserva, cliente, vehiculo, undefined, empresa);
+  const pantalla = (idiomaInicial: IdiomaContrato) =>
+    renderToString(<FirmaPantalla contrato={contrato} idiomaInicial={idiomaInicial} onCancelar={() => undefined} onConfirmar={async () => undefined} />);
+
+  it('en español muestra el contrato, la casilla de aceptación, el lienzo y los botones', () => {
+    const h = pantalla('es');
+    expect(h).toContain('Firma del contrato');
+    expect(h).toContain('Contrato de Alquiler de Vehículo');
+    expect(h).toContain('He leído el contrato y acepto sus condiciones');
+    expect(h).toContain('data-testid="lienzo-firma"');
+    expect(h).toContain('Firme aquí con el dedo');
+    expect(h).toContain('Firmar y guardar');
+    expect(h).toContain('Borrar');
+    expect(h).toContain('type="checkbox"');
+  });
+
+  it('en inglés todo sale en inglés', () => {
+    const h = pantalla('en');
+    for (const t of ['Contract signature', 'Vehicle Rental Agreement', 'I have read the agreement and accept its terms', 'Sign here with your finger', 'Sign and save', 'Clear']) expect(h).toContain(t);
+    for (const es of ['Firma del contrato', 'He leído', 'Firmar y guardar', 'Borrar']) expect(h).not.toContain(es);
+  });
+
+  it('no se puede firmar de entrada: sin aceptar ni firmar el botón está desactivado', () => {
+    expect(pantalla('es')).toMatch(/<button[^>]*disabled=""[^>]*>Firmar y guardar|<button[^>]*disabled=""[^>]*>[^<]*Firmar y guardar/);
+  });
+
+  it('no se imprime y se presenta como diálogo', () => {
+    const h = pantalla('es');
+    expect(h).toContain('print:hidden');
+    expect(h).toContain('role="dialog"');
+  });
+});
+
 describe('visor del contrato (Alquiler y ficha del cliente)', () => {
-  const visor = (cli: Cliente | undefined) =>
-    renderToString(<ContratoVisor reserva={reserva} cliente={cli} vehiculo={vehiculo} empresa={empresa} onClose={() => undefined} />);
+  const firmado = async (cambios: Partial<Reserva> = {}): Promise<ContratoFirmado> => {
+    const base = { contrato: crearSnapshot({ ...reserva, ...cambios }, cliente, vehiculo, undefined, empresa), idioma: 'en' as const, firmaPng: FIRMA_PNG, firmadoEn: '2026-10-30T13:05:00.000Z' };
+    return { id: 'f1', reservaId: reserva.id, ...base, huella: await calcularHuella(base), firmadoPor: 'Daniel' };
+  };
+  const vista = (estado: EstadoFirma, extra: { cli?: Cliente | undefined; reserva?: Reserva; integro?: boolean | null; puedeAnular?: boolean } = {}) =>
+    renderToString(
+      <ContratoVisorVista
+        reserva={extra.reserva ?? reserva} cliente={'cli' in extra ? extra.cli : cliente} vehiculo={vehiculo} empresa={empresa}
+        estado={estado} integro={extra.integro ?? null} puedeAnular={extra.puedeAnular ?? false} firmando={false}
+        onAbrirFirma={() => undefined} onCerrarFirma={() => undefined} onConfirmarFirma={async () => undefined}
+        onAnular={async () => undefined} onClose={() => undefined}
+      />,
+    );
+  const texto = (h: string) => h.replace(/<[^>]*>/g, ' ').replace(/&amp;/g, '&').replace(/&#x27;/g, "'").replace(/\s+/g, ' ');
 
   it('muestra el contrato con el selector de idioma, imprimir y cerrar', () => {
-    const h = visor(cliente);
+    const h = vista({ fase: 'listo', firmado: null });
     expect(h).toContain('Contrato de Alquiler de Vehículo');
     expect(h).toContain('Descargar / Imprimir');
     expect(h).toContain('Español');
@@ -224,10 +310,61 @@ describe('visor del contrato (Alquiler y ficha del cliente)', () => {
   });
 
   it('ofrece WhatsApp y correo solo si el cliente tiene teléfono y correo', () => {
-    expect(visor(cliente)).toContain('wa.me/34600111222');
-    expect(visor(cliente)).toContain('mailto:ana@example.com');
-    const h = visor(undefined);
+    expect(vista({ fase: 'listo', firmado: null })).toContain('wa.me/34600111222');
+    expect(vista({ fase: 'listo', firmado: null })).toContain('mailto:ana@example.com');
+    const h = vista({ fase: 'listo', firmado: null }, { cli: undefined });
     expect(h).not.toContain('wa.me');
     expect(h).not.toContain('mailto:');
+  });
+
+  it('sin firmar ofrece «Firmar en pantalla»; mientras comprueba, si falló la comprobación o si la reserva está anulada, no', () => {
+    expect(vista({ fase: 'listo', firmado: null })).toContain('Firmar en pantalla');
+    expect(vista({ fase: 'cargando' })).not.toContain('Firmar en pantalla');
+    const error = vista({ fase: 'error' });
+    expect(error).not.toContain('Firmar en pantalla');
+    expect(error).toContain('No se pudo comprobar si este contrato está firmado');
+    expect(vista({ fase: 'listo', firmado: null }, { reserva: { ...reserva, estado: 'cancelada' } })).not.toContain('Firmar en pantalla');
+  });
+
+  it('firmado: enseña lo firmado (no los datos actuales), en el idioma de la firma, con la firma dentro', async () => {
+    const f = await firmado();
+    // La reserva cambió después de firmar: el importe actual ya no es 76.
+    const h = vista({ fase: 'listo', firmado: f }, { reserva: { ...reserva, totalCobrado: 90 }, integro: true });
+    const t = texto(h);
+    expect(t).toContain('Vehicle Rental Agreement');
+    expect(t).toContain('76.00 €');
+    expect(t).not.toContain('90.00 €');
+    expect(h).toContain(`src="${FIRMA_PNG}"`);
+    expect(h).not.toContain('Firmar en pantalla');
+    expect(texto(h)).toContain('Contrato firmado el');
+    expect(texto(h)).toContain('Registrado por Daniel');
+    expect(texto(h)).toContain('Copia íntegra');
+  });
+
+  it('firmado: el selector de idioma queda desactivado', async () => {
+    const h = vista({ fase: 'listo', firmado: await firmado() });
+    expect((h.match(/disabled=""/g) ?? []).length).toBeGreaterThanOrEqual(2);
+  });
+
+  it('firmado: avisa si la reserva cambió desde la firma, y solo entonces', async () => {
+    const f = await firmado();
+    expect(vista({ fase: 'listo', firmado: f }, { integro: true })).not.toContain('aviso-cambios');
+    const h = vista({ fase: 'listo', firmado: f }, { reserva: { ...reserva, totalCobrado: 90, fechaFin: '2026-11-05' } });
+    expect(h).toContain('aviso-cambios');
+    expect(texto(h)).toContain('La reserva ha cambiado desde la firma');
+    expect(texto(h)).toContain('las fechas, el importe');
+  });
+
+  it('firmado: si la huella no coincide lo dice claramente', async () => {
+    const h = vista({ fase: 'listo', firmado: await firmado() }, { integro: false });
+    expect(texto(h)).toContain('no coincide con su huella');
+    expect(texto(h)).not.toContain('Copia íntegra');
+  });
+
+  it('solo un administrador ve «Anular firma»', async () => {
+    const f = await firmado();
+    expect(vista({ fase: 'listo', firmado: f }, { puedeAnular: true })).toContain('Anular firma');
+    expect(vista({ fase: 'listo', firmado: f }, { puedeAnular: false })).not.toContain('Anular firma');
+    expect(texto(vista({ fase: 'listo', firmado: f }, { puedeAnular: false, reserva: { ...reserva, totalCobrado: 90 } }))).toContain('pide a un administrador');
   });
 });
