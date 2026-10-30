@@ -164,13 +164,13 @@ describe('contenido que no debe perderse', () => {
     expect(html).not.toContain('resultados-busqueda');
   });
 
-  it('Taller y Agenda enseñan el tablero con cada coche que está en el taller', () => {
-    for (const nombre of ['Taller', 'Agenda']) {
-      const p = pestanas.find(x => x[0].startsWith(nombre))!;
-      const t = texto(p[1], p[2]);
-      expect(t, nombre).toContain('Estado de cada coche en el taller');
-      expect(t, nombre).toContain('En reparación');
-    }
+  it('Taller enseña el tablero con cada coche que está en el taller, y la Agenda no', () => {
+    const taller = pestanas.find(x => x[0].startsWith('Taller'))!;
+    const t = texto(taller[1], taller[2]);
+    expect(t).toContain('Estado de cada coche en el taller');
+    expect(t).toContain('En reparación');
+    const agenda = pestanas.find(x => x[0] === 'Agenda')!;
+    expect(texto(agenda[1], agenda[2])).not.toContain('Estado de cada coche en el taller');
   });
 
   it('Vehículos muestra las matrículas de la flota', () => {

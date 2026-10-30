@@ -15,8 +15,8 @@ const lineas = [
 const ot = (id: string, vehiculoId: string, estado: OrdenTrabajo['estado'], extra: Partial<OrdenTrabajo> = {}) =>
   ({ id, numero: `OT-${id}`, vehiculoId, estado, lineas, fechaActualizacion: '2026-10-30T11:55:00Z', ...extra }) as OrdenTrabajo;
 const texto = (h: string) => h.replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ');
-const pinta = (ordenes: OrdenTrabajo[], hechas: Record<string, string[]> = {}, compacto = false) =>
-  renderToString(<TableroTaller ordenes={ordenes} vehiculos={vehiculos} tareasHechas={hechas} compacto={compacto} ahora={ahora} />);
+const pinta = (ordenes: OrdenTrabajo[], hechas: Record<string, string[]> = {}) =>
+  renderToString(<TableroTaller ordenes={ordenes} vehiculos={vehiculos} tareasHechas={hechas} ahora={ahora} />);
 
 describe('tablero del taller', () => {
   it('enseña cada coche con matrícula, estado, mecánico, avance y última novedad', () => {
@@ -40,9 +40,8 @@ describe('tablero del taller', () => {
     expect(texto(pinta([ot('1', 'borrado', 'recibido')]))).toContain('Vehículo no disponible');
   });
 
-  it('vacío: avisa en la pestaña de Taller y no enseña nada en la Agenda (compacto)', () => {
+  it('vacío: avisa de que no hay coches en el taller', () => {
     expect(texto(pinta([]))).toContain('No hay coches en el taller ahora');
-    expect(pinta([], {}, true)).toBe('');
   });
 
   it('si se le da una acción, cada coche es un botón que abre su orden', () => {

@@ -13,18 +13,16 @@ interface Props {
   vehiculos: Vehiculo[];
   /** Tareas que los mecánicos han marcado como hechas: { otId: [lineaId, ...] }. */
   tareasHechas: Record<string, string[]>;
-  /** En la Agenda no se enseña nada si el taller está vacío (el cupo ya lo dice). */
-  compacto?: boolean;
   onSeleccionar?: (ot: OrdenTrabajo) => void;
   /** Hora de referencia para «hace X min» (se puede fijar en los tests). */
   ahora?: number;
 }
 
 /** Cada coche que hay ahora en el taller: estado, mecánico, avance de tareas y última novedad. */
-export default function TableroTaller({ ordenes, vehiculos, tareasHechas, compacto = false, onSeleccionar, ahora }: Props) {
+export default function TableroTaller({ ordenes, vehiculos, tareasHechas, onSeleccionar, ahora }: Props) {
   const fichas = fichasTaller(ordenes, tareasHechas);
   if (fichas.length === 0) {
-    return compacto ? null : (
+    return (
       <section data-testid="tablero-taller" className="bg-white border border-slate-100 rounded-2xl p-4 text-xs text-slate-400 text-center">
         No hay coches en el taller ahora.
       </section>
@@ -37,7 +35,7 @@ export default function TableroTaller({ ordenes, vehiculos, tareasHechas, compac
         <Wrench className="w-3.5 h-3.5 text-orange-500" /> Estado de cada coche en el taller
         <span className="text-slate-400 normal-case font-semibold">({fichas.length})</span>
       </h3>
-      <div className={`grid gap-2.5 ${compacto ? 'sm:grid-cols-2 lg:grid-cols-3' : 'sm:grid-cols-2 xl:grid-cols-3'}`}>
+      <div className="grid gap-2.5 sm:grid-cols-2 xl:grid-cols-3">
         {fichas.map(({ ot, estado, hechas, total }) => {
           const v = vehiculos.find(x => x.id === ot.vehiculoId);
           const pct = total > 0 ? Math.round((hechas / total) * 100) : 0;

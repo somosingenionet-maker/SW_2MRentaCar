@@ -12,7 +12,6 @@ import ConfirmDialog from './ConfirmDialog';
 import { FLOTA_CLIENTE_ID } from '../utils/flota';
 import { siguienteNumero } from '../utils/numeracion';
 import { otOcupaDia, vehiculosEnTaller, ocupacionDia, nivelCupo, ingresoDeOT, NivelCupo } from '../utils/tallerOcupacion';
-import TableroTaller from './TableroTaller';
 import CitaDetalle from './CitaDetalle';
 import { destinoDeCita, mensajeRecordatorioCita } from '../utils/citas';
 import { enlaceWhatsApp } from '../utils/tallerMecanico';
@@ -30,8 +29,6 @@ interface Props {
   onUpdateCita: (c: Cita) => void;
   onDeleteCita: (id: string) => void;
   onCreateOT: (ot: OrdenTrabajo) => void;
-  /** Tareas que los mecánicos han marcado como hechas: { otId: [lineaId, ...] }. */
-  tareasHechas?: Record<string, string[]>;
   /** Abre una orden en Taller. Solo se pasa si el usuario tiene acceso a Taller. */
   onAbrirOT?: (otId: string) => void;
 }
@@ -194,7 +191,7 @@ function seSolapan(a: [number, number], b: [number, number]): boolean {
   return a[0] < b[1] && b[0] < a[1];
 }
 
-export default function AgendaTab({ citas, vehiculos, clientes, tecnicos, ordenes, capacidadTaller, onAddCita, onUpdateCita, onDeleteCita, onCreateOT, tareasHechas = {}, onAbrirOT }: Props) {
+export default function AgendaTab({ citas, vehiculos, clientes, tecnicos, ordenes, capacidadTaller, onAddCita, onUpdateCita, onDeleteCita, onCreateOT, onAbrirOT }: Props) {
   const [selectedDay, setSelectedDay] = useState(() => new Date());
   const [vista, setVista] = useState<'dia' | 'semana' | 'mes'>('dia');
   const weekStart = useMemo(() => startOfWeek(selectedDay), [selectedDay]);
@@ -379,7 +376,6 @@ export default function AgendaTab({ citas, vehiculos, clientes, tecnicos, ordene
     <div className="space-y-5">
       {/* Cupo del taller: siempre a la vista */}
       <CupoTallerBanner enTaller={vehiculosEnTaller(ordenes)} capacidad={capacidadTaller} />
-      <TableroTaller compacto ordenes={ordenes} vehiculos={vehiculos} tareasHechas={tareasHechas} />
 
       {/* Toolbar */}
       <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3">

@@ -845,7 +845,6 @@ export default function App() {
             onUpdateCita={handleUpdateCita}
             onDeleteCita={handleDeleteCita}
             onCreateOT={handleAddOT}
-            tareasHechas={tareasHechas}
             onAbrirOT={puedeVerTaller ? abrirOT : undefined}
           />
         )}
