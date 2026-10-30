@@ -11,6 +11,7 @@ import { fetchAll, upsertOne, deleteOne } from './data/db';
 import { sinClienteFlota } from './utils/flota';
 import { fetchSolicitudes, updateGestionSolicitud } from './data/solicitudesDb';
 import { fetchFirmasVigentes } from './data/contratosFirmadosDb';
+import { fetchTecnicos, guardarTecnico, fetchTareasHechas, renombrarTecnicoEnOrdenes } from './data/tecnicosDb';
 import { fetchInvitaciones, crearInvitacion, updateEstadoInvitacion } from './data/invitacionesDb';
 import LoginScreen from './components/LoginScreen';
 import {
@@ -63,6 +64,8 @@ export default function App() {
   const [invitaciones, setInvitaciones] = useState<InvitacionCliente[]>([]);
   // Reservas con el contrato firmado en pantalla → fecha de la firma (para la marca «Firmado» de las listas).
   const [firmasVigentes, setFirmasVigentes] = useState<Record<string, string>>({});
+  // Tareas que los mecánicos han marcado como hechas: { otId: [lineaId, ...] }.
+  const [tareasHechas, setTareasHechas] = useState<Record<string, string[]>>({});
 
   // Check session on mount (Supabase)
   useEffect(() => {
@@ -96,7 +99,8 @@ export default function App() {
     fetchAll<NotificacionCliente>('notificaciones').then(setNotificaciones).catch(log('notificaciones'));
     fetchAll<Factura>('facturas').then(setFacturas).catch(log('facturas'));
     fetchAll<OrdenTrabajo>('ordenes_trabajo').then(setOrdenesTrabajo).catch(log('órdenes de trabajo'));
-    fetchAll<Tecnico>('tecnicos').then(setTecnicos).catch(log('técnicos'));
+    fetchTecnicos().then(setTecnicos).catch(log('técnicos'));
+    fetchTareasHechas().then(setTareasHechas).catch(log('tareas de los mecánicos'));
     fetchAll<Cita>('citas').then(setCitas).catch(log('citas'));
     fetchSolicitudes().then(setSolicitudes).catch(log('solicitudes de reserva'));
     fetchInvitaciones().then(setInvitaciones).catch(log('invitaciones de clientes'));
@@ -107,7 +111,7 @@ export default function App() {
   useEffect(() => {
     if (!currentUser) {
       setVehiculos([]); setClientes([]); setReservas([]);
-      setAlertas([]); setNotificaciones([]); setFacturas([]); setOrdenesTrabajo([]); setTecnicos([]); setCitas([]); setSolicitudes([]); setInvitaciones([]); setFirmasVigentes({});
+      setAlertas([]); setNotificaciones([]); setFacturas([]); setOrdenesTrabajo([]); setTecnicos([]); setCitas([]); setSolicitudes([]); setInvitaciones([]); setFirmasVigentes({}); setTareasHechas({});
       return;
     }
     cargarTodo();
@@ -152,6 +156,27 @@ export default function App() {
       .subscribe();
     return () => { void supabase.removeChannel(canal); void supabase.removeChannel(canalInv); };
   }, [currentUser, cargarClientes]);
+
+  // Taller en tiempo real: cuando un mecánico marca una tarea o cambia el estado de una orden desde su enlace,
+  // se recargan las órdenes y las tareas para que el tablero y la ficha lo muestren al momento (y para que el
+  // personal no guarde encima una copia antigua). Varios cambios seguidos se agrupan en una sola recarga.
+  useEffect(() => {
+    if (!currentUser) return;
+    let pendiente: ReturnType<typeof setTimeout> | undefined;
+    const recargar = () => {
+      clearTimeout(pendiente);
+      pendiente = setTimeout(() => {
+        fetchAll<OrdenTrabajo>('ordenes_trabajo').then(setOrdenesTrabajo).catch(err => console.error('Error recargando órdenes', err));
+        fetchTareasHechas().then(setTareasHechas).catch(err => console.error('Error recargando tareas', err));
+      }, 400);
+    };
+    const canal = supabase
+      .channel('taller')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'ordenes_trabajo' }, recargar)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'ot_tareas' }, recargar)
+      .subscribe();
+    return () => { clearTimeout(pendiente); void supabase.removeChannel(canal); };
+  }, [currentUser]);
 
   // Set default tab based on user modules
   useEffect(() => {
@@ -465,13 +490,27 @@ export default function App() {
 
   const handleAddTecnico = useCallback((t: Tecnico) => {
     setTecnicos(prev => [...prev, t]);
-    upsertOne('tecnicos', t).catch(fallo('guardar el técnico'));
+    guardarTecnico(t).catch(fallo('guardar el técnico'));
   }, [fallo]);
 
   const handleUpdateTecnico = useCallback((t: Tecnico) => {
+    const anterior = tecnicos.find(x => x.id === t.id);
     setTecnicos(prev => prev.map(x => x.id === t.id ? t : x));
-    upsertOne('tecnicos', t).catch(fallo('actualizar el técnico'));
-  }, [fallo]);
+    const guardar = async () => {
+      await guardarTecnico(t);
+      // Las órdenes se enlazan al técnico por nombre: si se renombra, sus coches deben seguir siendo suyos.
+      if (anterior && anterior.nombre !== t.nombre) {
+        await renombrarTecnicoEnOrdenes(anterior.nombre, t.nombre);
+        setOrdenesTrabajo(prev => prev.map(o => o.tecnicoAsignado === anterior.nombre ? { ...o, tecnicoAsignado: t.nombre } : o));
+      }
+    };
+    guardar().catch(fallo('actualizar el técnico'));
+  }, [fallo, tecnicos]);
+
+  // El enlace del mecánico se crea o se revoca desde Empresa; aquí solo se refleja en la lista.
+  const handleEnlaceTecnico = useCallback((id: string, creadoEn: string | null) => {
+    setTecnicos(prev => prev.map(x => x.id === id ? { ...x, enlaceCreadoEn: creadoEn } : x));
+  }, []);
 
   const handleDeleteTecnico = useCallback((id: string) => {
     setTecnicos(prev => prev.filter(x => x.id !== id));
@@ -801,6 +840,7 @@ export default function App() {
             onUpdateCita={handleUpdateCita}
             onDeleteCita={handleDeleteCita}
             onCreateOT={handleAddOT}
+            tareasHechas={tareasHechas}
           />
         )}
 
@@ -824,6 +864,7 @@ export default function App() {
             onAdd={handleAddOT}
             onUpdate={handleUpdateOT}
             onDelete={handleDeleteOT}
+            tareasHechas={tareasHechas}
           />
         )}
 
@@ -914,6 +955,7 @@ export default function App() {
           onAddTecnico={handleAddTecnico}
           onUpdateTecnico={handleUpdateTecnico}
           onDeleteTecnico={handleDeleteTecnico}
+          onEnlaceTecnico={handleEnlaceTecnico}
           onClose={() => setSettingsOpen(false)}
         />
       )}

@@ -15,6 +15,8 @@ import {
 import { OrdenTrabajo, OTEstado, LineaOT, LineaOTTipo, Vehiculo, Cliente, EventoOT, Tecnico } from '../types';
 import { getEmpresaConfig } from '../data/empresaConfig';
 import { FLOTA_CLIENTE_ID } from '../utils/flota';
+import TableroTaller from './TableroTaller';
+import { enlaceWhatsApp, mensajeAvisoMecanico } from '../utils/tallerMecanico';
 import { genId } from '../utils/id';
 
 interface Props {
@@ -25,6 +27,8 @@ interface Props {
   onAdd: (ot: OrdenTrabajo) => void;
   onUpdate: (ot: OrdenTrabajo) => void;
   onDelete: (id: string) => void;
+  /** Tareas que los mecánicos han marcado como hechas: { otId: [lineaId, ...] }. */
+  tareasHechas?: Record<string, string[]>;
 }
 
 const ESTADO_META: Record<OTEstado, { label: string; color: string; bg: string }> = {
@@ -113,7 +117,7 @@ function evento(descripcion: string): EventoOT {
   return { fecha: new Date().toISOString(), descripcion };
 }
 
-export default function OrdenesTrabajoTab({ ordenes, vehiculos, clientes, tecnicos, onAdd, onUpdate, onDelete }: Props) {
+export default function OrdenesTrabajoTab({ ordenes, vehiculos, clientes, tecnicos, onAdd, onUpdate, onDelete, tareasHechas = {} }: Props) {
   const [search, setSearch] = useState('');
   const [filterEstado, setFilterEstado] = useState<OTEstado | 'todas'>('todas');
   const [selected, setSelected] = useSeleccion(ordenes);
@@ -398,6 +402,9 @@ export default function OrdenesTrabajoTab({ ordenes, vehiculos, clientes, tecnic
         </button>
       </div>
 
+      {/* Tablero: cada coche que hay ahora en el taller, con su avance */}
+      <TableroTaller ordenes={ordenes} vehiculos={vehiculos} tareasHechas={tareasHechas} onSeleccionar={setSelected} />
+
       {/* Filters */}
       <div className="flex flex-col sm:flex-row gap-3">
         <div className="relative sm:flex-1">
@@ -572,6 +579,53 @@ export default function OrdenesTrabajoTab({ ordenes, vehiculos, clientes, tecnic
                     </div>
                   )}
                 </div>
+
+                {/* Avance del mecánico y aviso por WhatsApp (solo mientras el coche está en el taller) */}
+                {(['recibido', 'en_reparacion', 'listo'] as OTEstado[]).includes(selected.estado) && (() => {
+                  const tarea = selected.lineas.filter(l => l.tipo === 'mano_de_obra');
+                  const hechas = new Set(tareasHechas[selected.id] ?? []);
+                  const tec = selected.tecnicoAsignado ? tecnicos.find(t => t.nombre === selected.tecnicoAsignado) : undefined;
+                  const veh = vehiculos.find(v => v.id === selected.vehiculoId);
+                  return (
+                    <div className="rounded-xl border border-orange-100 bg-orange-50/50 p-3 space-y-2" data-testid="avance-mecanico">
+                      <p className="text-xs font-bold text-slate-600 uppercase tracking-wider">Avance en el taller</p>
+                      {tarea.length === 0 ? (
+                        <p className="text-xs text-slate-400">Sin tareas detalladas: añade líneas de mano de obra y el mecánico podrá marcarlas desde su enlace.</p>
+                      ) : (
+                        <ul className="space-y-1">
+                          {tarea.map(l => (
+                            <li key={l.id} className="flex items-center gap-2 text-xs">
+                              <span className={`w-4 h-4 rounded border flex items-center justify-center shrink-0 ${hechas.has(l.id) ? 'bg-emerald-500 border-emerald-500 text-white' : 'border-slate-300 bg-white'}`}>
+                                {hechas.has(l.id) && <Check size={11} />}
+                              </span>
+                              <span className={hechas.has(l.id) ? 'text-slate-400 line-through' : 'text-slate-700'}>{l.descripcion}</span>
+                            </li>
+                          ))}
+                        </ul>
+                      )}
+                      {selected.tecnicoAsignado ? (
+                        <div className="flex items-center gap-2 flex-wrap pt-1">
+                          <a
+                            href={enlaceWhatsApp(tec?.telefono, mensajeAvisoMecanico({
+                              nombre: selected.tecnicoAsignado,
+                              vehiculo: veh ? `${veh.marca} ${veh.modelo}` : 'vehículo',
+                              matricula: veh?.matricula ?? '',
+                              problema: selected.descripcionProblema,
+                            }))}
+                            target="_blank" rel="noreferrer"
+                            className="px-3 py-1.5 bg-green-600 hover:bg-green-500 text-white text-xs font-bold rounded-lg transition inline-flex items-center gap-1"
+                          >
+                            <MessageCircle size={13} /> Avisar a {selected.tecnicoAsignado} por WhatsApp
+                          </a>
+                          {!tec?.enlaceCreadoEn && <span className="text-[11px] text-amber-700 font-semibold">Este mecánico aún no tiene enlace (Empresa → Técnicos).</span>}
+                          {tec && !tec.telefono && <span className="text-[11px] text-slate-400">Sin teléfono guardado: WhatsApp te dejará elegir el contacto.</span>}
+                        </div>
+                      ) : (
+                        <p className="text-[11px] font-semibold text-amber-700">Sin mecánico asignado: edita la orden para asignarle uno.</p>
+                      )}
+                    </div>
+                  );
+                })()}
 
                 {/* Lines */}
                 <div>

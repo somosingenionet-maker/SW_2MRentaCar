@@ -1,10 +1,13 @@
 import React, { useState, useRef } from 'react';
 import ModalShell from './ModalShell';
-import { Upload, RotateCcw, Check, Building2, Wrench, Plus, Edit2, Trash2 } from 'lucide-react';
+import { Upload, RotateCcw, Check, Building2, Wrench, Plus, Edit2, Trash2, Link2, Copy, MessageCircle, Ban } from 'lucide-react';
 import { EmpresaConfig, DEFAULT_EMPRESA_CONFIG } from '../data/empresaConfig';
 import { genId } from '../utils/id';
 import { Tecnico } from '../types';
 import { contrastText } from '../utils/color';
+import { crearEnlaceTecnico, revocarEnlaceTecnico } from '../data/tecnicosDb';
+import { enlaceWhatsApp, mensajeEnlaceMecanico } from '../utils/tallerMecanico';
+import { formatDate } from '../utils/dateFormat';
 
 interface Props {
   config: EmpresaConfig;
@@ -13,6 +16,8 @@ interface Props {
   onAddTecnico: (t: Tecnico) => void;
   onUpdateTecnico: (t: Tecnico) => void;
   onDeleteTecnico: (id: string) => void;
+  /** El enlace del mecánico se creó (fecha) o se revocó (null): para reflejarlo en la lista. */
+  onEnlaceTecnico: (id: string, creadoEn: string | null) => void;
   onClose: () => void;
 }
 
@@ -31,30 +36,81 @@ const BRAND_COLORS = [
   { label: 'Negro',      value: '#111827' },
 ];
 
-export default function CompanySettingsPanel({ config, onSave, tecnicos, onAddTecnico, onUpdateTecnico, onDeleteTecnico, onClose }: Props) {
+export default function CompanySettingsPanel({ config, onSave, tecnicos, onAddTecnico, onUpdateTecnico, onDeleteTecnico, onEnlaceTecnico, onClose }: Props) {
   const [draft, setDraft] = useState<EmpresaConfig>({ ...config });
   const [saved, setSaved] = useState(false);
   const fileRef = useRef<HTMLInputElement>(null);
 
   // Técnicos (viven en App/Supabase; aquí solo se editan vía callbacks)
-  const [tecnicoForm, setTecnicoForm] = useState<{ nombre: string; especialidad: string } | null>(null);
+  const [tecnicoForm, setTecnicoForm] = useState<{ nombre: string; especialidad: string; telefono: string; activo: boolean; error: string } | null>(null);
   const [editingTecnicoId, setEditingTecnicoId] = useState<string | null>(null);
+  // Enlace del mecánico recién creado (solo se puede ver ahora), operación en curso y confirmación pendiente.
+  const [enlaceNuevo, setEnlaceNuevo] = useState<{ tecnicoId: string; url: string } | null>(null);
+  const [enlaceOcupado, setEnlaceOcupado] = useState<string | null>(null);
+  const [enlaceError, setEnlaceError] = useState('');
+  const [confirmarEnlace, setConfirmarEnlace] = useState<{ id: string; tipo: 'nuevo' | 'revocar' } | null>(null);
+  const [copiado, setCopiado] = useState(false);
 
   const openTecnicoForm = (t?: Tecnico) => {
     setEditingTecnicoId(t?.id ?? null);
-    setTecnicoForm({ nombre: t?.nombre ?? '', especialidad: t?.especialidad ?? '' });
+    setTecnicoForm({ nombre: t?.nombre ?? '', especialidad: t?.especialidad ?? '', telefono: t?.telefono ?? '', activo: t?.activo ?? true, error: '' });
   };
 
   const handleSaveTecnico = () => {
     if (!tecnicoForm?.nombre.trim()) return;
+    const nombre = tecnicoForm.nombre.trim();
+    // Las órdenes se enlazan al técnico por nombre: dos con el mismo nombre se mezclarían los coches.
+    if (tecnicos.some(t => t.id !== editingTecnicoId && t.nombre.trim().toLowerCase() === nombre.toLowerCase())) {
+      setTecnicoForm({ ...tecnicoForm, error: 'Ya hay un técnico con ese nombre. Usa otro (por ejemplo, con el apellido).' });
+      return;
+    }
+    const datos = { nombre, especialidad: tecnicoForm.especialidad.trim(), telefono: tecnicoForm.telefono.trim() || undefined, activo: tecnicoForm.activo };
     if (editingTecnicoId) {
       const existente = tecnicos.find(t => t.id === editingTecnicoId);
-      if (existente) onUpdateTecnico({ ...existente, nombre: tecnicoForm.nombre.trim(), especialidad: tecnicoForm.especialidad.trim() });
+      if (existente) onUpdateTecnico({ ...existente, ...datos });
     } else {
-      onAddTecnico({ id: genId('tec'), nombre: tecnicoForm.nombre.trim(), especialidad: tecnicoForm.especialidad.trim(), activo: true });
+      onAddTecnico({ id: genId('tec'), ...datos });
     }
     setTecnicoForm(null);
     setEditingTecnicoId(null);
+  };
+
+  const crearEnlace = async (t: Tecnico) => {
+    setConfirmarEnlace(null);
+    setEnlaceOcupado(t.id);
+    setEnlaceError('');
+    try {
+      const { token, creadoEn } = await crearEnlaceTecnico(t.id);
+      onEnlaceTecnico(t.id, creadoEn);
+      setCopiado(false);
+      setEnlaceNuevo({ tecnicoId: t.id, url: `${window.location.origin}/?taller=${token}` });
+    } catch (err) {
+      console.error('Error creando el enlace del mecánico', err);
+      setEnlaceError('No se pudo crear el enlace. Inténtalo de nuevo.');
+    } finally {
+      setEnlaceOcupado(null);
+    }
+  };
+
+  const revocarEnlace = async (t: Tecnico) => {
+    setConfirmarEnlace(null);
+    setEnlaceOcupado(t.id);
+    setEnlaceError('');
+    try {
+      await revocarEnlaceTecnico(t.id);
+      onEnlaceTecnico(t.id, null);
+      if (enlaceNuevo?.tecnicoId === t.id) setEnlaceNuevo(null);
+    } catch (err) {
+      console.error('Error revocando el enlace del mecánico', err);
+      setEnlaceError('No se pudo desactivar el enlace. Inténtalo de nuevo.');
+    } finally {
+      setEnlaceOcupado(null);
+    }
+  };
+
+  const copiarEnlace = async () => {
+    if (!enlaceNuevo) return;
+    try { await navigator.clipboard.writeText(enlaceNuevo.url); setCopiado(true); } catch { setCopiado(false); }
   };
 
   const set = (field: keyof EmpresaConfig, value: string) =>
@@ -393,6 +449,18 @@ export default function CompanySettingsPanel({ config, onSave, tecnicos, onAddTe
                 placeholder="Especialidad (opcional)"
                 className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-orange-400"
               />
+              <input
+                type="tel"
+                value={tecnicoForm.telefono}
+                onChange={e => setTecnicoForm(f => f ? { ...f, telefono: e.target.value } : f)}
+                placeholder="Teléfono con prefijo, para WhatsApp (opcional)"
+                className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-orange-400"
+              />
+              <label className="flex items-center gap-2 text-xs font-semibold text-slate-600 cursor-pointer">
+                <input type="checkbox" checked={tecnicoForm.activo} onChange={e => setTecnicoForm(f => f ? { ...f, activo: e.target.checked } : f)} />
+                Activo (si se desmarca, su enlace del taller deja de funcionar)
+              </label>
+              {tecnicoForm.error && <p role="alert" className="text-xs font-semibold text-rose-600">{tecnicoForm.error}</p>}
               <div className="flex gap-2 justify-end">
                 <button onClick={() => { setTecnicoForm(null); setEditingTecnicoId(null); }} className="px-3 py-1.5 text-xs font-semibold text-slate-600 border border-slate-200 rounded-lg hover:bg-slate-100 transition cursor-pointer">Cancelar</button>
                 <button onClick={handleSaveTecnico} className="px-3 py-1.5 text-xs font-bold text-white bg-orange-500 hover:bg-orange-600 rounded-lg transition flex items-center gap-1 cursor-pointer">
@@ -407,17 +475,66 @@ export default function CompanySettingsPanel({ config, onSave, tecnicos, onAddTe
           ) : (
             <div className="space-y-1.5">
               {tecnicos.map(t => (
-                <div key={t.id} className="flex items-center justify-between bg-slate-50 border border-slate-100 rounded-xl px-3 py-2.5">
-                  <div>
-                    <p className="text-sm font-semibold text-slate-700">{t.nombre}</p>
-                    {t.especialidad && <p className="text-xs text-slate-400">{t.especialidad}</p>}
+                <div key={t.id} className="bg-slate-50 border border-slate-100 rounded-xl px-3 py-2.5 space-y-2" data-testid="fila-tecnico">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <p className="text-sm font-semibold text-slate-700">{t.nombre}{!t.activo && <span className="ml-2 text-[10px] font-bold text-slate-400 uppercase">Inactivo</span>}</p>
+                      {t.especialidad && <p className="text-xs text-slate-400">{t.especialidad}</p>}
+                    </div>
+                    <div className="flex gap-1">
+                      <button onClick={() => openTecnicoForm(t)} className="p-1.5 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition cursor-pointer"><Edit2 className="w-3.5 h-3.5" /></button>
+                      <button onClick={() => onDeleteTecnico(t.id)} className="p-1.5 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition cursor-pointer"><Trash2 className="w-3.5 h-3.5" /></button>
+                    </div>
                   </div>
-                  <div className="flex gap-1">
-                    <button onClick={() => openTecnicoForm(t)} className="p-1.5 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition cursor-pointer"><Edit2 className="w-3.5 h-3.5" /></button>
-                    <button onClick={() => onDeleteTecnico(t.id)} className="p-1.5 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition cursor-pointer"><Trash2 className="w-3.5 h-3.5" /></button>
+
+                  {/* Enlace personal del mecánico */}
+                  <div className="flex items-center gap-2 flex-wrap text-[11px]">
+                    <Link2 className="w-3.5 h-3.5 text-slate-400 shrink-0" />
+                    {t.enlaceCreadoEn
+                      ? <span className="font-semibold text-emerald-700">Enlace activo desde {formatDate(t.enlaceCreadoEn.slice(0, 10))}</span>
+                      : <span className="text-slate-400">Sin enlace del taller</span>}
+                    {confirmarEnlace?.id === t.id ? (
+                      <span className="flex items-center gap-1.5">
+                        <span className="font-semibold text-amber-700">{confirmarEnlace.tipo === 'nuevo' ? 'El enlace actual dejará de funcionar.' : '¿Desactivar su enlace?'}</span>
+                        <button onClick={() => (confirmarEnlace.tipo === 'nuevo' ? void crearEnlace(t) : void revocarEnlace(t))} className="px-2 py-1 rounded-md bg-amber-500 text-white font-bold cursor-pointer">Sí</button>
+                        <button onClick={() => setConfirmarEnlace(null)} className="px-2 py-1 rounded-md border border-slate-300 text-slate-600 font-bold cursor-pointer">No</button>
+                      </span>
+                    ) : (
+                      <>
+                        <button disabled={enlaceOcupado === t.id}
+                          onClick={() => (t.enlaceCreadoEn ? setConfirmarEnlace({ id: t.id, tipo: 'nuevo' }) : void crearEnlace(t))}
+                          className="px-2 py-1 rounded-md bg-orange-500 hover:bg-orange-600 text-white font-bold cursor-pointer disabled:opacity-60">
+                          {enlaceOcupado === t.id ? 'Creando…' : t.enlaceCreadoEn ? 'Nuevo enlace' : 'Crear enlace'}
+                        </button>
+                        {t.enlaceCreadoEn && (
+                          <button onClick={() => setConfirmarEnlace({ id: t.id, tipo: 'revocar' })} className="px-2 py-1 rounded-md border border-slate-300 text-slate-600 font-bold inline-flex items-center gap-1 cursor-pointer">
+                            <Ban className="w-3 h-3" /> Desactivar
+                          </button>
+                        )}
+                      </>
+                    )}
                   </div>
+
+                  {enlaceNuevo?.tecnicoId === t.id && (
+                    <div className="rounded-lg border border-emerald-200 bg-emerald-50 p-2.5 space-y-2" data-testid="enlace-nuevo">
+                      <p className="text-[11px] font-semibold text-emerald-900">Este enlace solo se muestra ahora. Envíaselo a {t.nombre}; si lo pierdes, crea uno nuevo.</p>
+                      <input readOnly value={enlaceNuevo.url} onFocus={e => e.currentTarget.select()} aria-label="Enlace del mecánico"
+                        className="w-full px-2 py-1.5 border border-emerald-200 rounded-md text-[11px] font-mono bg-white" />
+                      <div className="flex gap-2 flex-wrap">
+                        <button onClick={copiarEnlace} className="px-2.5 py-1.5 rounded-md bg-slate-800 text-white text-[11px] font-bold inline-flex items-center gap-1 cursor-pointer">
+                          {copiado ? <Check className="w-3 h-3" /> : <Copy className="w-3 h-3" />} {copiado ? 'Copiado' : 'Copiar'}
+                        </button>
+                        <a href={enlaceWhatsApp(t.telefono, mensajeEnlaceMecanico({ nombre: t.nombre, empresa: config.nombre, enlace: enlaceNuevo.url }))} target="_blank" rel="noreferrer"
+                          className="px-2.5 py-1.5 rounded-md bg-green-600 hover:bg-green-500 text-white text-[11px] font-bold inline-flex items-center gap-1">
+                          <MessageCircle className="w-3 h-3" /> Enviar por WhatsApp
+                        </a>
+                        <button onClick={() => setEnlaceNuevo(null)} className="px-2.5 py-1.5 rounded-md border border-slate-300 text-slate-600 text-[11px] font-bold cursor-pointer">Ocultar</button>
+                      </div>
+                    </div>
+                  )}
                 </div>
               ))}
+              {enlaceError && <p role="alert" className="text-xs font-semibold text-rose-600">{enlaceError}</p>}
             </div>
           )}
         </div>

@@ -255,7 +255,11 @@ export interface Tecnico {
   id: string;
   nombre: string;
   especialidad?: string;
+  /** Opcional: para abrir WhatsApp directamente con el mecánico. */
+  telefono?: string;
   activo: boolean;
+  /** Cuándo se creó su enlace del taller (null/ausente = no tiene enlace activo). El token nunca se descarga: en la base solo está su hash. */
+  enlaceCreadoEn?: string | null;
 }
 
 /**

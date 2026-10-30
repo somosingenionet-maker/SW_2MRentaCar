@@ -12,6 +12,7 @@ import ConfirmDialog from './ConfirmDialog';
 import { FLOTA_CLIENTE_ID } from '../utils/flota';
 import { siguienteNumero } from '../utils/numeracion';
 import { otOcupaDia, vehiculosEnTaller, ocupacionDia, nivelCupo, ingresoDeOT, NivelCupo } from '../utils/tallerOcupacion';
+import TableroTaller from './TableroTaller';
 
 interface Props {
   citas: Cita[];
@@ -25,6 +26,8 @@ interface Props {
   onUpdateCita: (c: Cita) => void;
   onDeleteCita: (id: string) => void;
   onCreateOT: (ot: OrdenTrabajo) => void;
+  /** Tareas que los mecánicos han marcado como hechas: { otId: [lineaId, ...] }. */
+  tareasHechas?: Record<string, string[]>;
 }
 
 const ESTADO_META: Record<Cita['estado'], { label: string; color: string; bg: string }> = {
@@ -185,7 +188,7 @@ function seSolapan(a: [number, number], b: [number, number]): boolean {
   return a[0] < b[1] && b[0] < a[1];
 }
 
-export default function AgendaTab({ citas, vehiculos, clientes, tecnicos, ordenes, capacidadTaller, onAddCita, onUpdateCita, onDeleteCita, onCreateOT }: Props) {
+export default function AgendaTab({ citas, vehiculos, clientes, tecnicos, ordenes, capacidadTaller, onAddCita, onUpdateCita, onDeleteCita, onCreateOT, tareasHechas = {} }: Props) {
   const [selectedDay, setSelectedDay] = useState(() => new Date());
   const [vista, setVista] = useState<'dia' | 'semana' | 'mes'>('dia');
   const weekStart = useMemo(() => startOfWeek(selectedDay), [selectedDay]);
@@ -361,6 +364,7 @@ export default function AgendaTab({ citas, vehiculos, clientes, tecnicos, ordene
     <div className="space-y-5">
       {/* Cupo del taller: siempre a la vista */}
       <CupoTallerBanner enTaller={vehiculosEnTaller(ordenes)} capacidad={capacidadTaller} />
+      <TableroTaller compacto ordenes={ordenes} vehiculos={vehiculos} tareasHechas={tareasHechas} />
 
       {/* Toolbar */}
       <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3">

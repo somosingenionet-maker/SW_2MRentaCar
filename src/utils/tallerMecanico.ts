@@ -101,3 +101,22 @@ export function agruparTareasHechas(filas: { otId: string; lineaId: string }[]):
   for (const f of filas) (r[f.otId] ??= []).push(f.lineaId);
   return r;
 }
+
+// ── Mensajes de WhatsApp al mecánico ─────────────────────────────────────────
+
+/** Aviso de un coche asignado. No lleva el enlace del taller: solo se guarda su hash, así que no se puede volver a mostrar. */
+export function mensajeAvisoMecanico(d: { nombre: string; vehiculo: string; matricula: string; problema?: string }): string {
+  const problema = (d.problema ?? '').split('\n')[0].trim().slice(0, 140);
+  return `Hola ${d.nombre}, te hemos asignado el ${d.vehiculo}${d.matricula ? ` (${d.matricula})` : ''}.${problema ? ` Problema: ${problema}.` : ''} Lo tienes en tu lista del taller.`;
+}
+
+/** Primer envío del enlace personal del mecánico. */
+export function mensajeEnlaceMecanico(d: { nombre: string; empresa: string; enlace: string }): string {
+  return `Hola ${d.nombre}, este es tu enlace personal del taller de ${d.empresa}: ${d.enlace}\n\nÁbrelo desde el móvil y guárdalo (puedes añadirlo a la pantalla de inicio). Ahí verás los coches que te asignemos y podrás marcar las tareas. No lo compartas.`;
+}
+
+/** Enlace de WhatsApp con el texto escrito; si hay teléfono abre el chat directamente, si no deja elegir contacto. */
+export function enlaceWhatsApp(telefono: string | undefined, texto: string): string {
+  const digitos = (telefono ?? '').replace(/\D/g, '');
+  return `https://wa.me/${digitos}?text=${encodeURIComponent(texto)}`;
+}

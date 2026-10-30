@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import {
-  progresoMecanico, ordenarParaMecanico, ordenesNuevas, haceCuanto, descripcionVehiculo, progresoOT, fichasTaller, agruparTareasHechas,
+  progresoMecanico, ordenarParaMecanico, ordenesNuevas, haceCuanto, descripcionVehiculo, progresoOT, fichasTaller, agruparTareasHechas, mensajeAvisoMecanico, mensajeEnlaceMecanico, enlaceWhatsApp,
   type OrdenMecanico,
 } from './tallerMecanico';
 import type { OrdenTrabajo } from '../types';
@@ -94,5 +94,25 @@ describe('fichasTaller', () => {
 describe('agruparTareasHechas', () => {
   it('agrupa por orden', () => {
     expect(agruparTareasHechas([{ otId: 'a', lineaId: '1' }, { otId: 'b', lineaId: '2' }, { otId: 'a', lineaId: '3' }])).toEqual({ a: ['1', '3'], b: ['2'] });
+  });
+});
+
+describe('mensajes de WhatsApp al mecánico', () => {
+  it('el aviso de coche asignado lleva el coche, la matrícula y la primera línea del problema, sin enlace', () => {
+    const m = mensajeAvisoMecanico({ nombre: 'Pedro', vehiculo: 'Peugeot 3008', matricula: '0069LJX', problema: 'Frena mal\nruido atrás\nfalla el sensor' });
+    expect(m).toBe('Hola Pedro, te hemos asignado el Peugeot 3008 (0069LJX). Problema: Frena mal. Lo tienes en tu lista del taller.');
+    expect(m).not.toContain('http');
+  });
+  it('sin problema ni matrícula no deja huecos raros', () => {
+    expect(mensajeAvisoMecanico({ nombre: 'Pedro', vehiculo: 'Seat Ibiza', matricula: '' })).toBe('Hola Pedro, te hemos asignado el Seat Ibiza. Lo tienes en tu lista del taller.');
+  });
+  it('el primer envío del enlace lleva el enlace y pide no compartirlo', () => {
+    const m = mensajeEnlaceMecanico({ nombre: 'Pedro', empresa: '2M Rent a Car', enlace: 'https://app.2mrentacar.es/?taller=abc' });
+    expect(m).toContain('https://app.2mrentacar.es/?taller=abc');
+    expect(m).toContain('No lo compartas');
+  });
+  it('enlaceWhatsApp abre el chat si hay teléfono y deja elegir contacto si no', () => {
+    expect(enlaceWhatsApp('+34 623 59 64 15', 'Hola & adiós')).toBe('https://wa.me/34623596415?text=Hola%20%26%20adi%C3%B3s');
+    expect(enlaceWhatsApp(undefined, 'x')).toBe('https://wa.me/?text=x');
   });
 });
