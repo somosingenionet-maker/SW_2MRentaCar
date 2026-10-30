@@ -13,6 +13,10 @@ import { FLOTA_CLIENTE_ID } from '../utils/flota';
 import { siguienteNumero } from '../utils/numeracion';
 import { otOcupaDia, vehiculosEnTaller, ocupacionDia, nivelCupo, ingresoDeOT, NivelCupo } from '../utils/tallerOcupacion';
 import TableroTaller from './TableroTaller';
+import CitaDetalle from './CitaDetalle';
+import { destinoDeCita, mensajeRecordatorioCita } from '../utils/citas';
+import { enlaceWhatsApp } from '../utils/tallerMecanico';
+import { getEmpresaConfig } from '../data/empresaConfig';
 
 interface Props {
   citas: Cita[];
@@ -28,6 +32,8 @@ interface Props {
   onCreateOT: (ot: OrdenTrabajo) => void;
   /** Tareas que los mecánicos han marcado como hechas: { otId: [lineaId, ...] }. */
   tareasHechas?: Record<string, string[]>;
+  /** Abre una orden en Taller. Solo se pasa si el usuario tiene acceso a Taller. */
+  onAbrirOT?: (otId: string) => void;
 }
 
 const ESTADO_META: Record<Cita['estado'], { label: string; color: string; bg: string }> = {
@@ -188,7 +194,7 @@ function seSolapan(a: [number, number], b: [number, number]): boolean {
   return a[0] < b[1] && b[0] < a[1];
 }
 
-export default function AgendaTab({ citas, vehiculos, clientes, tecnicos, ordenes, capacidadTaller, onAddCita, onUpdateCita, onDeleteCita, onCreateOT, tareasHechas = {} }: Props) {
+export default function AgendaTab({ citas, vehiculos, clientes, tecnicos, ordenes, capacidadTaller, onAddCita, onUpdateCita, onDeleteCita, onCreateOT, tareasHechas = {}, onAbrirOT }: Props) {
   const [selectedDay, setSelectedDay] = useState(() => new Date());
   const [vista, setVista] = useState<'dia' | 'semana' | 'mes'>('dia');
   const weekStart = useMemo(() => startOfWeek(selectedDay), [selectedDay]);
@@ -214,6 +220,9 @@ export default function AgendaTab({ citas, vehiculos, clientes, tecnicos, ordene
   const [formError, setFormError] = useState('');
   const [confirmDelete, setConfirmDelete] = useState<Cita | null>(null);
   const [convertirCita, setConvertirCita] = useState<Cita | null>(null);
+  // Ficha de solo lectura de la cita abierta (se guarda el id para que refleje los cambios al instante).
+  const [detalleCitaId, setDetalleCitaId] = useState<string | null>(null);
+  const detalleCita = detalleCitaId ? citas.find(c => c.id === detalleCitaId) ?? null : null;
 
   // Todas las órdenes con el vehículo dentro (o ya entregado) se muestran en cada
   // día que ocupan el taller. Una OT que viene de una cita no se repite el día de
@@ -265,6 +274,12 @@ export default function AgendaTab({ citas, vehiculos, clientes, tecnicos, ordene
     if (!id) return null;
     const c = clientes.find((x) => x.id === id);
     return c ? `${c.nombre} ${c.apellidos}` : null;
+  };
+
+  // Pulsar una cita: a su orden en Taller si ya se convirtió (ahí está el proceso); si no, a su ficha.
+  const abrirCita = (c: Cita) => {
+    if (onAbrirOT && c.otId && destinoDeCita(c, new Set(ordenes.map(o => o.id)), true) === 'orden') onAbrirOT(c.otId);
+    else setDetalleCitaId(c.id);
   };
 
   const openCreate = () => {
@@ -480,7 +495,11 @@ export default function AgendaTab({ citas, vehiculos, clientes, tecnicos, ordene
                 const veh = vehiculoLabel(ot.vehiculoId);
                 const cli = ot.clienteId === FLOTA_CLIENTE_ID ? 'Flota propia' : clienteLabel(ot.clienteId);
                 return (
-                  <div key={`ot-${ot.id}`} className="px-5 py-4 flex items-start gap-4 hover:bg-slate-50/60 transition">
+                  <div
+                    key={`ot-${ot.id}`}
+                    {...(onAbrirOT ? { role: 'button', tabIndex: 0, title: `Abrir la orden ${ot.numero} en Taller`, onClick: () => onAbrirOT(ot.id), onKeyDown: (e: React.KeyboardEvent) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onAbrirOT(ot.id); } } } : {})}
+                    className={`px-5 py-4 flex items-start gap-4 hover:bg-slate-50/60 transition ${onAbrirOT ? 'cursor-pointer' : ''}`}
+                  >
                     <div className="flex flex-col items-center shrink-0 w-14">
                       <Wrench className="w-3.5 h-3.5 text-slate-300 mb-0.5" />
                       <span className="text-[10px] text-slate-400 font-bold text-center">Taller</span>
@@ -520,7 +539,13 @@ export default function AgendaTab({ citas, vehiculos, clientes, tecnicos, ordene
               const cli = clienteLabel(c.clienteId) ?? c.contactoNombre;
               return (
                 <div key={c.id} className="px-5 py-4 flex items-start justify-between gap-4 hover:bg-slate-50/60 transition">
-                  <div className="flex items-start gap-3 min-w-0">
+                  <div
+                    role="button" tabIndex={0}
+                    title={c.otId && onAbrirOT ? 'Abrir la orden en Taller' : 'Ver los datos de la cita'}
+                    onClick={() => abrirCita(c)}
+                    onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); abrirCita(c); } }}
+                    className="flex items-start gap-3 min-w-0 flex-1 cursor-pointer"
+                  >
                     <div className="flex flex-col items-center shrink-0 w-14">
                       <Clock className="w-3.5 h-3.5 text-slate-300 mb-0.5" />
                       <span className="text-sm font-extrabold text-slate-800">
@@ -611,8 +636,8 @@ export default function AgendaTab({ citas, vehiculos, clientes, tecnicos, ordene
                         return (
                           <button
                             key={`ot-${ot.id}`}
-                            onClick={() => irADia(d)}
-                            title={`${ot.numero} — ${meta.label}`}
+                            onClick={() => (onAbrirOT ? onAbrirOT(ot.id) : irADia(d))}
+                            title={`${ot.numero} — ${meta.label}${onAbrirOT ? ' · abrir en Taller' : ''}`}
                             className={`w-full text-left px-1.5 py-1 rounded-lg text-[10px] font-semibold truncate flex items-center gap-1 cursor-pointer hover:opacity-80 transition ${meta.bg} ${meta.color}`}
                           >
                             <Wrench className="w-2.5 h-2.5 shrink-0" />
@@ -625,8 +650,8 @@ export default function AgendaTab({ citas, vehiculos, clientes, tecnicos, ordene
                       return (
                         <button
                           key={c.id}
-                          onClick={() => irADia(d)}
-                          title={c.motivo}
+                          onClick={() => abrirCita(c)}
+                          title={`${c.motivo} · ${c.otId && onAbrirOT ? 'abrir la orden en Taller' : 'ver los datos'}`}
                           className={`w-full text-left px-1.5 py-1 rounded-lg text-[10px] font-semibold truncate cursor-pointer hover:opacity-80 transition ${meta.bg} ${meta.color}`}
                         >
                           {new Date(c.fechaHora).toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' })} {c.motivo}
@@ -655,10 +680,13 @@ export default function AgendaTab({ citas, vehiculos, clientes, tecnicos, ordene
               const esMesActual = d.getMonth() === selectedDay.getMonth();
               const entradas = entriesForDay(d);
               return (
-                <button
+                <div
                   key={key}
-                  type="button"
+                  role="button"
+                  tabIndex={0}
+                  title="Ver el día"
                   onClick={() => irADia(d)}
+                  onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); irADia(d); } }}
                   className={`min-h-[92px] p-1.5 border-b border-r border-slate-100 text-left cursor-pointer transition hover:bg-slate-50 flex flex-col gap-0.5 ${esMesActual ? 'bg-white' : 'bg-slate-50/50'}`}
                 >
                   <span className={`text-xs font-bold w-5 h-5 flex items-center justify-center rounded-full ${
@@ -670,22 +698,33 @@ export default function AgendaTab({ citas, vehiculos, clientes, tecnicos, ordene
                     if (entry.kind === 'ot') {
                       const meta = OT_BADGE_META[entry.data.estado];
                       return (
-                        <span key={`ot-${entry.data.id}`} className={`block text-[9px] font-semibold truncate px-1 rounded ${meta.bg} ${meta.color}`}>
+                        <button
+                          type="button" key={`ot-${entry.data.id}`}
+                          title={onAbrirOT ? `Abrir la orden ${entry.data.numero} en Taller` : entry.data.numero}
+                          onClick={(e) => { e.stopPropagation(); if (onAbrirOT) onAbrirOT(entry.data.id); else irADia(d); }}
+                          className={`block w-full text-left text-[9px] font-semibold truncate px-1 rounded cursor-pointer hover:opacity-80 ${meta.bg} ${meta.color}`}
+                        >
                           {entry.data.numero}
-                        </span>
+                        </button>
                       );
                     }
                     const meta = ESTADO_META[entry.data.estado];
+                    const cita = entry.data;
                     return (
-                      <span key={entry.data.id} className={`block text-[9px] font-semibold truncate px-1 rounded ${meta.bg} ${meta.color}`}>
-                        {new Date(entry.data.fechaHora).toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' })} {entry.data.motivo}
-                      </span>
+                      <button
+                        type="button" key={cita.id}
+                        title={`${cita.motivo} · ${cita.otId && onAbrirOT ? 'abrir la orden en Taller' : 'ver los datos'}`}
+                        onClick={(e) => { e.stopPropagation(); abrirCita(cita); }}
+                        className={`block w-full text-left text-[9px] font-semibold truncate px-1 rounded cursor-pointer hover:opacity-80 ${meta.bg} ${meta.color}`}
+                      >
+                        {new Date(cita.fechaHora).toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' })} {cita.motivo}
+                      </button>
                     );
                   })}
                   {entradas.length > 2 && (
                     <span className="block text-[9px] text-slate-400 font-semibold px-1">+{entradas.length - 2} más</span>
                   )}
-                </button>
+                </div>
               );
             })}
           </div>
@@ -828,6 +867,40 @@ export default function AgendaTab({ citas, vehiculos, clientes, tecnicos, ordene
             </div>
         </ModalShell>
       )}
+
+      {detalleCita && (() => {
+        const c = detalleCita;
+        const cli = c.clienteId ? clientes.find(x => x.id === c.clienteId) : undefined;
+        const telefono = c.contactoTelefono?.trim() || cli?.telefono || undefined;
+        const nombre = clienteLabel(c.clienteId) ?? c.contactoNombre ?? '';
+        const orden = c.otId ? ordenes.find(o => o.id === c.otId) : undefined;
+        const abierta = c.estado === 'pendiente' || c.estado === 'confirmada';
+        const inicio = new Date(c.fechaHora);
+        return (
+          <CitaDetalle
+            cita={c}
+            estado={ESTADO_META[c.estado]}
+            cliente={nombre || null}
+            telefono={telefono}
+            vehiculo={vehiculoLabel(c.vehiculoId) ?? c.vehiculoDescripcion}
+            mecanico={tecnicos.find(t => t.id === c.tecnicoId)?.nombre}
+            orden={orden ? { numero: orden.numero } : undefined}
+            whatsappHref={abierta && telefono ? enlaceWhatsApp(telefono, mensajeRecordatorioCita({
+              nombre: (cli?.nombre ?? c.contactoNombre ?? '').split(' ')[0],
+              empresa: getEmpresaConfig().nombre,
+              fecha: inicio.toLocaleDateString('es-ES', { weekday: 'long', day: 'numeric', month: 'long' }),
+              hora: inicio.toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' }),
+              motivo: c.motivo,
+            })) : undefined}
+            onVerOrden={onAbrirOT && orden ? () => { setDetalleCitaId(null); onAbrirOT(orden.id); } : undefined}
+            onEditar={() => { setDetalleCitaId(null); openEdit(c); }}
+            onConfirmar={() => handleCambiarEstado(c, 'confirmada')}
+            onCancelar={() => handleCambiarEstado(c, 'cancelada')}
+            onConvertir={() => { setDetalleCitaId(null); setConvertirCita(c); }}
+            onClose={() => setDetalleCitaId(null)}
+          />
+        );
+      })()}
 
       {convertirCita && (
         <ConvertirEnOTModal

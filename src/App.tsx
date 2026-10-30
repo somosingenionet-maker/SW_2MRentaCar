@@ -66,6 +66,8 @@ export default function App() {
   const [firmasVigentes, setFirmasVigentes] = useState<Record<string, string>>({});
   // Tareas que los mecánicos han marcado como hechas: { otId: [lineaId, ...] }.
   const [tareasHechas, setTareasHechas] = useState<Record<string, string[]>>({});
+  // Orden que Taller debe abrir al entrar (al llegar desde una cita de la Agenda).
+  const [otAAbrir, setOtAAbrir] = useState<string | null>(null);
 
   // Check session on mount (Supabase)
   useEffect(() => {
@@ -120,6 +122,9 @@ export default function App() {
   const recargarFirmas = useCallback(() => {
     fetchFirmasVigentes().then(setFirmasVigentes).catch(err => console.error('Error recargando contratos firmados', err));
   }, []);
+  // Un usuario sin módulos asignados lo ve todo; si no, necesita Taller para abrir una orden desde la Agenda.
+  const puedeVerTaller = !!currentUser && (currentUser.modulos.length === 0 || currentUser.modulos.includes('taller'));
+  const abrirOT = useCallback((otId: string) => { setOtAAbrir(otId); setActiveTab('taller'); }, []);
   // Solo los administradores pueden anular la firma de un contrato.
   const puedeAnularFirma = currentUser?.rol === 'admin' || currentUser?.rol === 'super_admin';
 
@@ -841,6 +846,7 @@ export default function App() {
             onDeleteCita={handleDeleteCita}
             onCreateOT={handleAddOT}
             tareasHechas={tareasHechas}
+            onAbrirOT={puedeVerTaller ? abrirOT : undefined}
           />
         )}
 
@@ -865,6 +871,8 @@ export default function App() {
             onUpdate={handleUpdateOT}
             onDelete={handleDeleteOT}
             tareasHechas={tareasHechas}
+            abrirId={otAAbrir}
+            onAbierta={() => setOtAAbrir(null)}
           />
         )}
 

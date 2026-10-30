@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { avisoKilometraje } from '../utils/kilometraje';
 import ModalShell from './ModalShell';
 import { usePaginacion } from '../utils/usePaginacion';
@@ -29,6 +29,10 @@ interface Props {
   onDelete: (id: string) => void;
   /** Tareas que los mecánicos han marcado como hechas: { otId: [lineaId, ...] }. */
   tareasHechas?: Record<string, string[]>;
+  /** Orden que debe abrirse al entrar (por ejemplo, al llegar desde una cita de la Agenda). */
+  abrirId?: string | null;
+  /** Se llama cuando ya se ha atendido `abrirId`, para que la app lo olvide. */
+  onAbierta?: () => void;
 }
 
 const ESTADO_META: Record<OTEstado, { label: string; color: string; bg: string }> = {
@@ -117,10 +121,18 @@ function evento(descripcion: string): EventoOT {
   return { fecha: new Date().toISOString(), descripcion };
 }
 
-export default function OrdenesTrabajoTab({ ordenes, vehiculos, clientes, tecnicos, onAdd, onUpdate, onDelete, tareasHechas = {} }: Props) {
+export default function OrdenesTrabajoTab({ ordenes, vehiculos, clientes, tecnicos, onAdd, onUpdate, onDelete, tareasHechas = {}, abrirId, onAbierta }: Props) {
   const [search, setSearch] = useState('');
   const [filterEstado, setFilterEstado] = useState<OTEstado | 'todas'>('todas');
   const [selected, setSelected] = useSeleccion(ordenes);
+
+  // Llegada desde otra pestaña: se abre la orden pedida y se quitan los filtros para que también se vea en la lista.
+  useEffect(() => {
+    if (!abrirId) return;
+    const ot = ordenes.find(o => o.id === abrirId);
+    if (ot) { setSearch(''); setFilterEstado('todas'); setSelected(ot); }
+    onAbierta?.();
+  }, [abrirId, ordenes, setSelected, onAbierta]);
   const [isCreating, setIsCreating] = useState(false);
   const [createTipo, setCreateTipo] = useState<'presupuesto' | 'recibido'>('presupuesto');
   const [otForm, setOTForm] = useState<OTForm>(EMPTY_OT_FORM);
