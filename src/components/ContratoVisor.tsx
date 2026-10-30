@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { motion } from 'motion/react';
-import { FileText, Printer, MessageCircle, Mail as MailIcon, PenTool, ShieldCheck, AlertTriangle } from 'lucide-react';
+import { FileText, Printer, MessageCircle, PenTool, ShieldCheck, AlertTriangle } from 'lucide-react';
 import type { Reserva, Cliente, Vehiculo, SolicitudReserva, ContratoFirmado } from '../types';
 import type { EmpresaConfig } from '../data/empresaConfig';
 import ContratoAlquiler from './ContratoAlquiler';
@@ -112,7 +112,7 @@ export function ContratoVisorVista({
               >
                 <Printer className="w-3.5 h-3.5" /> Descargar / Imprimir
               </button>
-              {/* Selector de idioma del contrato (también cambia el mensaje de WhatsApp y de correo) */}
+              {/* Selector de idioma del contrato (también cambia el mensaje de WhatsApp) */}
               <div className="inline-flex rounded-lg border border-slate-600 overflow-hidden text-xs font-bold" role="group" aria-label="Idioma del contrato"
                 title={firmado ? 'El contrato firmado queda en el idioma en que se firmó' : undefined}>
                 {IDIOMAS_CONTRATO.map(i => (
@@ -132,12 +132,6 @@ export function ContratoVisorVista({
                 <a href={`https://wa.me/${tel}?text=${encodeURIComponent(texto)}`} target="_blank" rel="noreferrer"
                   className="px-3 py-1.5 bg-green-600 hover:bg-green-500 text-white text-xs font-bold rounded-lg transition flex items-center gap-1">
                   <MessageCircle className="w-3.5 h-3.5" /> WhatsApp
-                </a>
-              )}
-              {cliente?.correo && (
-                <a href={`mailto:${cliente.correo}?subject=${encodeURIComponent(tx.asuntoCorreo(empresa.nombre))}&body=${encodeURIComponent(texto)}`}
-                  className="px-3 py-1.5 bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-bold rounded-lg transition flex items-center gap-1">
-                  <MailIcon className="w-3.5 h-3.5" /> Email
                 </a>
               )}
               <button

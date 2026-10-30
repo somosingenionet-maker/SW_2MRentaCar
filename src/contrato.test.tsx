@@ -129,9 +129,8 @@ describe('contrato en los dos idiomas', () => {
     const d = { nombre: 'Ana', vehiculo: 'Seat Ibiza', matricula: '5612HDR', desde: '31 Oct 2026 · 10:00', hasta: '2 Nov 2026 · 09:30', dias: 2, total: '76.00', empresa: '2M Rent a Car' };
     expect(TEXTOS_CONTRATO.es.mensaje(d)).toContain('Le enviamos los datos del contrato de alquiler');
     expect(TEXTOS_CONTRATO.en.mensaje(d)).toContain('Here are the details of the rental agreement');
-    // Los enlaces de correo y WhatsApp no pueden adjuntar archivos: el texto no debe prometerlo.
+    // El enlace de WhatsApp no puede adjuntar archivos: el texto no debe prometerlo.
     for (const idioma of ['es', 'en'] as const) expect(TEXTOS_CONTRATO[idioma].mensaje(d)).not.toMatch(/adjunt|attach/i);
-    expect(TEXTOS_CONTRATO.en.asuntoCorreo('2M')).toBe('Rental Agreement - 2M');
   });
 });
 
@@ -317,12 +316,13 @@ describe('visor del contrato (Alquiler y ficha del cliente)', () => {
     expect(h).toContain('data-imprimible');
   });
 
-  it('ofrece WhatsApp y correo solo si el cliente tiene teléfono y correo', () => {
-    expect(vista({ fase: 'listo', firmado: null })).toContain('wa.me/34600111222');
-    expect(vista({ fase: 'listo', firmado: null })).toContain('mailto:ana@example.com');
-    const h = vista({ fase: 'listo', firmado: null }, { cli: undefined });
-    expect(h).not.toContain('wa.me');
-    expect(h).not.toContain('mailto:');
+  it('ofrece WhatsApp solo si el cliente tiene teléfono, y ya no ofrece enviar por correo', () => {
+    const con = vista({ fase: 'listo', firmado: null });
+    expect(con).toContain('wa.me/34600111222');
+    expect(con).not.toContain('mailto:');
+    const sin = vista({ fase: 'listo', firmado: null }, { cli: undefined });
+    expect(sin).not.toContain('wa.me');
+    expect(sin).not.toContain('mailto:');
   });
 
   it('sin firmar ofrece «Firmar en pantalla»; mientras comprueba, si falló la comprobación o si la reserva está anulada, no', () => {

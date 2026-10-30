@@ -92,7 +92,6 @@ export interface TextosContrato {
     firmaCorta: string;
   };
   // Mensaje que acompaña al contrato
-  asuntoCorreo: (empresa: string) => string;
   mensaje: (d: { nombre: string; vehiculo: string; matricula: string; desde: string; hasta: string; dias: number; total: string; empresa: string }) => string;
 }
 
@@ -156,7 +155,6 @@ const ES: TextosContrato = {
     errorGuardar: 'No se pudo guardar la firma. Compruebe la conexión e inténtelo de nuevo.',
     firmaCorta: 'La firma es demasiado corta. Bórrela y firme de nuevo.',
   },
-  asuntoCorreo: empresa => `Contrato de Alquiler - ${empresa}`,
   mensaje: d =>
     `Hola ${d.nombre},\n\nLe enviamos los datos del contrato de alquiler del vehículo ${d.vehiculo} (${d.matricula}) desde el ${d.desde} hasta el ${d.hasta} (${d.dias} días). Total: ${d.total} €.\n\nUn saludo,\n${d.empresa}`,
 };
@@ -221,7 +219,6 @@ const EN: TextosContrato = {
     errorGuardar: 'The signature could not be saved. Check the connection and try again.',
     firmaCorta: 'The signature is too short. Clear it and sign again.',
   },
-  asuntoCorreo: empresa => `Rental Agreement - ${empresa}`,
   mensaje: d =>
     `Hello ${d.nombre},\n\nHere are the details of the rental agreement for the vehicle ${d.vehiculo} (${d.matricula}) from ${d.desde} to ${d.hasta} (${d.dias} days). Total: ${d.total} €.\n\nKind regards,\n${d.empresa}`,
 };
