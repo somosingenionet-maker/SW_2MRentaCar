@@ -10,6 +10,7 @@ import { formatDate } from '../utils/dateFormat';
 import { getEmpresaConfig } from '../data/empresaConfig';
 import { genId } from '../utils/id';
 import ConfirmDialog from './ConfirmDialog';
+import { mensajeFactura } from '../utils/mensajeFactura';
 
 interface FacturasTabProps {
   facturas: Factura[];
@@ -475,7 +476,7 @@ export default function FacturasTab({
         const cli = clientes.find(c => c.id === f.clienteId);
         const veh = vehiculos.find(v => v.id === f.vehiculoId);
 
-        const textoWA = `Hola ${cli?.nombre ?? ''},\n\nAdjuntamos la Factura ${f.numero} por importe de ${fmt(f.total)} €.\n\nPor favor, revísala y confírmanos la recepción.\n\nUn saludo,\n${empresa.nombre}`;
+        const textoWA = mensajeFactura({ nombre: cli?.nombre ?? '', numero: f.numero, total: fmt(f.total), empresa: empresa.nombre });
         const telefonoWA = cli?.telefono?.replace(/\D/g, '') ?? '';
         const waUrl = `https://wa.me/${telefonoWA}?text=${encodeURIComponent(textoWA)}`;
         const mailUrl = `mailto:${cli?.correo ?? ''}?subject=${encodeURIComponent(`Factura ${f.numero} - ${empresa.nombre}`)}&body=${encodeURIComponent(textoWA)}`;
