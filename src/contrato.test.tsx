@@ -140,9 +140,17 @@ describe('cajas de firma', () => {
     renderToString(<ContratoAlquiler reserva={reserva} cliente={cliente} vehiculo={vehiculo} empresa={empresa} idioma={idioma} />);
   const cajas = (idioma: IdiomaContrato) => [...html(idioma).matchAll(/data-testid="caja-firma"[^>]*>(.*?)<\/div>/g)].map(m => m[1].replace(/<[^>]*>/g, ''));
 
-  it('hay una caja por firmante, con el título en el idioma del contrato', () => {
-    expect(cajas('es')).toEqual(['Firma arrendador (2M Rent a Car)', 'Firma conductor']);
-    expect(cajas('en')).toEqual(["Lessor&#x27;s signature (2M Rent a Car)", "Driver&#x27;s signature"]);
+  it('hay una sola caja, la del conductor, con el título en el idioma del contrato', () => {
+    expect(cajas('es')).toEqual(['Firma conductor']);
+    expect(cajas('en')).toEqual(["Driver&#x27;s signature"]);
+  });
+
+  it('ya no hay caja de firma de la empresa, en ningún idioma', () => {
+    for (const idioma of ['es', 'en'] as const) expect(texto(idioma)).not.toMatch(/Firma arrendador|Lessor's signature/);
+  });
+
+  it('la caja va centrada', () => {
+    expect(html('es')).toMatch(/data-testid="caja-firma" class="[^"]*\bmx-auto\b/);
   });
 
   it('las cajas llevan el borde lila de marca y ya no quedan las líneas de puntos antiguas', () => {
@@ -242,10 +250,10 @@ describe('firma dentro de la caja del conductor', () => {
     expect(en).not.toContain('Firmado electrónicamente');
   });
 
-  it('la firma va en la caja del conductor, no en la de la empresa', () => {
+  it('la firma va dentro de la caja del conductor', () => {
     const h = html('es', f);
     expect(h.indexOf('Firma conductor')).toBeLessThan(h.indexOf('firma-cliente'));
-    expect(h.indexOf('Firma arrendador')).toBeLessThan(h.indexOf('Firma conductor'));
+    expect(h.match(/data-testid="caja-firma"/g)).toHaveLength(1);
   });
 });
 

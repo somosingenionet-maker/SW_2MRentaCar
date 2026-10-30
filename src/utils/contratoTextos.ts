@@ -74,8 +74,7 @@ export interface TextosContrato {
   importeNeto: string;
   // Final
   declaracion: string;
-  /** Título de la caja de firma de la empresa y de la del conductor (se muestra en mayúsculas). */
-  firmaArrendador: (empresa: string) => string;
+  /** Título de la caja de firma del cliente (se muestra en mayúsculas). */
   firmaConductor: string;
   /** Línea bajo la firma del cliente: «Firmado electrónicamente el 30 oct. 2026 14:05 · Ref. 1A2B3C4D». */
   firmadoElectronicamente: (fecha: string, ref: string) => string;
@@ -143,7 +142,6 @@ const ES: TextosContrato = {
   fianza: 'Fianza (depósito reembolsable)',
   importeNeto: 'IMPORTE FACTURADO NETO',
   declaracion: DECLARACION_ES,
-  firmaArrendador: empresa => `Firma arrendador (${empresa})`,
   firmaConductor: 'Firma conductor',
   firmadoElectronicamente: (fecha, ref) => `Firmado electrónicamente el ${fecha} · Ref. ${ref}`,
   pantallaFirma: {
@@ -209,7 +207,6 @@ const EN: TextosContrato = {
   fianza: 'Deposit (refundable)',
   importeNeto: 'NET INVOICED AMOUNT',
   declaracion: DECLARACION_EN,
-  firmaArrendador: empresa => `Lessor's signature (${empresa})`,
   firmaConductor: "Driver's signature",
   firmadoElectronicamente: (fecha, ref) => `Electronically signed on ${fecha} · Ref. ${ref}`,
   pantallaFirma: {

@@ -164,21 +164,19 @@ export default function ContratoAlquiler({ reserva, cliente, vehiculo, empresa, 
         </div>
       </div>
 
-      {/* Firmas: una caja con borde lila por firmante, con el título dentro y espacio para firmar */}
-      <div className="grid grid-cols-2 gap-6 pt-4 pb-2 print:pt-2 print:pb-0 break-inside-avoid" id="contract-signatures-visualizer">
-        {[{ titulo: tx.firmaArrendador(empresa.nombre), conductor: false }, { titulo: tx.firmaConductor, conductor: true }].map(({ titulo, conductor }) => (
-          <div key={titulo} data-testid="caja-firma" className="relative h-36 print:h-28 border-[3px] px-3 pt-2 break-inside-avoid" style={{ borderColor: '#C48CD6' }}>
-            <span className="block text-[11px] font-bold uppercase tracking-wide text-slate-900">{titulo}</span>
-            {conductor && firma && (
-              <>
-                <img src={firma.png} alt={tx.firmaConductor} data-testid="firma-cliente" className="absolute left-3 right-3 top-7 bottom-5 w-[calc(100%-1.5rem)] h-[calc(100%-3rem)] object-contain" />
-                <span className="absolute bottom-1 left-3 right-3 text-[8px] text-slate-500 truncate">
-                  {tx.firmadoElectronicamente(fechaHoraFirma(firma.firmadoEn, idioma), referenciaCorta(firma.huella))}
-                </span>
-              </>
-            )}
-          </div>
-        ))}
+      {/* Firma del cliente: una caja con borde lila, centrada, con el título dentro y espacio para firmar */}
+      <div className="pt-4 pb-2 print:pt-2 print:pb-0 break-inside-avoid" id="contract-signatures-visualizer">
+        <div data-testid="caja-firma" className="relative w-1/2 min-w-[14rem] mx-auto h-36 print:h-28 border-[3px] px-3 pt-2 break-inside-avoid" style={{ borderColor: '#C48CD6' }}>
+          <span className="block text-[11px] font-bold uppercase tracking-wide text-slate-900">{tx.firmaConductor}</span>
+          {firma && (
+            <>
+              <img src={firma.png} alt={tx.firmaConductor} data-testid="firma-cliente" className="absolute left-3 right-3 top-7 bottom-5 w-[calc(100%-1.5rem)] h-[calc(100%-3rem)] object-contain" />
+              <span className="absolute bottom-1 left-3 right-3 text-[8px] text-slate-500 truncate">
+                {tx.firmadoElectronicamente(fechaHoraFirma(firma.firmadoEn, idioma), referenciaCorta(firma.huella))}
+              </span>
+            </>
+          )}
+        </div>
       </div>
 
       {/* Declaración final del cliente, debajo de las firmas */}
