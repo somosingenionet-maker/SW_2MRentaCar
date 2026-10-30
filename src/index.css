@@ -30,10 +30,10 @@
    Al imprimir solo debe salir el documento: se oculta todo lo que no lo contiene
    y se saca la capa de su posición fija para que fluya en páginas normales.
    Cada documento imprimible lleva el atributo data-imprimible. */
-@page { size: A4; margin: 12mm; }
-/* El contrato se imprime en una hoja sin márgenes de página: así el navegador no escribe en ellos
-   la fecha, el título de la pestaña ni la dirección web. El margen lo da el propio contrato. */
-@page contrato { size: A4; margin: 0; }
+/* Margen de arriba y de abajo de 8 mm a propósito: Chrome solo escribe su encabezado y pie (fecha,
+   título de la pestaña y dirección web) cuando ese margen llega a unos 10 mm. Con 8 mm no los pone
+   en ninguna página, también en documentos de varias hojas. No subirlo sin volver a comprobarlo. */
+@page { size: A4; margin: 8mm 12mm; }
 
 @media print {
   body:has([data-imprimible]) :is(#root, #root *):not(:has([data-imprimible])):not([data-imprimible]):not([data-imprimible] *) {
@@ -52,7 +52,6 @@
     backdrop-filter: none !important;
     box-shadow: none !important;
   }
-  [data-imprimible][data-hoja='contrato'] { page: contrato; }
   [data-imprimible] .overflow-y-auto { overflow: visible !important; }
   /* Sin esto el navegador quita los fondos y colores al imprimir y el documento sale distinto al de pantalla. */
   [data-imprimible], [data-imprimible] * {
