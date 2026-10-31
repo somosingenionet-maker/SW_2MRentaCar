@@ -2,7 +2,7 @@ import { useState, useRef, useEffect } from 'react';
 import { ChevronDown, Search, X } from 'lucide-react';
 
 /** Una opción del desplegable. `sublabel` se muestra en gris bajo el label principal. */
-export interface SelectOption {
+interface SelectOption {
   value: string;
   label: string;
   sublabel?: string;

@@ -129,7 +129,7 @@ export interface Cliente {
   vehiculosAsociados?: string[];
 }
 
-export type TemporadaAlquiler = 'alta' | 'media' | 'baja';
+type TemporadaAlquiler = 'alta' | 'media' | 'baja';
 
 export interface Reserva {
   id: string;
@@ -285,7 +285,7 @@ export interface Cita {
 }
 
 /** Datos que el cliente envía desde el formulario público de autorregistro. */
-export interface DatosRegistro {
+interface DatosRegistro {
   nombre: string;
   apellidos: string;
   tipoDocumento: 'dni' | 'nie' | 'pasaporte';

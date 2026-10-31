@@ -9,7 +9,7 @@ const ESTADOS_EN_TALLER = ['recibido', 'en_reparacion', 'listo'];
  * entregado, sigue creciendo día a día (hasta hoy, o hasta la fecha estimada
  * si cae más adelante) para que se siga viendo "en curso".
  */
-export function otRangoDias(ot: OrdenTrabajo, hoy: string): [string, string] {
+function otRangoDias(ot: OrdenTrabajo, hoy: string): [string, string] {
   if (ot.fechaEntrega) return [ot.fechaRecepcion, ot.fechaEntrega];
   const fin = ot.fechaEstimadaEntrega && ot.fechaEstimadaEntrega > hoy ? ot.fechaEstimadaEntrega : hoy;
   return [ot.fechaRecepcion, fin];

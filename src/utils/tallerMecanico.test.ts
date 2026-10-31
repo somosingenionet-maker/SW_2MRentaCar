@@ -116,3 +116,21 @@ describe('mensajes de WhatsApp al mecánico', () => {
     expect(enlaceWhatsApp(undefined, 'x')).toBe('https://wa.me/?text=x');
   });
 });
+
+describe('datos vacíos de órdenes antiguas (la base de datos los permite)', () => {
+  it('ordenar para el mecánico no falla si falta la fecha de recepción', () => {
+    const r = ordenarParaMecanico([om('1', 'recibido', { recepcion: null }), om('2', 'recibido', { recepcion: '2026-10-01' }), om('3', 'recibido', { recepcion: undefined })]);
+    expect(r.map(o => o.id)).toEqual(['2', '3', '1']); // con fecha primero; sin fecha, por número de orden de mayor a menor
+  });
+
+  it('el tablero del personal no falla si falta la fecha de actualización', () => {
+    const sinFecha = { ...ot('a', 'en_reparacion'), fechaActualizacion: undefined } as unknown as OrdenTrabajo;
+    const nula = { ...ot('b', 'en_reparacion'), fechaActualizacion: null } as unknown as OrdenTrabajo;
+    expect(() => fichasTaller([sinFecha, ot('c', 'en_reparacion'), nula], {})).not.toThrow();
+    expect(fichasTaller([sinFecha, ot('c', 'en_reparacion'), nula], {})[0].ot.id).toBe('c');
+  });
+
+  it('una orden con líneas vacías o sin definir no rompe el avance', () => {
+    expect(progresoOT({ lineas: undefined as unknown as OrdenTrabajo['lineas'] }, undefined)).toEqual({ hechas: 0, total: 0 });
+  });
+});

@@ -2,7 +2,7 @@ import type { OrdenTrabajo, OTEstado } from '../types';
 
 /** Estados en los que el coche está físicamente en el taller y el mecánico lo trabaja. */
 export type EstadoTaller = Extract<OTEstado, 'recibido' | 'en_reparacion' | 'listo'>;
-export const ESTADOS_TALLER: EstadoTaller[] = ['recibido', 'en_reparacion', 'listo'];
+const ESTADOS_TALLER: EstadoTaller[] = ['recibido', 'en_reparacion', 'listo'];
 
 export const ETIQUETA_ESTADO_TALLER: Record<EstadoTaller, string> = {
   recibido: 'Por empezar',
@@ -15,7 +15,8 @@ export interface OrdenMecanico {
   id: string;
   numero: string;
   estado: EstadoTaller;
-  recepcion: string;
+  /** Puede venir vacía en órdenes antiguas. */
+  recepcion?: string | null;
   fechaEstimadaEntrega?: string | null;
   kilometraje?: number | null;
   problema?: string | null;
@@ -42,7 +43,7 @@ export function progresoMecanico(o: Pick<OrdenMecanico, 'tareas'>): { hechas: nu
 /** Primero lo que se está trabajando, luego lo pendiente de empezar y al final lo ya listo. */
 const PRIORIDAD: Record<EstadoTaller, number> = { en_reparacion: 0, recibido: 1, listo: 2 };
 export function ordenarParaMecanico(ordenes: OrdenMecanico[]): OrdenMecanico[] {
-  return [...ordenes].sort((a, b) => PRIORIDAD[a.estado] - PRIORIDAD[b.estado] || b.recepcion.localeCompare(a.recepcion) || b.numero.localeCompare(a.numero));
+  return [...ordenes].sort((a, b) => PRIORIDAD[a.estado] - PRIORIDAD[b.estado] || (b.recepcion ?? '').localeCompare(a.recepcion ?? '') || (b.numero ?? '').localeCompare(a.numero ?? ''));
 }
 
 /** Órdenes que no estaban en la lista anterior: las que acaban de asignarle. Sin lista anterior (primera carga) no hay nuevas. */
@@ -92,7 +93,7 @@ export function fichasTaller(ordenes: OrdenTrabajo[], tareasHechas: Record<strin
   return ordenes
     .filter((ot): ot is OrdenTrabajo & { estado: EstadoTaller } => (ESTADOS_TALLER as string[]).includes(ot.estado))
     .map(ot => ({ ot, estado: ot.estado, ...progresoOT(ot, new Set(tareasHechas[ot.id] ?? [])) }))
-    .sort((a, b) => PRIORIDAD[a.estado] - PRIORIDAD[b.estado] || b.ot.fechaActualizacion.localeCompare(a.ot.fechaActualizacion));
+    .sort((a, b) => PRIORIDAD[a.estado] - PRIORIDAD[b.estado] || (b.ot.fechaActualizacion ?? '').localeCompare(a.ot.fechaActualizacion ?? ''));
 }
 
 /** Agrupa las filas de `ot_tareas` por orden: { otId: [lineaId, ...] }. */

@@ -280,7 +280,7 @@ export function Tarjeta({ orden: o, color, ahora, abierta, nueva, ocupado, nota,
         <div className="px-4 pb-4 space-y-4 border-t border-slate-100 pt-3">
           <dl className="grid grid-cols-2 gap-2 text-xs">
             <div><dt className="text-slate-400 font-semibold">Orden</dt><dd className="font-bold text-slate-700">{o.numero}</dd></div>
-            <div><dt className="text-slate-400 font-semibold">Entrada</dt><dd className="font-bold text-slate-700">{formatDate(o.recepcion)}</dd></div>
+            <div><dt className="text-slate-400 font-semibold">Entrada</dt><dd className="font-bold text-slate-700">{o.recepcion ? formatDate(o.recepcion) : '—'}</dd></div>
             {o.kilometraje != null && <div><dt className="text-slate-400 font-semibold flex items-center gap-1"><Gauge className="w-3 h-3" /> Kilometraje</dt><dd className="font-bold text-slate-700">{o.kilometraje.toLocaleString('es-ES')} km</dd></div>}
             {o.fechaEstimadaEntrega && <div><dt className="text-slate-400 font-semibold">Entrega prevista</dt><dd className="font-bold text-slate-700">{formatDate(o.fechaEstimadaEntrega)}</dd></div>}
             {o.actualizada && <div className="col-span-2"><dt className="text-slate-400 font-semibold">Última novedad</dt><dd className="font-bold text-slate-700">{haceCuanto(o.actualizada, ahora)}</dd></div>}
