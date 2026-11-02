@@ -1,13 +1,13 @@
 import { describe, it, expect } from 'vitest';
 import { renderToString } from 'react-dom/server';
-import { FilaDuracion, FilaCalculo } from './components/DuracionReserva';
+import { FilaDuracion, FilaCalculo, FilaComplementos } from './components/DuracionReserva';
 import type { Reserva } from './types';
 
 const reserva = (extra: Partial<Reserva> = {}) => ({
   fechaInicio: '2027-01-01', fechaFin: '2027-01-04', horaInicio: '12:00', horaFin: '19:00',
   tarifaDiaria: 30, seguroDia: 15, incluyeSeguroTodoRiesgo: true, totalCobrado: 180, origen: 'manual', ...extra,
 }) as Reserva;
-const texto = (h: string) => h.replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ').replace(/ ([,.])/g, '$1');
+const texto = (h: string) => h.replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ').replace(/ ([,.)])/g, '$1').replace(/\( /g, '(');
 
 describe('duración del alquiler en la ficha', () => {
   it('enseña los días totales de forma destacada y de dónde sale la fracción', () => {
@@ -55,5 +55,35 @@ describe('cálculo del total en la ficha', () => {
 
   it('con seguro pero sin su precio guardado (reservas antiguas) no se puede comprobar, así que no avisa', () => {
     expect(renderToString(<FilaCalculo reserva={reserva({ seguroDia: undefined, totalCobrado: 77 })} />)).not.toContain('total-no-cuadra');
+  });
+});
+
+describe('complementos en la ficha', () => {
+  const extras = [
+    { nombre: 'Sillita infantil', cantidad: 1, precio: 8, porDia: true, total: 32 },
+    { nombre: 'Baca coche', cantidad: 1, precio: 50, porDia: false, total: 50 },
+  ];
+
+  it('lista los complementos con su importe y, en los manuales, cómo se cobran', () => {
+    const t = texto(renderToString(<FilaComplementos extras={extras} />));
+    expect(t).toContain('Sillita infantil (8.00 € / día) 32.00 €');
+    expect(t).toContain('Baca coche (50.00 € fijo) 50.00 €');
+  });
+
+  it('los de la web no llevan desglose; sin complementos no sale nada', () => {
+    expect(texto(renderToString(<FilaComplementos extras={[{ nombre: 'Maxi-Cosi - 8€/día', cantidad: 2, total: 100 }]} />))).toContain('Maxi-Cosi × 2 100.00 €');
+    expect(renderToString(<FilaComplementos extras={[]} />)).toBe('');
+    expect(renderToString(<FilaComplementos extras={undefined} />)).toBe('');
+  });
+
+  it('el cálculo incluye los complementos: 4 × 45 + 82 = 262 €', () => {
+    const t = texto(renderToString(<FilaCalculo reserva={reserva({ extras, totalCobrado: 262 })} />));
+    expect(t).toContain('4 × 45.00 € + complementos 82.00 € = 262.00 €');
+  });
+
+  it('si el total no incluye los complementos, lo avisa con la cuenta completa', () => {
+    const h = renderToString(<FilaCalculo reserva={reserva({ extras, totalCobrado: 180 })} />);
+    expect(h).toContain('total-no-cuadra');
+    expect(texto(h)).toContain('Ojo: con 4 días × 45.00 € + complementos 82.00 € el total sería 262.00 €, y aquí figura 180.00 €.');
   });
 });

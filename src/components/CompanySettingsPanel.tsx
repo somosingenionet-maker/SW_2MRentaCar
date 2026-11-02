@@ -3,7 +3,8 @@ import ModalShell from './ModalShell';
 import { Upload, RotateCcw, Check, Building2, Wrench, Plus, Edit2, Trash2, Link2, Copy, MessageCircle, Ban } from 'lucide-react';
 import { EmpresaConfig, DEFAULT_EMPRESA_CONFIG } from '../data/empresaConfig';
 import { genId } from '../utils/id';
-import { Tecnico } from '../types';
+import { Tecnico, Complemento } from '../types';
+import ComplementosPanel from './ComplementosPanel';
 import { contrastText } from '../utils/color';
 import { crearEnlaceTecnico, revocarEnlaceTecnico } from '../data/tecnicosDb';
 import { enlaceWhatsApp, mensajeEnlaceMecanico } from '../utils/tallerMecanico';
@@ -18,6 +19,10 @@ interface Props {
   onDeleteTecnico: (id: string) => void;
   /** El enlace del mecánico se creó (fecha) o se revocó (null): para reflejarlo en la lista. */
   onEnlaceTecnico: (id: string, creadoEn: string | null) => void;
+  complementos: Complemento[];
+  onAddComplemento: (c: Complemento) => void;
+  onUpdateComplemento: (c: Complemento) => void;
+  onDeleteComplemento: (id: string) => void;
   onClose: () => void;
 }
 
@@ -36,7 +41,7 @@ const BRAND_COLORS = [
   { label: 'Negro',      value: '#111827' },
 ];
 
-export default function CompanySettingsPanel({ config, onSave, tecnicos, onAddTecnico, onUpdateTecnico, onDeleteTecnico, onEnlaceTecnico, onClose }: Props) {
+export default function CompanySettingsPanel({ config, onSave, tecnicos, onAddTecnico, onUpdateTecnico, onDeleteTecnico, onEnlaceTecnico, complementos, onAddComplemento, onUpdateComplemento, onDeleteComplemento, onClose }: Props) {
   const [draft, setDraft] = useState<EmpresaConfig>({ ...config });
   const [saved, setSaved] = useState(false);
   const fileRef = useRef<HTMLInputElement>(null);
@@ -538,6 +543,8 @@ export default function CompanySettingsPanel({ config, onSave, tecnicos, onAddTe
             </div>
           )}
         </div>
+
+        <ComplementosPanel complementos={complementos} onAdd={onAddComplemento} onUpdate={onUpdateComplemento} onDelete={onDeleteComplemento} />
     </ModalShell>
   );
 }

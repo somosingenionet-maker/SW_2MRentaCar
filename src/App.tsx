@@ -2,7 +2,7 @@ import React, { lazy, Suspense, useState, useEffect, useMemo, useCallback } from
 import { kilometrajeTrasIngreso } from './utils/kilometraje';
 import { contrastText } from './utils/color';
 import { genId } from './utils/id';
-import { Vehiculo, Cliente, Reserva, Alerta, NotificacionCliente, InteraccionCliente, AlertaTipo, Usuario, Factura, ModuloId, OrdenTrabajo, Tecnico, Cita, SolicitudReserva, InvitacionCliente } from './types';
+import { Complemento, Vehiculo, Cliente, Reserva, Alerta, NotificacionCliente, InteraccionCliente, AlertaTipo, Usuario, Factura, ModuloId, OrdenTrabajo, Tecnico, Cita, SolicitudReserva, InvitacionCliente } from './types';
 import { getSessionUsuario, signOut } from './lib/auth';
 import { supabase } from './lib/supabase';
 import LoginScreenReset from './components/ResetPasswordScreen';
@@ -66,6 +66,8 @@ export default function App() {
   const [firmasVigentes, setFirmasVigentes] = useState<Record<string, string>>({});
   // Tareas que los mecánicos han marcado como hechas: { otId: [lineaId, ...] }.
   const [tareasHechas, setTareasHechas] = useState<Record<string, string[]>>({});
+  // Catálogo de complementos de alquiler (sillitas, baca...), editable en Empresa.
+  const [complementos, setComplementos] = useState<Complemento[]>([]);
   // Orden que Taller debe abrir al entrar (al llegar desde una cita de la Agenda).
   const [otAAbrir, setOtAAbrir] = useState<string | null>(null);
 
@@ -102,6 +104,7 @@ export default function App() {
     fetchAll<Factura>('facturas').then(setFacturas).catch(log('facturas'));
     fetchAll<OrdenTrabajo>('ordenes_trabajo').then(setOrdenesTrabajo).catch(log('órdenes de trabajo'));
     fetchTecnicos().then(setTecnicos).catch(log('técnicos'));
+    fetchAll<Complemento>('complementos').then(setComplementos).catch(log('complementos'));
     fetchTareasHechas().then(setTareasHechas).catch(log('tareas de los mecánicos'));
     fetchAll<Cita>('citas').then(setCitas).catch(log('citas'));
     fetchSolicitudes().then(setSolicitudes).catch(log('solicitudes de reserva'));
@@ -113,7 +116,7 @@ export default function App() {
   useEffect(() => {
     if (!currentUser) {
       setVehiculos([]); setClientes([]); setReservas([]);
-      setAlertas([]); setNotificaciones([]); setFacturas([]); setOrdenesTrabajo([]); setTecnicos([]); setCitas([]); setSolicitudes([]); setInvitaciones([]); setFirmasVigentes({}); setTareasHechas({});
+      setAlertas([]); setNotificaciones([]); setFacturas([]); setOrdenesTrabajo([]); setTecnicos([]); setCitas([]); setSolicitudes([]); setInvitaciones([]); setFirmasVigentes({}); setTareasHechas({}); setComplementos([]);
       return;
     }
     cargarTodo();
@@ -522,6 +525,21 @@ export default function App() {
     deleteOne('tecnicos', id).catch(fallo('eliminar el técnico'));
   }, [fallo]);
 
+  const handleAddComplemento = useCallback((c: Complemento) => {
+    setComplementos(prev => [...prev, c]);
+    upsertOne('complementos', c).catch(fallo('guardar el complemento'));
+  }, [fallo]);
+
+  const handleUpdateComplemento = useCallback((c: Complemento) => {
+    setComplementos(prev => prev.map(x => x.id === c.id ? c : x));
+    upsertOne('complementos', c).catch(fallo('actualizar el complemento'));
+  }, [fallo]);
+
+  const handleDeleteComplemento = useCallback((id: string) => {
+    setComplementos(prev => prev.filter(x => x.id !== id));
+    deleteOne('complementos', id).catch(fallo('eliminar el complemento'));
+  }, [fallo]);
+
   const handleAddCita = useCallback((c: Cita) => {
     setCitas(prev => [...prev, c]);
     upsertOne('citas', c).catch(fallo('guardar la cita'));
@@ -909,6 +927,7 @@ export default function App() {
             onConvertirSolicitud={handleConvertirSolicitud}
             onDescartarSolicitud={handleDescartarSolicitud}
             usuarioNombre={currentUser?.nombre ?? ''}
+            complementos={complementos}
             firmasVigentes={firmasVigentes}
             onFirmaCambiada={recargarFirmas}
             puedeAnularFirma={puedeAnularFirma}
@@ -963,6 +982,10 @@ export default function App() {
           onUpdateTecnico={handleUpdateTecnico}
           onDeleteTecnico={handleDeleteTecnico}
           onEnlaceTecnico={handleEnlaceTecnico}
+          complementos={complementos}
+          onAddComplemento={handleAddComplemento}
+          onUpdateComplemento={handleUpdateComplemento}
+          onDeleteComplemento={handleDeleteComplemento}
           onClose={() => setSettingsOpen(false)}
         />
       )}

@@ -4,6 +4,7 @@ import { diasAlquiler } from '../utils/solicitudes';
 import { fechaConHora } from '../utils/horaReserva';
 import { resumenCarnet } from '../utils/carnet';
 import { lugaresReserva } from '../utils/lugarReserva';
+import { nombreComplemento } from '../utils/complementos';
 import { fechaHoraFirma, referenciaCorta } from '../utils/firmaContrato';
 import { TEXTOS_CONTRATO, etiquetaTransmisionContrato, type IdiomaContrato } from '../utils/contratoTextos';
 
@@ -157,6 +158,15 @@ export default function ContratoAlquiler({ reserva, cliente, vehiculo, empresa, 
               <strong className="font-mono">{reserva.fianza.toFixed(2)} €</strong>
             </div>
           )}
+          {(reserva.extras ?? []).map((e, i) => (
+            <div key={i} data-testid="complemento-contrato" className="flex justify-between gap-2 font-sans">
+              <span>
+                {nombreComplemento(e.nombre)}{e.cantidad > 1 ? ` × ${e.cantidad}` : ''}
+                {e.precio != null && e.porDia != null ? ` (${e.precio.toFixed(2)} ${e.porDia ? tx.porDia : `€, ${tx.precioFijo}`})` : ''}:
+              </span>
+              <strong className="font-mono shrink-0">{e.total.toFixed(2)} €</strong>
+            </div>
+          ))}
           <div className="flex justify-between border-t border-blue-300 pt-1 text-blue-900 font-extrabold font-sans">
             <span>{tx.importeNeto}:</span>
             <strong className="font-mono text-blue-950">{reserva.totalCobrado.toFixed(2)} €</strong>

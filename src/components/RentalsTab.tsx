@@ -5,7 +5,7 @@ import ModalShell from './ModalShell';
 import { usePaginacion } from '../utils/usePaginacion';
 import { ofreceSeguro, totalAlquiler, etiquetaTransmision, parseFianza, fianzaSugerida, totalTrasCambioDeHoras } from '../utils/condicionesAlquiler';
 import { useSeleccion } from '../utils/useSeleccion';
-import { Reserva, Vehiculo, Cliente, SolicitudReserva, MovimientoVehiculo } from '../types';
+import { Reserva, Vehiculo, Cliente, SolicitudReserva, MovimientoVehiculo, Complemento } from '../types';
 import SearchableSelect from './SearchableSelect';
 import {
   Calendar, Plus, User, Car, FileText, Check, X, Download, ChevronLeft, ChevronRight, Search, Globe, AlertTriangle
@@ -20,7 +20,8 @@ import { validarHorasReserva, fechaConHora, ordenarProximas, ordenarHistorial } 
 import Hora24Field from './Hora24Field';
 import { LUGARES_HABITUALES, lugaresReserva } from '../utils/lugarReserva';
 import { buscarReservas } from '../utils/buscarReservas';
-import { FilaDuracion, FilaCalculo } from './DuracionReserva';
+import { FilaDuracion, FilaCalculo, FilaComplementos } from './DuracionReserva';
+import { extrasManuales, extrasDePedidoWeb, totalExtras, etiquetaPrecioComplemento, resumenExtras } from '../utils/complementos';
 import ContratoVisor from './ContratoVisor';
 import { downloadCsv, slugify } from '../utils/csvExport';
 import { genId } from '../utils/id';
@@ -54,9 +55,12 @@ interface RentalsTabProps {
   firmasVigentes?: Record<string, string>;
   onFirmaCambiada?: () => void;
   puedeAnularFirma?: boolean;
+  /** Catálogo de complementos (sillitas, baca...) que se pueden añadir a una reserva manual. */
+  complementos?: Complemento[];
 }
 
 export default function RentalsTab({
+  complementos = [],
   usuarioNombre = '',
   firmasVigentes = {},
   onFirmaCambiada,
@@ -97,6 +101,8 @@ export default function RentalsTab({
   const [formTarifa, setFormTarifa] = useState<number>(45.00);
   const [formTemporada, setFormTemporada] = useState<'alta' | 'media' | 'baja'>('media');
   const [formSeguro, setFormSeguro] = useState(true);
+  // Complementos elegidos en el alta manual: { id del complemento: cantidad }.
+  const [formExtras, setFormExtras] = useState<Record<string, number>>({});
   const [formError, setFormError] = useState('');
   const [confirmOverlap, setConfirmOverlap] = useState<{ isOpen: boolean; pendingReserva: Reserva | null }>({ isOpen: false, pendingReserva: null });
   const [confirmAnular, setConfirmAnular] = useState<{ isOpen: boolean; resId: string }>({ isOpen: false, resId: '' });
@@ -126,7 +132,10 @@ export default function RentalsTab({
   // Condiciones del vehículo elegido: el seguro y la fianza son suyos, no valores fijos.
   const vehiculoElegido = vehiculos.find(v => v.id === formVehiculoId);
   const seguroDiaElegido = vehiculoElegido?.seguroAmpliadoDia ?? null;
-  const calculatedTotal = totalAlquiler(currentDuration, formTarifa, seguroDiaElegido, formSeguro);
+  const complementosActivos = complementos.filter(c => c.activo).sort((a, b) => a.orden - b.orden);
+  const extrasForm = extrasManuales(complementosActivos, formExtras, currentDuration);
+  const importeExtrasForm = totalExtras(extrasForm, currentDuration);
+  const calculatedTotal = Math.round((totalAlquiler(currentDuration, formTarifa, seguroDiaElegido, formSeguro) + importeExtrasForm) * 100) / 100;
 
   const handleOpenAdd = () => {
     setSolicitudActiva(null);
@@ -141,6 +150,7 @@ export default function RentalsTab({
     setFormHoraFin('');
     setFormLugarRecogida('');
     setFormLugarDevolucion('');
+    setFormExtras({});
     setFormTemporada('media');
     setFormTarifa(vehiculos[0]?.tarifasAlquiler?.temporadaMedia ?? 45);
     setFormSeguro(ofreceSeguro(vehiculos[0]));
@@ -169,9 +179,12 @@ export default function RentalsTab({
         fianza: parseFianza(formFianza) ?? undefined,
         seguroDia: seguroDiaElegido ?? undefined,
         origen: 'web',
+        // Lo que cobró la web por los complementos (con sus descuentos); las coberturas ya van en el seguro.
+        extras: extrasDePedidoWeb(solicitudActiva.extras),
       };
     }
-    const total = totalAlquiler(duration, Number(formTarifa), seguroDiaElegido, formSeguro);
+    const extras = extrasManuales(complementosActivos, formExtras, duration);
+    const total = Math.round((totalAlquiler(duration, Number(formTarifa), seguroDiaElegido, formSeguro) + totalExtras(extras, duration)) * 100) / 100;
     return {
       id: genId('res'),
       vehiculoId: formVehiculoId,
@@ -189,6 +202,7 @@ export default function RentalsTab({
       incluyeSeguroTodoRiesgo: formSeguro && seguroDiaElegido != null,
       fianza: parseFianza(formFianza) ?? undefined,
       seguroDia: formSeguro && seguroDiaElegido != null ? seguroDiaElegido : undefined,
+      extras,
     };
   };
 
@@ -347,7 +361,7 @@ export default function RentalsTab({
     if (err) { setEditandoHoras({ ...editandoHoras, error: err }); return; }
     // Las horas deciden cuántos días se cobran: si cambian, el total de una reserva manual se recalcula.
     const t = totalTrasCambioDeHoras(selectedReserva, editandoHoras.inicio, editandoHoras.fin);
-    const actualizada = { ...selectedReserva, horaInicio: editandoHoras.inicio, horaFin: editandoHoras.fin, totalCobrado: t.total };
+    const actualizada = { ...selectedReserva, horaInicio: editandoHoras.inicio, horaFin: editandoHoras.fin, totalCobrado: t.total, extras: t.extras };
     onUpdateReserva(actualizada);
     setSelectedReserva(actualizada);
     setEditandoHoras(null);
@@ -370,7 +384,7 @@ export default function RentalsTab({
   };
 
   const handleExportCsv = () => {
-    const headers = ['ID', 'Vehículo', 'Matrícula', 'Cliente', 'Fecha Inicio', 'Hora entrega', 'Fecha Fin', 'Hora devolución', 'Días', 'Tarifa/día (€)', 'Seguro', 'Total (€)', 'Estado'];
+    const headers = ['ID', 'Vehículo', 'Matrícula', 'Cliente', 'Fecha Inicio', 'Hora entrega', 'Fecha Fin', 'Hora devolución', 'Días', 'Tarifa/día (€)', 'Seguro', 'Total (€)', 'Estado', 'Complementos'];
     const rows = reservas.map(res => {
       const veh = vehiculos.find(v => v.id === res.vehiculoId);
       const cli = clientes.find(c => c.id === res.clienteId);
@@ -388,7 +402,8 @@ export default function RentalsTab({
         String(res.tarifaDiaria),
         res.incluyeSeguroTodoRiesgo ? 'Sí' : 'No',
         String(res.totalCobrado),
-        res.estado
+        res.estado,
+        resumenExtras(res.extras)
       ];
     });
     downloadCsv(`${slugify(empresaCfg.nombre)}_alquileres_${new Date().toISOString().slice(0, 10)}.csv`, [headers, ...rows]);
@@ -1141,6 +1156,7 @@ export default function RentalsTab({
                     )}
                   </div>
                   {editandoFianza?.error && <p role="alert" className="text-[11px] text-rose-600 font-medium">{editandoFianza.error}</p>}
+                  <FilaComplementos extras={selectedReserva.extras} />
                   <FilaCalculo reserva={selectedReserva} />
                   <div className="flex justify-between border-t border-blue-200 pt-1.5 text-xs font-bold text-blue-800">
                     <span>LIQUIDACIÓN TOTAL:</span>
@@ -1475,6 +1491,29 @@ export default function RentalsTab({
                   </div>
                   )}
 
+                  {/* Complementos del catálogo: precio por día o precio fijo */}
+                  {!solicitudActiva && complementosActivos.length > 0 && (
+                    <div className="p-3 bg-slate-50 rounded-lg border border-slate-100 space-y-2" data-testid="form-complementos">
+                      <p className="text-xs font-bold text-slate-500 uppercase">Complementos (opcional)</p>
+                      {complementosActivos.map(c => (
+                        <div key={c.id} className="flex items-center justify-between gap-3">
+                          <label htmlFor={`comp-${c.id}`} className="text-xs text-slate-700 min-w-0">
+                            <strong className="font-bold block truncate">{c.nombre}</strong>
+                            <span className="text-[10px] text-slate-400">{etiquetaPrecioComplemento(c)}</span>
+                          </label>
+                          <select
+                            id={`comp-${c.id}`}
+                            value={formExtras[c.id] ?? 0}
+                            onChange={e => setFormExtras(prev => ({ ...prev, [c.id]: Number(e.target.value) }))}
+                            className="w-16 h-[34px] border border-slate-200 rounded-lg text-sm bg-white focus:outline-none focus:ring-1 focus:ring-blue-500"
+                          >
+                            {[0, 1, 2, 3, 4, 5].map(n => <option key={n} value={n}>{n}</option>)}
+                          </select>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+
                   {/* Temporary total preview */}
                   <div className="p-3.5 bg-blue-50 font-sans text-blue-800 rounded-xl border border-blue-100 flex justify-between items-center text-xs">
                     <div>
@@ -1484,7 +1523,7 @@ export default function RentalsTab({
                       <span>
                         {solicitudActiva
                           ? `${currentDuration} días · vehículo ${solicitudActiva.vehiculoTotal.toFixed(2)} € + extras${solicitudActiva.pagado ? ' · pagado' : ' · pago al recoger'}`
-                          : `Alquiler: ${currentDuration} días a ${formTarifa}€ / día`}
+                          : `Alquiler: ${currentDuration} días a ${formTarifa}€ / día${importeExtrasForm > 0 ? ` + complementos ${importeExtrasForm.toFixed(2)} €` : ''}`}
                       </span>
                     </div>
                     <div className="text-right font-mono text-base font-extrabold text-blue-900">

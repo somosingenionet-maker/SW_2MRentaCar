@@ -16,7 +16,8 @@ const tecnicos: Tecnico[] = [
 ];
 const pinta = (t: Tecnico[]) => renderToString(
   <CompanySettingsPanel config={DEFAULT_EMPRESA_CONFIG} onSave={() => undefined} tecnicos={t} onAddTecnico={() => undefined}
-    onUpdateTecnico={() => undefined} onDeleteTecnico={() => undefined} onEnlaceTecnico={() => undefined} onClose={() => undefined} />,
+    onUpdateTecnico={() => undefined} onDeleteTecnico={() => undefined} onEnlaceTecnico={() => undefined}
+    complementos={[]} onAddComplemento={() => undefined} onUpdateComplemento={() => undefined} onDeleteComplemento={() => undefined} onClose={() => undefined} />,
 );
 const texto = (h: string) => h.replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ');
 

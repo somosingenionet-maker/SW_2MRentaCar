@@ -71,6 +71,7 @@ export interface TextosContrato {
   incluido: string;
   polizaTerceros: string;
   fianza: string;
+  precioFijo: string;
   importeNeto: string;
   // Final
   declaracion: string;
@@ -139,6 +140,7 @@ const ES: TextosContrato = {
   incluido: 'Incluido',
   polizaTerceros: 'Póliza Terceros Básica',
   fianza: 'Fianza (depósito reembolsable)',
+  precioFijo: 'precio fijo',
   importeNeto: 'IMPORTE FACTURADO NETO',
   declaracion: DECLARACION_ES,
   firmaConductor: 'Firma conductor',
@@ -203,6 +205,7 @@ const EN: TextosContrato = {
   incluido: 'Included',
   polizaTerceros: 'Basic third-party policy',
   fianza: 'Deposit (refundable)',
+  precioFijo: 'fixed price',
   importeNeto: 'NET INVOICED AMOUNT',
   declaracion: DECLARACION_EN,
   firmaConductor: "Driver's signature",

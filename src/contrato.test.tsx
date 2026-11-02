@@ -403,3 +403,48 @@ describe('días de alquiler en el contrato', () => {
     expect(snap.reserva.dias).toBe(4);
   });
 });
+
+describe('complementos en el contrato', () => {
+  const extras = [
+    { nombre: 'Sillita infantil', cantidad: 2, precio: 8, porDia: true, total: 64 },
+    { nombre: 'Baca coche', cantidad: 1, precio: 50, porDia: false, total: 50 },
+    { nombre: 'Portabicicletas', cantidad: 1, total: 37.5 },
+  ];
+  const conExtras = (idioma: IdiomaContrato) => texto(idioma, { reserva: { extras } as Partial<Reserva> });
+
+  it('lista cada complemento con su importe: por día, precio fijo y los de la web (sin desglose)', () => {
+    const t = conExtras('es');
+    expect(t).toContain('Sillita infantil × 2 (8.00 € / día): 64.00 €');
+    expect(t).toContain('Baca coche (50.00 €, precio fijo): 50.00 €');
+    expect(t).toContain('Portabicicletas: 37.50 €');
+  });
+
+  it('en inglés traduce el tipo de precio', () => {
+    const t = conExtras('en');
+    expect(t).toContain('Sillita infantil × 2 (8.00 € / day): 64.00 €');
+    expect(t).toContain('Baca coche (50.00 €, fixed price): 50.00 €');
+  });
+
+  it('la línea va dentro del cuadro económico, antes del importe neto', () => {
+    const t = conExtras('es');
+    expect(t.indexOf('Baca coche')).toBeLessThan(t.indexOf('IMPORTE FACTURADO NETO'));
+    expect(t.indexOf('Fianza')).toBeLessThan(t.indexOf('Baca coche'));
+  });
+
+  it('quita el precio que la web pone en el nombre', () => {
+    const t = texto('es', { reserva: { extras: [{ nombre: 'Maxi-Cosi - 8€/día', cantidad: 1, total: 64 }] } as Partial<Reserva> });
+    expect(t).toContain('Maxi-Cosi: 64.00 €');
+    expect(t).not.toContain('8€/día');
+  });
+
+  it('sin complementos no aparece ninguna línea extra', () => {
+    expect(renderToString(<ContratoAlquiler reserva={reserva} cliente={cliente} vehiculo={vehiculo} empresa={empresa} idioma="es" />)).not.toContain('complemento-contrato');
+  });
+
+  it('la copia firmada guarda los complementos, y no añade el campo si no hay', () => {
+    const con = crearSnapshot({ ...reserva, extras } as Reserva, cliente, vehiculo, undefined, empresa);
+    expect(con.reserva.extras).toEqual(extras);
+    expect(JSON.parse(JSON.stringify(con))).toEqual(con);
+    expect('extras' in crearSnapshot(reserva, cliente, vehiculo, undefined, empresa).reserva).toBe(false);
+  });
+});

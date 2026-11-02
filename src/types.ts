@@ -160,6 +160,30 @@ export interface Reserva {
   entrega?: MovimientoVehiculo | null;
   /** Registro de la devolución del coche. */
   devolucion?: MovimientoVehiculo | null;
+  /** Complementos que lleva la reserva (sillitas, baca, portabicicletas...). No incluye coberturas: las modelan los campos de seguro. */
+  extras?: ExtraReserva[];
+}
+
+/**
+ * Un complemento de una reserva. En las de la web se guarda lo que cobró la web (`total`, ya con sus descuentos).
+ * En las manuales se guarda además el `precio` y si es `porDia`, para recalcular el total si cambian los días.
+ */
+export interface ExtraReserva {
+  nombre: string;
+  cantidad: number;
+  total: number;
+  precio?: number;
+  porDia?: boolean;
+}
+
+/** Complemento del catálogo (Empresa) que se puede añadir a una reserva manual: precio por día o precio fijo. */
+export interface Complemento {
+  id: string;
+  nombre: string;
+  precio: number;
+  porDia: boolean;
+  activo: boolean;
+  orden: number;
 }
 
 export type NivelCombustible = 'lleno' | 'tres_cuartos' | 'medio' | 'cuarto' | 'reserva';
@@ -370,7 +394,7 @@ export interface EmpresaContrato {
 
 /** Copia congelada de lo que el cliente firmó: el contrato no cambia aunque se editen la reserva, el cliente o el coche. */
 export interface SnapshotContrato {
-  reserva: Pick<Reserva, 'id' | 'vehiculoId' | 'clienteId' | 'fechaInicio' | 'fechaFin' | 'horaInicio' | 'horaFin' | 'lugarRecogida' | 'lugarDevolucion' | 'tarifaDiaria' | 'totalCobrado' | 'incluyeSeguroTodoRiesgo' | 'fianza' | 'seguroDia'> & {
+  reserva: Pick<Reserva, 'id' | 'vehiculoId' | 'clienteId' | 'fechaInicio' | 'fechaFin' | 'horaInicio' | 'horaFin' | 'lugarRecogida' | 'lugarDevolucion' | 'tarifaDiaria' | 'totalCobrado' | 'incluyeSeguroTodoRiesgo' | 'fianza' | 'seguroDia' | 'extras'> & {
     /** Días de alquiler tal como se contaron al firmar. Los contratos sin firmar lo calculan al vuelo. */
     dias?: number;
   };

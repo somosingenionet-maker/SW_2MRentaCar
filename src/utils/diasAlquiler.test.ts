@@ -89,17 +89,17 @@ const reserva = (extra: Partial<Reserva> = {}) => ({
 describe('totalTrasCambioDeHoras', () => {
   it('reserva manual sin horas (135 € = 3 días × 45 €): al poner 12:00 → 19:00 pasa a 4 días y 180 €', () => {
     const r = totalTrasCambioDeHoras(reserva(), '12:00', '19:00');
-    expect(r).toEqual({ diasAntes: 3, diasDespues: 4, total: 180, recalculado: true });
+    expect(r).toEqual({ diasAntes: 3, diasDespues: 4, total: 180, recalculado: true, extras: [] });
   });
 
   it('si al cambiar las horas bajan los días (4 → 3), el total baja con ellos', () => {
     const r = totalTrasCambioDeHoras(reserva({ horaInicio: '12:00', horaFin: '19:00', totalCobrado: 180 }), '12:00', '12:00');
-    expect(r).toEqual({ diasAntes: 4, diasDespues: 3, total: 135, recalculado: true });
+    expect(r).toEqual({ diasAntes: 4, diasDespues: 3, total: 135, recalculado: true, extras: [] });
   });
 
   it('si las horas cambian pero los días siguen siendo los mismos, no toca el total', () => {
     const r = totalTrasCambioDeHoras(reserva({ horaInicio: '12:00', horaFin: '19:00', totalCobrado: 180 }), '13:00', '20:00');
-    expect(r).toEqual({ diasAntes: 4, diasDespues: 4, total: 180, recalculado: false });
+    expect(r).toEqual({ diasAntes: 4, diasDespues: 4, total: 180, recalculado: false, extras: undefined });
   });
 
   it('nunca recalcula una reserva de la web: el precio lo pone la web', () => {
