@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { motion } from 'motion/react';
 import { FileText, Printer, MessageCircle, PenTool, ShieldCheck, AlertTriangle } from 'lucide-react';
-import type { Reserva, Cliente, Vehiculo, SolicitudReserva, ContratoFirmado } from '../types';
+import type { Reserva, Cliente, Vehiculo, SolicitudReserva, ContratoFirmado, SnapshotContrato } from '../types';
 import type { EmpresaConfig } from '../data/empresaConfig';
 import ContratoAlquiler from './ContratoAlquiler';
 import FirmaPantalla from './FirmaPantalla';
@@ -53,14 +53,16 @@ export function ContratoVisorVista({
   const idioma = firmado ? firmado.idioma : idiomaElegido;
   const tx = TEXTOS_CONTRATO[idioma];
   const fecha = (iso: string) => formatDate(iso, idioma);
+  // Un contrato firmado manda lo que se firmó (fechas, horas, días e importe), no el estado actual de la reserva.
+  const r: SnapshotContrato['reserva'] = firmado ? firmado.contrato.reserva : reserva;
   const texto = tx.mensaje({
     nombre: cliente?.nombre ?? '',
     vehiculo: `${vehiculo?.marca ?? ''} ${vehiculo?.modelo ?? ''}`.trim(),
     matricula: vehiculo?.matricula ?? '',
-    desde: fechaConHora(reserva.fechaInicio, reserva.horaInicio, fecha),
-    hasta: fechaConHora(reserva.fechaFin, reserva.horaFin, fecha),
-    dias: diasAlquiler(reserva.fechaInicio, reserva.fechaFin),
-    total: reserva.totalCobrado.toFixed(2),
+    desde: fechaConHora(r.fechaInicio, r.horaInicio, fecha),
+    hasta: fechaConHora(r.fechaFin, r.horaFin, fecha),
+    dias: r.dias ?? diasAlquiler(r.fechaInicio, r.fechaFin, r.horaInicio, r.horaFin),
+    total: r.totalCobrado.toFixed(2),
     empresa: empresa.nombre,
   });
   const tel = cliente?.telefono?.replace(/\D/g, '') ?? '';

@@ -133,7 +133,7 @@ export default function ContratoAlquiler({ reserva, cliente, vehiculo, empresa, 
           <p><strong>{tx.lugarEntrega}:</strong> {lugares.recogida || tx.noInformado}</p>
           <p><strong>{tx.fechaHoraRetorno}:</strong> {fechaConHora(reserva.fechaFin, reserva.horaFin, fecha)}</p>
           <p><strong>{tx.lugarDevolucion}:</strong> {lugares.devolucion || tx.noInformado}</p>
-          <p><strong>{tx.jornadas}:</strong> {tx.diasNaturales(diasAlquiler(reserva.fechaInicio, reserva.fechaFin))}</p>
+          <p><strong>{tx.jornadas}:</strong> {tx.diasNaturales(reserva.dias ?? diasAlquiler(reserva.fechaInicio, reserva.fechaFin, reserva.horaInicio, reserva.horaFin))}</p>
           <p className="text-slate-500 italic text-[10px]">{tx.retraso}</p>
         </div>
 

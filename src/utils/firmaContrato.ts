@@ -1,5 +1,6 @@
 import type { Cliente, ContratoFirmado, EmpresaContrato, Reserva, SnapshotContrato, SolicitudReserva, Vehiculo } from '../types';
 import { lugaresReserva } from './lugarReserva';
+import { diasAlquiler } from './solicitudes';
 
 /** JSON con las claves ordenadas y sin campos vacíos de `undefined`: misma entrada, mismo texto, antes y después de pasar por la base de datos. */
 export function jsonCanonico(valor: unknown): string {
@@ -22,6 +23,7 @@ export function crearSnapshot(
       lugarRecogida: lugares.recogida || undefined, lugarDevolucion: lugares.devolucion || undefined,
       tarifaDiaria: reserva.tarifaDiaria, totalCobrado: reserva.totalCobrado,
       incluyeSeguroTodoRiesgo: reserva.incluyeSeguroTodoRiesgo, fianza: reserva.fianza, seguroDia: reserva.seguroDia,
+      dias: diasAlquiler(reserva.fechaInicio, reserva.fechaFin, reserva.horaInicio, reserva.horaFin),
     },
     cliente: cliente ? {
       nombre: cliente.nombre, apellidos: cliente.apellidos, nifNiePasaporte: cliente.nifNiePasaporte, correo: cliente.correo,

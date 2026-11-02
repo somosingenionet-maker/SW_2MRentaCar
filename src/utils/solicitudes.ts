@@ -2,11 +2,53 @@ import { Reserva, SolicitudReserva, SolicitudExtra, Vehiculo } from '../types';
 import { finEfectivo } from './entregaDevolucion';
 import { hoyISO } from './fechas';
 
-/** Días de alquiler entre dos fechas 'YYYY-MM-DD' (mínimo 1). */
-export function diasAlquiler(inicio: string, fin: string): number {
+const MINUTOS_DIA = 24 * 60;
+const HORA = /^([01]\d|2[0-3]):([0-5]\d)$/;
+
+/** Minutos desde las 00:00 de una hora 'HH:mm', o null si falta o no es válida. */
+function minutosDelDia(hora?: string): number | null {
+  const m = hora ? HORA.exec(hora) : null;
+  return m ? Number(m[1]) * 60 + Number(m[2]) : null;
+}
+
+/**
+ * Minutos entre la entrega y la devolución, o null si no se pueden contar con horas (falta alguna).
+ * Se cuenta en hora de reloj de la oficina, sin ajustes por cambio de hora: «mismas horas al día siguiente» es 1 día.
+ */
+function minutosDeAlquiler(inicio: string, fin: string, horaInicio?: string, horaFin?: string): number | null {
+  const a = minutosDelDia(horaInicio);
+  const b = minutosDelDia(horaFin);
+  if (a == null || b == null) return null;
+  return (new Date(fin).getTime() - new Date(inicio).getTime()) / 60000 + (b - a);
+}
+
+/**
+ * Días de alquiler. Con horas de entrega y devolución se cuentan periodos de 24 h y cada fracción
+ * cuenta como un día más (el mismo criterio con el que cobra la web de 2M: del 1 a las 12:00 al 4 a las
+ * 19:00 son 3 días y 7 h = 4 días; del 10 a las 11:00 al 22 a las 11:00, 12 días). Sin horas, se cuenta
+ * la diferencia entre fechas, como antes. Mínimo 1.
+ */
+export function diasAlquiler(inicio: string, fin: string, horaInicio?: string, horaFin?: string): number {
   if (!inicio || !fin) return 1;
+  const minutos = minutosDeAlquiler(inicio, fin, horaInicio, horaFin);
+  if (minutos != null) return Math.max(1, Math.ceil(minutos / MINUTOS_DIA));
   const diff = Math.abs(new Date(fin).getTime() - new Date(inicio).getTime());
   return Math.ceil(diff / (1000 * 60 * 60 * 24)) || 1;
+}
+
+/** Duración exacta, p. ej. «3 días y 7 h», cuando las horas hacen que los días facturados sean más que los completos. Si no, null. */
+export function duracionExacta(inicio: string, fin: string, horaInicio?: string, horaFin?: string): string | null {
+  const minutos = inicio && fin ? minutosDeAlquiler(inicio, fin, horaInicio, horaFin) : null;
+  if (minutos == null || minutos <= 0 || minutos % MINUTOS_DIA === 0) return null;
+  const dias = Math.floor(minutos / MINUTOS_DIA);
+  const horas = Math.floor((minutos % MINUTOS_DIA) / 60);
+  const min = Math.round(minutos % 60);
+  const partes = [
+    dias > 0 ? `${dias} ${dias === 1 ? 'día' : 'días'}` : '',
+    horas > 0 ? `${horas} h` : '',
+    min > 0 ? `${min} min` : '',
+  ].filter(Boolean);
+  return partes.length > 1 ? `${partes.slice(0, -1).join(', ')} y ${partes[partes.length - 1]}` : partes[0];
 }
 
 /**

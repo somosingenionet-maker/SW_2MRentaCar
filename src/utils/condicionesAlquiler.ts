@@ -1,4 +1,5 @@
-import type { Vehiculo } from '../types';
+import type { Reserva, Vehiculo } from '../types';
+import { diasAlquiler } from './solicitudes';
 
 /** El vehículo ofrece seguro a todo riesgo si tiene un precio por día definido. */
 export const ofreceSeguro = (v?: Pick<Vehiculo, 'seguroAmpliadoDia'> | null): boolean =>
@@ -8,6 +9,28 @@ export const ofreceSeguro = (v?: Pick<Vehiculo, 'seguroAmpliadoDia'> | null): bo
 export function totalAlquiler(dias: number, tarifaDia: number, seguroDia: number | null | undefined, conSeguro: boolean): number {
   const seguro = conSeguro && seguroDia != null ? dias * seguroDia : 0;
   return dias * tarifaDia + seguro;
+}
+
+/** Total que corresponde a una reserva con `dias` días, con la tarifa y el seguro que la propia reserva guarda. */
+export function totalDeReserva(r: Pick<Reserva, 'tarifaDiaria' | 'seguroDia' | 'incluyeSeguroTodoRiesgo'>, dias: number): number {
+  return totalAlquiler(dias, r.tarifaDiaria, r.seguroDia, r.incluyeSeguroTodoRiesgo);
+}
+
+const centimos = (n: number) => Math.round(n * 100);
+
+/**
+ * Qué pasa con los días y el total al cambiar las horas de una reserva. El total solo se recalcula en
+ * reservas manuales cuyo total era exactamente días × tarifa: nunca en las de la web (el precio lo pone la
+ * web) ni si el total se había pactado distinto.
+ */
+export function totalTrasCambioDeHoras(
+  r: Pick<Reserva, 'fechaInicio' | 'fechaFin' | 'horaInicio' | 'horaFin' | 'tarifaDiaria' | 'seguroDia' | 'incluyeSeguroTodoRiesgo' | 'totalCobrado' | 'origen'>,
+  horaInicio: string, horaFin: string,
+): { diasAntes: number; diasDespues: number; total: number; recalculado: boolean } {
+  const diasAntes = diasAlquiler(r.fechaInicio, r.fechaFin, r.horaInicio, r.horaFin);
+  const diasDespues = diasAlquiler(r.fechaInicio, r.fechaFin, horaInicio, horaFin);
+  const puedeRecalcular = diasAntes !== diasDespues && r.origen !== 'web' && centimos(r.totalCobrado) === centimos(totalDeReserva(r, diasAntes));
+  return { diasAntes, diasDespues, total: puedeRecalcular ? totalDeReserva(r, diasDespues) : r.totalCobrado, recalculado: puedeRecalcular };
 }
 
 export const etiquetaTransmision = (t?: Vehiculo['transmision']): string =>

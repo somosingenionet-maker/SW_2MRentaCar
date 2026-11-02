@@ -376,3 +376,30 @@ describe('visor del contrato (Alquiler y ficha del cliente)', () => {
     expect(texto(vista({ fase: 'listo', firmado: f }, { puedeAnular: false, reserva: { ...reserva, totalCobrado: 90 } }))).toContain('pide a un administrador');
   });
 });
+
+describe('días de alquiler en el contrato', () => {
+  const conHoras = (extra: Partial<Reserva>, idioma: IdiomaContrato = 'es') => texto(idioma, { reserva: extra });
+
+  it('cuenta las horas: del 1 a las 12:00 al 4 a las 19:00 son 4 días, no 3', () => {
+    const t = conHoras({ fechaInicio: '2027-01-01', fechaFin: '2027-01-04', horaInicio: '12:00', horaFin: '19:00' });
+    expect(t).toContain('Número total de jornadas: 4 días naturales');
+    expect(conHoras({ fechaInicio: '2027-01-01', fechaFin: '2027-01-04', horaInicio: '12:00', horaFin: '19:00' }, 'en')).toContain('Total number of rental days: 4 calendar days');
+  });
+
+  it('con las mismas horas, los días exactos', () => {
+    expect(conHoras({ fechaInicio: '2027-01-01', fechaFin: '2027-01-04', horaInicio: '12:00', horaFin: '12:00' })).toContain('jornadas: 3 días naturales');
+  });
+
+  it('una reserva sin horas cuenta la diferencia entre fechas, como siempre', () => {
+    expect(conHoras({ fechaInicio: '2026-10-31', fechaFin: '2026-11-02', horaInicio: undefined, horaFin: undefined })).toContain('jornadas: 2 días naturales');
+  });
+
+  it('un contrato firmado enseña los días que se firmaron, aunque la cuenta cambie después', () => {
+    expect(conHoras({ dias: 9 } as Partial<Reserva>)).toContain('jornadas: 9 días naturales');
+  });
+
+  it('la copia firmada guarda los días', () => {
+    const snap = crearSnapshot({ ...reserva, fechaInicio: '2027-01-01', fechaFin: '2027-01-04', horaInicio: '12:00', horaFin: '19:00' } as Reserva, cliente, vehiculo, undefined, empresa);
+    expect(snap.reserva.dias).toBe(4);
+  });
+});

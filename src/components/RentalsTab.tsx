@@ -3,7 +3,7 @@ import RegistroMovimientoModal, { TarjetaMovimiento } from './RegistroMovimiento
 import { estadoReserva as estadoDeReserva, esHistorica as esHistoricaReserva, finEfectivo, kmRecorridos, ESTADO_META } from '../utils/entregaDevolucion';
 import ModalShell from './ModalShell';
 import { usePaginacion } from '../utils/usePaginacion';
-import { ofreceSeguro, totalAlquiler, etiquetaTransmision, parseFianza, fianzaSugerida } from '../utils/condicionesAlquiler';
+import { ofreceSeguro, totalAlquiler, etiquetaTransmision, parseFianza, fianzaSugerida, totalTrasCambioDeHoras } from '../utils/condicionesAlquiler';
 import { useSeleccion } from '../utils/useSeleccion';
 import { Reserva, Vehiculo, Cliente, SolicitudReserva, MovimientoVehiculo } from '../types';
 import SearchableSelect from './SearchableSelect';
@@ -20,6 +20,7 @@ import { validarHorasReserva, fechaConHora, ordenarProximas, ordenarHistorial } 
 import Hora24Field from './Hora24Field';
 import { LUGARES_HABITUALES, lugaresReserva } from '../utils/lugarReserva';
 import { buscarReservas } from '../utils/buscarReservas';
+import { FilaDuracion, FilaCalculo } from './DuracionReserva';
 import ContratoVisor from './ContratoVisor';
 import { downloadCsv, slugify } from '../utils/csvExport';
 import { genId } from '../utils/id';
@@ -91,6 +92,8 @@ export default function RentalsTab({
   // Edición de las horas de una reserva ya creada (desde la ficha de gestión).
   const [editandoHoras, setEditandoHoras] = useState<{ inicio: string; fin: string; error: string } | null>(null);
   const [editandoLugares, setEditandoLugares] = useState<{ recogida: string; devolucion: string } | null>(null);
+  // Aviso tras cambiar las horas de una reserva cuando eso cambia los días (y quizá el total).
+  const [avisoDias, setAvisoDias] = useState<string | null>(null);
   const [formTarifa, setFormTarifa] = useState<number>(45.00);
   const [formTemporada, setFormTemporada] = useState<'alta' | 'media' | 'baja'>('media');
   const [formSeguro, setFormSeguro] = useState(true);
@@ -119,7 +122,7 @@ export default function RentalsTab({
 
   const calculateDays = diasAlquiler;
 
-  const currentDuration = calculateDays(formFechaInicio, formFechaFin);
+  const currentDuration = calculateDays(formFechaInicio, formFechaFin, formHoraInicio, formHoraFin);
   // Condiciones del vehículo elegido: el seguro y la fianza son suyos, no valores fijos.
   const vehiculoElegido = vehiculos.find(v => v.id === formVehiculoId);
   const seguroDiaElegido = vehiculoElegido?.seguroAmpliadoDia ?? null;
@@ -145,7 +148,7 @@ export default function RentalsTab({
   };
 
   const buildReserva = (): Reserva => {
-    const duration = calculateDays(formFechaInicio, formFechaFin);
+    const duration = calculateDays(formFechaInicio, formFechaFin, formHoraInicio, formHoraFin);
     if (solicitudActiva) {
       // Reserva de la web: se respeta lo que la web cobró (total con extras y descuentos).
       return {
@@ -321,7 +324,7 @@ export default function RentalsTab({
   };
 
   // Al elegir otra reserva se descarta una edición de horas a medias.
-  useEffect(() => { setEditandoHoras(null); setEditandoFianza(null); setEditandoLugares(null); }, [selectedReserva?.id]);
+  useEffect(() => { setEditandoHoras(null); setEditandoFianza(null); setEditandoLugares(null); setAvisoDias(null); }, [selectedReserva?.id]);
 
   const handleGuardarFianza = () => {
     if (!selectedReserva || !editandoFianza) return;
@@ -342,10 +345,16 @@ export default function RentalsTab({
       horaInicio: editandoHoras.inicio, horaFin: editandoHoras.fin,
     });
     if (err) { setEditandoHoras({ ...editandoHoras, error: err }); return; }
-    const actualizada = { ...selectedReserva, horaInicio: editandoHoras.inicio, horaFin: editandoHoras.fin };
+    // Las horas deciden cuántos días se cobran: si cambian, el total de una reserva manual se recalcula.
+    const t = totalTrasCambioDeHoras(selectedReserva, editandoHoras.inicio, editandoHoras.fin);
+    const actualizada = { ...selectedReserva, horaInicio: editandoHoras.inicio, horaFin: editandoHoras.fin, totalCobrado: t.total };
     onUpdateReserva(actualizada);
     setSelectedReserva(actualizada);
     setEditandoHoras(null);
+    if (t.diasAntes === t.diasDespues) setAvisoDias(null);
+    else if (t.recalculado) setAvisoDias(`Con las nuevas horas el alquiler pasa de ${t.diasAntes} a ${t.diasDespues} días y el total se ha recalculado: ${t.total.toFixed(2)} €.`);
+    else if (selectedReserva.origen === 'web') setAvisoDias(`Con las nuevas horas el alquiler pasa de ${t.diasAntes} a ${t.diasDespues} días. El total (${t.total.toFixed(2)} €) lo fija la web y no se ha cambiado.`);
+    else setAvisoDias(`Con las nuevas horas el alquiler pasa de ${t.diasAntes} a ${t.diasDespues} días. El total no se ha cambiado porque no coincidía con días × tarifa: revísalo.`);
   };
 
   const handleGuardarLugares = () => {
@@ -365,7 +374,7 @@ export default function RentalsTab({
     const rows = reservas.map(res => {
       const veh = vehiculos.find(v => v.id === res.vehiculoId);
       const cli = clientes.find(c => c.id === res.clienteId);
-      const days = calculateDays(res.fechaInicio, res.fechaFin);
+      const days = calculateDays(res.fechaInicio, res.fechaFin, res.horaInicio, res.horaFin);
       return [
         res.id,
         veh ? `${veh.marca} ${veh.modelo}` : res.vehiculoId,
@@ -925,7 +934,7 @@ export default function RentalsTab({
                             {(res.horaInicio || res.horaFin) && (
                               <span className="text-[10px] text-slate-500 font-semibold block">Entrega {res.horaInicio ?? '—'} · Devolución {res.horaFin ?? '—'}</span>
                             )}
-                            <span className="text-[10px] text-slate-400 font-medium">{calculateDays(res.fechaInicio, res.fechaFin)} días de contrato</span>
+                            <span className="text-[10px] text-slate-400 font-medium">{calculateDays(res.fechaInicio, res.fechaFin, res.horaInicio, res.horaFin)} días de contrato</span>
                           </td>
                           <td className="py-3 px-2 text-right">
                             <span className="font-mono font-extrabold text-slate-800 block text-xs">{res.totalCobrado.toFixed(2)} €</span>
@@ -1092,10 +1101,8 @@ export default function RentalsTab({
                       </div>
                     );
                   })()}
-                  <div className="flex justify-between border-t border-slate-100/50 pt-1.5 text-[11px] font-semibold text-slate-600">
-                    <span>Días de devengo:</span>
-                    <span>{calculateDays(selectedReserva.fechaInicio, selectedReserva.fechaFin)} días</span>
-                  </div>
+                  <FilaDuracion reserva={selectedReserva} />
+                  {avisoDias && <p role="status" data-testid="aviso-dias" className="text-[11px] font-semibold text-emerald-700 bg-emerald-50 border border-emerald-200 rounded-md px-2 py-1">{avisoDias}</p>}
                 </div>
 
                 {/* Financial overview */}
@@ -1134,6 +1141,7 @@ export default function RentalsTab({
                     )}
                   </div>
                   {editandoFianza?.error && <p role="alert" className="text-[11px] text-rose-600 font-medium">{editandoFianza.error}</p>}
+                  <FilaCalculo reserva={selectedReserva} />
                   <div className="flex justify-between border-t border-blue-200 pt-1.5 text-xs font-bold text-blue-800">
                     <span>LIQUIDACIÓN TOTAL:</span>
                     <span>{selectedReserva.totalCobrado.toFixed(2)} €</span>
