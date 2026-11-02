@@ -629,7 +629,7 @@ export default function OrdenesTrabajoTab({ ordenes, vehiculos, clientes, tecnic
                           >
                             <MessageCircle size={13} /> Avisar a {selected.tecnicoAsignado} por WhatsApp
                           </a>
-                          {!tec?.enlaceCreadoEn && <span className="text-[11px] text-amber-700 font-semibold">Este mecánico aún no tiene enlace (Empresa → Técnicos).</span>}
+                          {!tec?.enlaceCreadoEn && <span className="text-[11px] text-amber-700 font-semibold">Este mecánico aún no tiene enlace (Empresa → Taller y técnicos).</span>}
                           {tec && !tec.telefono && <span className="text-[11px] text-slate-400">Sin teléfono guardado: WhatsApp te dejará elegir el contacto.</span>}
                         </div>
                       ) : (

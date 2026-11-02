@@ -1,6 +1,6 @@
 import React, { useState, useRef } from 'react';
 import ModalShell from './ModalShell';
-import { Upload, RotateCcw, Check, Building2, Wrench, Plus, Edit2, Trash2, Link2, Copy, MessageCircle, Ban } from 'lucide-react';
+import { Upload, RotateCcw, Check, Building2, Wrench, Plus, Edit2, Trash2, Link2, Copy, MessageCircle, Ban, Palette, Package } from 'lucide-react';
 import { EmpresaConfig, DEFAULT_EMPRESA_CONFIG } from '../data/empresaConfig';
 import { genId } from '../utils/id';
 import { Tecnico, Complemento } from '../types';
@@ -23,8 +23,19 @@ interface Props {
   onAddComplemento: (c: Complemento) => void;
   onUpdateComplemento: (c: Complemento) => void;
   onDeleteComplemento: (id: string) => void;
+  /** Sección que se abre primero (por defecto, los datos de la empresa). */
+  seccionInicial?: Seccion;
   onClose: () => void;
 }
+
+export type Seccion = 'empresa' | 'apariencia' | 'taller' | 'alquiler';
+
+const SECCIONES: { id: Seccion; titulo: string; descripcion: string; icono: typeof Building2 }[] = [
+  { id: 'empresa', titulo: 'Datos de la empresa', descripcion: 'Identidad, datos fiscales y contacto. Salen en los contratos y las facturas.', icono: Building2 },
+  { id: 'apariencia', titulo: 'Logo y color', descripcion: 'La imagen de la empresa en la aplicación y en los documentos.', icono: Palette },
+  { id: 'taller', titulo: 'Taller y técnicos', descripcion: 'Capacidad del taller y mecánicos, con su enlace personal para ver y marcar sus trabajos.', icono: Wrench },
+  { id: 'alquiler', titulo: 'Complementos', descripcion: 'Sillitas, baca, portabicicletas… que se pueden añadir a una reserva manual.', icono: Package },
+];
 
 const BRAND_COLORS = [
   { label: 'Azul',       value: '#2563eb' },
@@ -41,7 +52,8 @@ const BRAND_COLORS = [
   { label: 'Negro',      value: '#111827' },
 ];
 
-export default function CompanySettingsPanel({ config, onSave, tecnicos, onAddTecnico, onUpdateTecnico, onDeleteTecnico, onEnlaceTecnico, complementos, onAddComplemento, onUpdateComplemento, onDeleteComplemento, onClose }: Props) {
+export default function CompanySettingsPanel({ config, onSave, tecnicos, onAddTecnico, onUpdateTecnico, onDeleteTecnico, onEnlaceTecnico, complementos, onAddComplemento, onUpdateComplemento, onDeleteComplemento, seccionInicial = 'empresa', onClose }: Props) {
+  const [seccion, setSeccion] = useState<Seccion>(seccionInicial);
   const [draft, setDraft] = useState<EmpresaConfig>({ ...config });
   const [saved, setSaved] = useState(false);
   const fileRef = useRef<HTMLInputElement>(null);
@@ -136,6 +148,8 @@ export default function CompanySettingsPanel({ config, onSave, tecnicos, onAddTe
   };
 
   const handleReset = () => setDraft({ ...DEFAULT_EMPRESA_CONFIG });
+  // Datos de empresa (logo, color, capacidad...) editados y aún sin guardar. Técnicos y complementos se guardan al momento.
+  const hayCambios = JSON.stringify(draft) !== JSON.stringify({ ...DEFAULT_EMPRESA_CONFIG, ...config });
 
   // Derive initials for logo preview
   const initials = draft.nombre
@@ -150,21 +164,29 @@ export default function CompanySettingsPanel({ config, onSave, tecnicos, onAddTe
       titulo="Configuración de Empresa"
       icono={<Building2 className="w-5 h-5 text-blue-600" />}
       onClose={onClose}
-      ancho="max-w-lg"
+      ancho="max-w-5xl"
       pie={
-        <div className="px-5 py-4 flex items-center justify-between gap-3 bg-slate-50">
-          <button
-            onClick={handleReset}
-            className="flex items-center gap-1.5 text-xs text-slate-400 hover:text-slate-600 transition"
-          >
-            <RotateCcw className="w-3.5 h-3.5" /> Restaurar por defecto
-          </button>
-          <div className="flex gap-2">
+        <div className="px-5 py-4 flex items-center justify-between gap-3 bg-slate-50 flex-wrap">
+          <div className="flex items-center gap-4 flex-wrap">
+            <button
+              onClick={handleReset}
+              className="flex items-center gap-1.5 text-xs text-slate-400 hover:text-slate-600 transition"
+            >
+              <RotateCcw className="w-3.5 h-3.5" /> Restaurar datos de empresa por defecto
+            </button>
+            {hayCambios && (
+              <span data-testid="cambios-sin-guardar" className="text-[11px] font-bold text-amber-700 bg-amber-50 border border-amber-200 rounded-full px-2.5 py-1">
+                Cambios sin guardar
+              </span>
+            )}
+          </div>
+          <div className="flex gap-2 items-center">
+            <span className="hidden md:block text-[11px] text-slate-400 mr-1">Los técnicos y los complementos se guardan al momento.</span>
             <button
               onClick={onClose}
               className="px-4 py-2 text-xs font-semibold text-slate-600 hover:bg-slate-100 rounded-lg border border-slate-200 transition"
             >
-              Cancelar
+              Cerrar
             </button>
             <button
               onClick={handleSave}
@@ -177,47 +199,45 @@ export default function CompanySettingsPanel({ config, onSave, tecnicos, onAddTe
         </div>
       }
     >
-        <div className="px-6 py-5 space-y-6">
-
-          {/* Logo preview + upload */}
-          <section>
-            <p className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-3">Logo de la Empresa</p>
-            <div className="flex items-center gap-4">
-              <div
-                className="w-16 h-16 rounded-xl flex items-center justify-center overflow-hidden shrink-0 shadow-md border border-slate-200"
-                style={{ backgroundColor: draft.brandColor }}
+      <div className="flex flex-col md:flex-row min-h-[34rem]">
+        {/* Navegación por secciones */}
+        <nav role="tablist" aria-label="Secciones de la configuración" className="md:w-56 shrink-0 border-b md:border-b-0 md:border-r border-slate-100 bg-slate-50/70 p-3 flex md:flex-col gap-1 overflow-x-auto">
+          {SECCIONES.map(sec => {
+            const Icono = sec.icono;
+            const cuenta = sec.id === 'taller' ? tecnicos.length : sec.id === 'alquiler' ? complementos.length : null;
+            const activa = seccion === sec.id;
+            return (
+              <button
+                key={sec.id}
+                role="tab"
+                id={`tab-${sec.id}`}
+                aria-selected={activa}
+                aria-controls={`panel-${sec.id}`}
+                onClick={() => setSeccion(sec.id)}
+                className={`shrink-0 flex items-center gap-2.5 px-3 py-2.5 rounded-xl text-left text-xs font-bold transition cursor-pointer ${activa ? 'bg-white text-slate-900 shadow-sm border border-slate-200' : 'text-slate-500 hover:bg-white/70 hover:text-slate-700 border border-transparent'}`}
               >
-                {draft.logoBase64 ? (
-                  <img src={draft.logoBase64} alt="logo" className="w-full h-full object-contain" />
-                ) : (
-                  <span className="text-white font-black text-xl tracking-tighter">{initials}</span>
-                )}
-              </div>
-              <div className="flex flex-col gap-2">
-                <button
-                  onClick={() => fileRef.current?.click()}
-                  className="flex items-center gap-1.5 px-3 py-1.5 bg-blue-50 text-blue-700 hover:bg-blue-100 text-xs font-semibold rounded-lg border border-blue-200 transition"
-                >
-                  <Upload className="w-3.5 h-3.5" /> Subir imagen
-                </button>
-                {draft.logoBase64 && (
-                  <button
-                    onClick={() => set('logoBase64', '')}
-                    className="text-xs text-slate-400 hover:text-rose-500 transition text-left"
-                  >
-                    Eliminar logo
-                  </button>
-                )}
-                <p className="text-[10px] text-slate-400">PNG, JPG o SVG — máx. 2 MB</p>
-              </div>
-              <input ref={fileRef} type="file" accept="image/*" className="hidden" onChange={handleLogoUpload} />
-            </div>
-          </section>
+                <Icono className={`w-4 h-4 shrink-0 ${activa ? 'text-orange-500' : 'text-slate-400'}`} />
+                <span className="whitespace-nowrap md:whitespace-normal">{sec.titulo}</span>
+                {cuenta != null && <span className="ml-auto text-[10px] font-bold text-slate-400 bg-slate-100 rounded-full px-1.5 py-0.5">{cuenta}</span>}
+              </button>
+            );
+          })}
+        </nav>
 
-          {/* Identidad */}
-          <section className="space-y-3">
-            <p className="text-xs font-bold text-slate-500 uppercase tracking-wider">Identidad</p>
+        {/* Contenido de la sección */}
+        <div role="tabpanel" id={`panel-${seccion}`} aria-labelledby={`tab-${seccion}`} className="flex-1 min-w-0 p-4 md:p-5 space-y-4 bg-slate-50/40">
+          <div>
+            <h2 className="text-lg font-extrabold text-slate-900">{SECCIONES.find(x => x.id === seccion)!.titulo}</h2>
+            <p className="text-xs text-slate-500 mt-0.5">{SECCIONES.find(x => x.id === seccion)!.descripcion}</p>
+          </div>
 
+          {seccion === 'empresa' && (
+            <div className="grid md:grid-cols-2 gap-4" data-testid="seccion-empresa">
+            <section className="bg-white border border-slate-200 rounded-2xl p-4 space-y-3 ">
+              <div>
+                <h3 className="text-sm font-extrabold text-slate-800">Identidad</h3>
+                <p className="text-xs text-slate-400 mt-0.5">Cómo se llama la empresa y cómo se presenta.</p>
+              </div>
             <div>
               <label className="block text-xs font-semibold text-slate-600 mb-1">Nombre de la empresa *</label>
               <input
@@ -239,13 +259,13 @@ export default function CompanySettingsPanel({ config, onSave, tecnicos, onAddTe
                 placeholder="Sistema de gestión de flota..."
               />
             </div>
-          </section>
-
-          {/* Datos fiscales (aparecen en contratos y facturas) */}
-          <section className="space-y-3">
-            <p className="text-xs font-bold text-slate-500 uppercase tracking-wider">Datos Fiscales</p>
-            <p className="text-[10px] text-slate-400 -mt-2">Se muestran en contratos de alquiler y facturas.</p>
-
+          
+            </section>
+            <section className="bg-white border border-slate-200 rounded-2xl p-4 space-y-3 ">
+              <div>
+                <h3 className="text-sm font-extrabold text-slate-800">Datos fiscales</h3>
+                <p className="text-xs text-slate-400 mt-0.5">Se muestran en los contratos de alquiler y en las facturas.</p>
+              </div>
             <div>
               <label className="block text-xs font-semibold text-slate-600 mb-1">Razón social</label>
               <input
@@ -278,12 +298,13 @@ export default function CompanySettingsPanel({ config, onSave, tecnicos, onAddTe
                 placeholder="Calle Mayor 45, Planta 2, Madrid"
               />
             </div>
-          </section>
-
-          {/* Contacto */}
-          <section className="space-y-3">
-            <p className="text-xs font-bold text-slate-500 uppercase tracking-wider">Datos de Contacto</p>
-
+          
+            </section>
+            <section className="bg-white border border-slate-200 rounded-2xl p-4 space-y-3 md:col-span-2 sm:grid sm:grid-cols-3 sm:gap-3 sm:space-y-0">
+              <div className="sm:col-span-3">
+                <h3 className="text-sm font-extrabold text-slate-800">Datos de contacto</h3>
+                
+              </div>
             <div>
               <label className="block text-xs font-semibold text-slate-600 mb-1">Correo electrónico</label>
               <input
@@ -316,7 +337,7 @@ export default function CompanySettingsPanel({ config, onSave, tecnicos, onAddTe
                 placeholder="www.miempresa.com"
               />
             </div>
-            <div className="grid grid-cols-2 gap-3">
+            <div className="grid grid-cols-2 gap-3 sm:col-span-3">
               <div>
                 <label className="block text-xs font-semibold text-slate-600 mb-1">Ciudad</label>
                 <input
@@ -338,12 +359,55 @@ export default function CompanySettingsPanel({ config, onSave, tecnicos, onAddTe
                 />
               </div>
             </div>
-          </section>
+          
+            </section>
+            </div>
+          )}
 
-          {/* Color de marca */}
-          <section>
-            <p className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-3">Color de Marca</p>
-
+          {seccion === 'apariencia' && (
+            <div className="grid lg:grid-cols-2 gap-4 items-start" data-testid="seccion-apariencia">
+            <section className="bg-white border border-slate-200 rounded-2xl p-4 space-y-3 ">
+              <div>
+                <h3 className="text-sm font-extrabold text-slate-800">Logo</h3>
+                <p className="text-xs text-slate-400 mt-0.5">Aparece en el menú, en los contratos, en las facturas y en las órdenes.</p>
+              </div>
+            <div className="flex items-center gap-4">
+              <div
+                className="w-16 h-16 rounded-xl flex items-center justify-center overflow-hidden shrink-0 shadow-md border border-slate-200"
+                style={{ backgroundColor: draft.brandColor }}
+              >
+                {draft.logoBase64 ? (
+                  <img src={draft.logoBase64} alt="logo" className="w-full h-full object-contain" />
+                ) : (
+                  <span className="text-white font-black text-xl tracking-tighter">{initials}</span>
+                )}
+              </div>
+              <div className="flex flex-col gap-2">
+                <button
+                  onClick={() => fileRef.current?.click()}
+                  className="flex items-center gap-1.5 px-3 py-1.5 bg-blue-50 text-blue-700 hover:bg-blue-100 text-xs font-semibold rounded-lg border border-blue-200 transition"
+                >
+                  <Upload className="w-3.5 h-3.5" /> Subir imagen
+                </button>
+                {draft.logoBase64 && (
+                  <button
+                    onClick={() => set('logoBase64', '')}
+                    className="text-xs text-slate-400 hover:text-rose-500 transition text-left"
+                  >
+                    Eliminar logo
+                  </button>
+                )}
+                <p className="text-[10px] text-slate-400">PNG, JPG o SVG — máx. 2 MB</p>
+              </div>
+              <input ref={fileRef} type="file" accept="image/*" className="hidden" onChange={handleLogoUpload} />
+            </div>
+          
+            </section>
+            <section className="bg-white border border-slate-200 rounded-2xl p-4 space-y-3 ">
+              <div>
+                <h3 className="text-sm font-extrabold text-slate-800">Color de marca</h3>
+                <p className="text-xs text-slate-400 mt-0.5">Colorea los botones y el encabezado de la aplicación.</p>
+              </div>
             {/* Preset palette */}
             <div className="grid grid-cols-6 gap-2 mb-3">
               {BRAND_COLORS.map(c => (
@@ -403,12 +467,16 @@ export default function CompanySettingsPanel({ config, onSave, tecnicos, onAddTe
                 </div>
               );
             })()}
-          </section>
-        </div>
+          
+            </section>
+            </div>
+          )}
 
+          {seccion === 'taller' && (
+            <div className="space-y-4" data-testid="seccion-taller">
         {/* Capacidad del taller */}
-        <div className="px-6 pb-5 space-y-2 border-t border-slate-100 pt-5">
-          <h3 className="text-xs font-bold text-slate-500 uppercase tracking-wider flex items-center gap-1.5">
+            <section className="bg-white border border-slate-200 rounded-2xl p-4 space-y-2">
+          <h3 className="text-sm font-extrabold text-slate-800 flex items-center gap-1.5">
             <Wrench className="w-3.5 h-3.5 text-orange-500" /> Capacidad del taller
           </h3>
           <label className="block text-xs font-semibold text-slate-600">Vehículos que caben a la vez</label>
@@ -422,12 +490,11 @@ export default function CompanySettingsPanel({ config, onSave, tecnicos, onAddTe
             placeholder="Sin límite"
           />
           <p className="text-[11px] text-slate-400">La Agenda muestra cuántos vehículos hay en el taller frente a este número y avisa al acercarse o pasarse. Déjalo vacío si no quieres límite.</p>
-        </div>
-
+        </section>
         {/* Técnicos */}
-        <div className="px-6 pb-5 space-y-3 border-t border-slate-100 pt-5">
+            <section className="bg-white border border-slate-200 rounded-2xl p-4 space-y-3">
           <div className="flex items-center justify-between">
-            <h3 className="text-xs font-bold text-slate-500 uppercase tracking-wider flex items-center gap-1.5">
+            <h3 className="text-sm font-extrabold text-slate-800 flex items-center gap-1.5">
               <Wrench className="w-3.5 h-3.5 text-orange-500" /> Técnicos del taller
             </h3>
             <button
@@ -478,13 +545,13 @@ export default function CompanySettingsPanel({ config, onSave, tecnicos, onAddTe
           {tecnicos.length === 0 ? (
             <p className="text-xs text-slate-400 italic text-center py-3">Sin técnicos registrados.</p>
           ) : (
-            <div className="space-y-1.5">
+            <div className="grid grid-cols-1 xl:grid-cols-2 gap-2">
               {tecnicos.map(t => (
                 <div key={t.id} className="bg-slate-50 border border-slate-100 rounded-xl px-3 py-2.5 space-y-2" data-testid="fila-tecnico">
                   <div className="flex items-center justify-between">
                     <div>
                       <p className="text-sm font-semibold text-slate-700">{t.nombre}{!t.activo && <span className="ml-2 text-[10px] font-bold text-slate-400 uppercase">Inactivo</span>}</p>
-                      {t.especialidad && <p className="text-xs text-slate-400">{t.especialidad}</p>}
+                      {(t.especialidad || t.telefono) && <p className="text-xs text-slate-400">{[t.especialidad, t.telefono].filter(Boolean).join(' · ')}</p>}
                     </div>
                     <div className="flex gap-1">
                       <button onClick={() => openTecnicoForm(t)} className="p-1.5 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition cursor-pointer"><Edit2 className="w-3.5 h-3.5" /></button>
@@ -542,9 +609,17 @@ export default function CompanySettingsPanel({ config, onSave, tecnicos, onAddTe
               {enlaceError && <p role="alert" className="text-xs font-semibold text-rose-600">{enlaceError}</p>}
             </div>
           )}
-        </div>
+        </section>
+            </div>
+          )}
 
-        <ComplementosPanel complementos={complementos} onAdd={onAddComplemento} onUpdate={onUpdateComplemento} onDelete={onDeleteComplemento} />
+          {seccion === 'alquiler' && (
+            <div className="bg-white border border-slate-200 rounded-2xl" data-testid="seccion-alquiler">
+              <ComplementosPanel complementos={complementos} onAdd={onAddComplemento} onUpdate={onUpdateComplemento} onDelete={onDeleteComplemento} />
+            </div>
+          )}
+        </div>
+      </div>
     </ModalShell>
   );
 }

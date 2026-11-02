@@ -44,7 +44,7 @@ export default function ComplementosPanel({ complementos, onAdd, onUpdate, onDel
   };
 
   return (
-    <div className="px-6 pb-5 space-y-3 border-t border-slate-100 pt-5" data-testid="panel-complementos">
+    <div className="p-5 space-y-3" data-testid="panel-complementos">
       <div className="flex items-center justify-between">
         <h3 className="text-xs font-bold text-slate-500 uppercase tracking-wider flex items-center gap-1.5">
           <Package className="w-3.5 h-3.5 text-orange-500" /> Complementos de alquiler
@@ -53,7 +53,6 @@ export default function ComplementosPanel({ complementos, onAdd, onUpdate, onDel
           <Plus className="w-3 h-3" /> Añadir
         </button>
       </div>
-      <p className="text-[11px] text-slate-400">Sillitas, baca, portabicicletas… Se añaden al crear una reserva manual y se suman al total. Las reservas de la web ya traen los suyos.</p>
 
       {form && (
         <div className="bg-orange-50 border border-orange-200 rounded-xl p-3 space-y-2">
@@ -83,7 +82,7 @@ export default function ComplementosPanel({ complementos, onAdd, onUpdate, onDel
       {ordenados.length === 0 ? (
         <p className="text-xs text-slate-400 italic text-center py-3">Sin complementos. Añade el primero.</p>
       ) : (
-        <div className="space-y-1.5">
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-2">
           {ordenados.map(c => (
             <div key={c.id} data-testid="fila-complemento" className={`flex items-center justify-between gap-2 border rounded-xl px-3 py-2.5 ${c.activo ? 'bg-slate-50 border-slate-100' : 'bg-slate-50/50 border-slate-100 opacity-70'}`}>
               <div className="min-w-0">
