@@ -25,6 +25,7 @@ import { tarifaDeTemporada, precioConvenio } from '../utils/tarifasAlquiler';
 import { FilaDuracion, DesgloseFicha } from './DuracionReserva';
 import { extrasManuales, totalExtras, etiquetaPrecioComplemento, resumenExtras, filasEditorExtras, aplicarFilasEditor, type FilaEditorExtras } from '../utils/complementos';
 import { EditorComplementos } from './EditorComplementos';
+import { InputPrecio } from './InputPrecio';
 import ContratoVisor from './ContratoVisor';
 import { downloadCsv, slugify } from '../utils/csvExport';
 import { genId } from '../utils/id';
@@ -1159,8 +1160,8 @@ export default function RentalsTab({
                       <span>Fianza (depósito aparte, no incluida en el total):</span>
                       {editandoFianza ? (
                         <span className="flex items-center gap-1.5">
-                          <input
-                            type="number" min="0" step="0.01" inputMode="decimal" aria-label="Fianza en euros"
+                          <InputPrecio
+                            aria-label="Fianza en euros"
                             className="w-24 px-2 h-[30px] border border-blue-200 rounded-md text-right text-xs text-slate-800 bg-white focus:outline-none focus:ring-1 focus:ring-blue-500"
                             value={editandoFianza.valor}
                             onChange={e => setEditandoFianza({ valor: e.target.value, error: '' })}
@@ -1486,11 +1487,7 @@ export default function RentalsTab({
                       <>
                     <div className="relative mt-2">
                       <span className="absolute inset-y-0 left-0 pl-3 flex items-center text-slate-400 font-semibold text-xs">€/Día</span>
-                      <input
-                        type="number"
-                        min="0"
-                        step="0.01"
-                        inputMode="decimal"
+                      <InputPrecio
                         className="w-full pl-14 pr-3 py-2 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-1 focus:ring-blue-500 font-mono"
                         value={formTarifa}
                         onChange={e => setFormTarifa(Math.round(Number(e.target.value) * 100) / 100)}
@@ -1567,12 +1564,8 @@ export default function RentalsTab({
                   {/* Fianza: la fija el taller en cada reserva; se propone la habitual del vehículo */}
                   <div>
                     <label htmlFor="reserva-fianza" className="block text-xs font-bold text-slate-500 uppercase">Fianza a dejar al recoger (€) *</label>
-                    <input
+                    <InputPrecio
                       id="reserva-fianza"
-                      type="number"
-                      min="0"
-                      step="0.01"
-                      inputMode="decimal"
                       className="w-full mt-1 px-3 h-[38px] border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-1 focus:ring-blue-500"
                       value={formFianza}
                       onChange={e => { setFormFianza(e.target.value); if (formError) setFormError(''); }}

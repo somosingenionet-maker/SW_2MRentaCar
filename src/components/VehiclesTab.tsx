@@ -7,6 +7,7 @@ import { useSeleccion } from '../utils/useSeleccion';
 import { datoDuplicado } from '../utils/vehiculoDuplicado';
 import { Vehiculo, OrdenTrabajo, OTEstado, TarifasAlquiler } from '../types';
 import { cambiarTarifa, precioConvenio } from '../utils/tarifasAlquiler';
+import { InputPrecio } from './InputPrecio';
 import {
   Car, Search, Plus, Wrench, Calendar, Shield, CreditCard, PenTool, Trash2, X, Check, Save, Download, ClipboardList
 } from 'lucide-react';
@@ -456,8 +457,8 @@ export default function VehiclesTab({
                 <div className="grid grid-cols-3 gap-2">
                   {[
                     { label: 'Transmisión', valor: etiquetaTransmision(selectedVehiculo.transmision) },
-                    { label: 'Fianza habitual', valor: selectedVehiculo.fianza ? `${selectedVehiculo.fianza} €` : '—' },
-                    { label: 'Seguro ampliado', valor: selectedVehiculo.seguroAmpliadoDia != null ? `${selectedVehiculo.seguroAmpliadoDia} €/día` : 'No ofrece' },
+                    { label: 'Fianza habitual', valor: selectedVehiculo.fianza ? `${selectedVehiculo.fianza.toFixed(2)} €` : '—' },
+                    { label: 'Seguro ampliado', valor: selectedVehiculo.seguroAmpliadoDia != null ? `${selectedVehiculo.seguroAmpliadoDia.toFixed(2)} €/día` : 'No ofrece' },
                   ].map(({ label, valor }) => (
                     <div key={label} className="bg-white rounded-lg border border-blue-100 p-2 text-center">
                       <div className="text-[10px] text-slate-400 font-semibold uppercase">{label}</div>
@@ -714,10 +715,8 @@ export default function VehiclesTab({
                             <div key={key}>
                               <label className="block text-[10px] font-semibold text-blue-700 mb-0.5">{label}</label>
                               <div className="relative">
-                                <input
-                                  type="number"
-                                  min="0"
-                                  step="0.01"
+                                <InputPrecio
+                                  
                                   value={formData.tarifasAlquiler?.[key] ?? ''}
                                   onChange={e => updateAddTarifa(key, e.target.value)}
                                   className="w-full border border-blue-200 rounded-lg pl-2 pr-6 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400 bg-white"
@@ -731,11 +730,9 @@ export default function VehiclesTab({
                         <div className="mt-2.5" data-testid="campo-precio-convenio">
                           <label htmlFor="precio-convenio-alta" className="block text-[10px] font-semibold text-blue-700 mb-0.5">Precio personalizado — convenios con clientes (opcional)</label>
                           <div className="relative sm:max-w-[14rem]">
-                            <input
+                            <InputPrecio
                               id="precio-convenio-alta"
-                              type="number"
-                              min="0"
-                              step="0.01"
+                              
                               value={formData.tarifasAlquiler?.precioPersonalizado ?? ''}
                               onChange={e => updateAddTarifa('precioPersonalizado', e.target.value)}
                               className="w-full border border-blue-200 rounded-lg pl-2 pr-12 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400 bg-white"
@@ -917,10 +914,8 @@ export default function VehiclesTab({
                             <div key={key}>
                               <label className="block text-[10px] font-semibold text-blue-700 mb-0.5">{label}</label>
                               <div className="relative">
-                                <input
-                                  type="number"
-                                  min="0"
-                                  step="0.01"
+                                <InputPrecio
+                                  
                                   value={editFormData.tarifasAlquiler?.[key] ?? ''}
                                   onChange={e => updateEditTarifa(key, e.target.value)}
                                   className="w-full border border-blue-200 rounded-lg pl-2 pr-6 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400 bg-white"
@@ -934,11 +929,9 @@ export default function VehiclesTab({
                         <div className="mt-2.5" data-testid="campo-precio-convenio">
                           <label htmlFor="precio-convenio-edicion" className="block text-[10px] font-semibold text-blue-700 mb-0.5">Precio personalizado — convenios con clientes (opcional)</label>
                           <div className="relative sm:max-w-[14rem]">
-                            <input
+                            <InputPrecio
                               id="precio-convenio-edicion"
-                              type="number"
-                              min="0"
-                              step="0.01"
+                              
                               value={editFormData.tarifasAlquiler?.precioPersonalizado ?? ''}
                               onChange={e => updateEditTarifa('precioPersonalizado', e.target.value)}
                               className="w-full border border-blue-200 rounded-lg pl-2 pr-12 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400 bg-white"

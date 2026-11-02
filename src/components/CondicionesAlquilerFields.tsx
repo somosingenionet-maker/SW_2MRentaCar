@@ -1,3 +1,4 @@
+import { InputPrecio } from './InputPrecio';
 import { Vehiculo } from '../types';
 import { CONDICIONES_POR_DEFECTO } from '../utils/condicionesAlquiler';
 
@@ -30,8 +31,8 @@ export default function CondicionesAlquilerFields({ value, onChange }: Props) {
         </div>
         <div>
           <label className="block text-[10px] font-semibold text-blue-700 mb-0.5" title="Es el importe que se propone en cada reserva; el taller lo puede cambiar en cada una.">Fianza habitual (€)</label>
-          <input
-            type="number" min="0" step="0.01" placeholder="0"
+          <InputPrecio
+            placeholder="0"
             value={value.fianza ?? ''}
             onChange={e => onChange({ fianza: e.target.value === '' ? 0 : Number(e.target.value) })}
             className={campo}
@@ -51,8 +52,7 @@ export default function CondicionesAlquilerFields({ value, onChange }: Props) {
         {ofreceSeguro && (
           <div className="mt-1.5 w-40">
             <label className="block text-[10px] font-semibold text-blue-700 mb-0.5">Precio por día (€)</label>
-            <input
-              type="number" min="0" step="0.01"
+            <InputPrecio
               value={value.seguroAmpliadoDia ?? ''}
               onChange={e => onChange({ seguroAmpliadoDia: e.target.value === '' ? 0 : Number(e.target.value) })}
               className={campo}

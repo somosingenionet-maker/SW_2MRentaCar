@@ -1,3 +1,4 @@
+import { InputPrecio } from './InputPrecio';
 import { useState } from 'react';
 import { Package, Plus, Edit2, Trash2, Check } from 'lucide-react';
 import type { Complemento } from '../types';
@@ -59,7 +60,7 @@ export default function ComplementosPanel({ complementos, onAdd, onUpdate, onDel
           <input type="text" value={form.nombre} onChange={e => setForm({ ...form, nombre: e.target.value, error: '' })} placeholder="Nombre *" aria-label="Nombre del complemento"
             className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-orange-400" />
           <div className="grid grid-cols-2 gap-2">
-            <input type="number" min="0" step="0.01" inputMode="decimal" value={form.precio} onChange={e => setForm({ ...form, precio: e.target.value, error: '' })} placeholder="Precio en € *" aria-label="Precio en euros"
+            <InputPrecio value={form.precio} onChange={e => setForm({ ...form, precio: e.target.value, error: '' })} placeholder="Precio en € *" aria-label="Precio en euros"
               className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-orange-400" />
             <select value={form.porDia ? 'dia' : 'fijo'} onChange={e => setForm({ ...form, porDia: e.target.value === 'dia' })} aria-label="Cómo se cobra"
               className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-orange-400">
