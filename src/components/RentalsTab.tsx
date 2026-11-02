@@ -966,7 +966,7 @@ export default function RentalsTab({
                           </td>
                           <td className="py-3 px-2 text-right">
                             <span className="font-mono font-extrabold text-slate-800 block text-xs">{res.totalCobrado.toFixed(2)} €</span>
-                            <span className="text-[9px] text-slate-400">{res.tarifaDiaria}€/día {res.incluyeSeguroTodoRiesgo && '+ todo riesgo'}</span>
+                            <span className="text-[9px] text-slate-400">{res.tarifaDiaria.toFixed(2)}€/día {res.incluyeSeguroTodoRiesgo && '+ todo riesgo'}</span>
                           </td>
                           <td className="py-3 px-2 text-right space-x-1" onClick={e => e.stopPropagation()}>
                             {(() => {
@@ -1475,7 +1475,7 @@ export default function RentalsTab({
                                 className={`flex flex-col items-center py-2 px-1 rounded-lg border text-xs transition ${active ? 'border-blue-500 bg-blue-50 text-blue-700 font-bold' : 'border-slate-200 text-slate-600 hover:border-slate-300'}`}
                               >
                                 <span>{label}</span>
-                                {precio !== null && <span className="font-mono mt-0.5 text-[11px]">{precio}€/día</span>}
+                                {precio !== null && <span className="font-mono mt-0.5 text-[11px]">{precio.toFixed(2)}€/día</span>}
                               </button>
                             );
                           })}
@@ -1488,10 +1488,12 @@ export default function RentalsTab({
                       <span className="absolute inset-y-0 left-0 pl-3 flex items-center text-slate-400 font-semibold text-xs">€/Día</span>
                       <input
                         type="number"
-                        min="1"
+                        min="0"
+                        step="0.01"
+                        inputMode="decimal"
                         className="w-full pl-14 pr-3 py-2 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-1 focus:ring-blue-500 font-mono"
                         value={formTarifa}
-                        onChange={e => setFormTarifa(Number(e.target.value))}
+                        onChange={e => setFormTarifa(Math.round(Number(e.target.value) * 100) / 100)}
                         required
                       />
                     </div>
@@ -1554,7 +1556,7 @@ export default function RentalsTab({
                       <span>
                         {solicitudActiva
                           ? `${currentDuration} días${solicitudActiva.descuento > 0 && solicitudActiva.vehiculoSubtotal != null ? ` · incluye ${solicitudActiva.descuento.toFixed(2)} € de descuento` : ''}${solicitudActiva.pagado ? ' · pagado' : ' · pago al recoger'}`
-                          : `Alquiler: ${currentDuration} días a ${formTarifa}€ / día${importeExtrasForm > 0 ? ` + complementos ${importeExtrasForm.toFixed(2)} €` : ''}`}
+                          : `Alquiler: ${currentDuration} días a ${formTarifa.toFixed(2)}€ / día${importeExtrasForm > 0 ? ` + complementos ${importeExtrasForm.toFixed(2)} €` : ''}`}
                       </span>
                     </div>
                     <div className="text-right font-mono text-base font-extrabold text-blue-900">

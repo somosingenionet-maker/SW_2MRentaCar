@@ -9,7 +9,7 @@ export const ofreceSeguro = (v?: Pick<Vehiculo, 'seguroAmpliadoDia'> | null): bo
 /** Total de un alquiler: días × tarifa, más el seguro por día si se contrata y el vehículo lo ofrece. */
 export function totalAlquiler(dias: number, tarifaDia: number, seguroDia: number | null | undefined, conSeguro: boolean): number {
   const seguro = conSeguro && seguroDia != null ? dias * seguroDia : 0;
-  return dias * tarifaDia + seguro;
+  return Math.round((dias * tarifaDia + seguro) * 100) / 100;
 }
 
 /** Total que corresponde a una reserva con `dias` días: alquiler y seguro, más sus complementos (los de precio por día se recalculan). */

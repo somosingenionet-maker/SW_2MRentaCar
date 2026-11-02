@@ -7,7 +7,8 @@ export type ClaveTarifa = keyof TarifasAlquiler;
  * (convenios con clientes) es opcional: si se vacía o es 0 desaparece, no se guarda un 0 que parecería un convenio.
  */
 export function cambiarTarifa(actuales: TarifasAlquiler | undefined, clave: ClaveTarifa, valor: string): TarifasAlquiler {
-  const num = valor.trim() === '' ? 0 : Number(valor);
+  // Precios en euros con 2 decimales como máximo, para que los totales cuadren al céntimo.
+  const num = valor.trim() === '' ? 0 : Math.round(Number(valor) * 100) / 100;
   const siguiente: TarifasAlquiler = {
     temporadaAlta: actuales?.temporadaAlta ?? 0,
     temporadaMedia: actuales?.temporadaMedia ?? 0,

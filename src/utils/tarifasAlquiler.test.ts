@@ -1,4 +1,5 @@
 import { describe, it, expect } from 'vitest';
+import { totalAlquiler } from './condicionesAlquiler';
 import { cambiarTarifa, precioConvenio, tarifaDeTemporada } from './tarifasAlquiler';
 
 const base = { temporadaAlta: 60, temporadaMedia: 45, temporadaBaja: 30 };
@@ -47,5 +48,17 @@ describe('tarifaDeTemporada', () => {
   it('sin convenio o sin tarifas devuelve null', () => {
     expect(tarifaDeTemporada({ ...t, precioPersonalizado: undefined }, 'convenio')).toBeNull();
     expect(tarifaDeTemporada(undefined, 'media')).toBeNull();
+  });
+});
+
+describe('precios con decimales', () => {
+  it('admite céntimos y no guarda más de 2 decimales', () => {
+    expect(cambiarTarifa(base, 'temporadaMedia', '45.75').temporadaMedia).toBe(45.75);
+    expect(cambiarTarifa(base, 'temporadaMedia', '45.756').temporadaMedia).toBe(45.76);
+    expect(cambiarTarifa(base, 'precioPersonalizado', '33.333').precioPersonalizado).toBe(33.33);
+  });
+  it('días × tarifa con céntimos no arrastra decimales de más', () => {
+    expect(totalAlquiler(3, 33.33, null, false)).toBe(99.99);
+    expect(totalAlquiler(3, 33.33, 12.1, true)).toBe(136.29);
   });
 });

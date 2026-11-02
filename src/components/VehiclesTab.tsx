@@ -437,14 +437,14 @@ export default function VehiclesTab({
                       return (
                         <div key={key} className="bg-white rounded-lg border border-blue-100 p-2 text-center">
                           <div className="text-[10px] text-slate-400 font-semibold uppercase">{label}</div>
-                          <div className="text-sm font-extrabold text-slate-800 mt-0.5">{precio != null ? `${precio} €` : '—'}</div>
+                          <div className="text-sm font-extrabold text-slate-800 mt-0.5">{precio != null ? `${precio.toFixed(2)} €` : '—'}</div>
                         </div>
                       );
                     })}
                     {precioConvenio(selectedVehiculo.tarifasAlquiler) != null && (
                       <div data-testid="tarjeta-convenio" className="bg-white rounded-lg border border-amber-200 p-2 text-center">
                         <div className="text-[10px] text-amber-600 font-semibold uppercase">Convenio</div>
-                        <div className="text-sm font-extrabold text-slate-800 mt-0.5">{precioConvenio(selectedVehiculo.tarifasAlquiler)} €</div>
+                        <div className="text-sm font-extrabold text-slate-800 mt-0.5">{precioConvenio(selectedVehiculo.tarifasAlquiler)?.toFixed(2)} €</div>
                       </div>
                     )}
                   </div>
