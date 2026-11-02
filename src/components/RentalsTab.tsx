@@ -1573,7 +1573,7 @@ export default function RentalsTab({
                     />
                     <p className="text-[11px] text-slate-400 mt-1">
                       {vehiculoElegido
-                        ? `Importe habitual de este vehículo: ${vehiculoElegido.fianza ?? 0} €. Cámbialo si para esta reserva se pide otro; pon 0 si no hay fianza.`
+                        ? `Importe habitual de este vehículo: ${(vehiculoElegido.fianza ?? 0).toFixed(2)} €. Cámbialo si para esta reserva se pide otro; pon 0 si no hay fianza.`
                         : 'Elige un vehículo para ver su importe habitual.'}
                       {vehiculoElegido?.transmision ? ` · Cambio ${etiquetaTransmision(vehiculoElegido.transmision).toLowerCase()}` : ''}
                     </p>

@@ -11,6 +11,7 @@ import { getEmpresaConfig } from '../data/empresaConfig';
 import { genId } from '../utils/id';
 import ConfirmDialog from './ConfirmDialog';
 import { mensajeFactura } from '../utils/mensajeFactura';
+import { InputPrecio } from './InputPrecio';
 
 interface FacturasTabProps {
   facturas: Factura[];
@@ -262,7 +263,7 @@ function FacturaModal({ factura, clientes, vehiculos, ordenesTrabajo, nextNumero
                 <div key={l.id} className="grid grid-cols-12 gap-1.5 items-center">
                   <input className="col-span-5 border border-slate-200 rounded-lg px-2 py-1.5 text-xs focus:outline-none focus:ring-2 focus:ring-blue-400" placeholder="Descripción" value={l.descripcion} onChange={e => updateLine(l.id, 'descripcion', e.target.value)} />
                   <input type="number" min="1" className="col-span-2 border border-slate-200 rounded-lg px-2 py-1.5 text-xs text-center focus:outline-none focus:ring-2 focus:ring-blue-400" placeholder="Cant." value={l.cantidad} onChange={e => updateLine(l.id, 'cantidad', parseFloat(e.target.value) || 0)} />
-                  <input type="number" min="0" step="0.01" className="col-span-2 border border-slate-200 rounded-lg px-2 py-1.5 text-xs text-right focus:outline-none focus:ring-2 focus:ring-blue-400" placeholder="Precio" value={l.precioUnitario} onChange={e => updateLine(l.id, 'precioUnitario', parseFloat(e.target.value) || 0)} />
+                  <InputPrecio className="col-span-2 border border-slate-200 rounded-lg px-2 py-1.5 text-xs text-right focus:outline-none focus:ring-2 focus:ring-blue-400" placeholder="Precio" value={l.precioUnitario} onChange={e => updateLine(l.id, 'precioUnitario', parseFloat(e.target.value) || 0)} />
                   <div className="col-span-2 text-right text-xs font-semibold text-slate-700 px-1">{fmt(l.subtotal)} €</div>
                   <button onClick={() => removeLine(l.id)} className="col-span-1 p-1 text-slate-300 hover:text-rose-500 transition"><X className="w-3.5 h-3.5" /></button>
                 </div>

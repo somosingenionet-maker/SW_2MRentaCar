@@ -18,6 +18,7 @@ import { FLOTA_CLIENTE_ID } from '../utils/flota';
 import TableroTaller from './TableroTaller';
 import { enlaceWhatsApp, mensajeAvisoMecanico } from '../utils/tallerMecanico';
 import { genId } from '../utils/id';
+import { InputPrecio } from './InputPrecio';
 
 interface Props {
   ordenes: OrdenTrabajo[];
@@ -1050,11 +1051,11 @@ export default function OrdenesTrabajoTab({ ordenes, vehiculos, clientes, tecnic
                                       className="px-2 py-1.5 border border-blue-300 rounded-lg text-xs font-mono focus:outline-none"
                                       placeholder={editOTEditLineaForm.tipo === 'mano_de_obra' ? 'Horas *' : 'Cantidad *'} />
                                     {!editFormEsFlota && (
-                                      <input type="number" min="0" step="0.01" value={editOTEditLineaForm.precioUnitario}
+                                      <InputPrecio value={editOTEditLineaForm.precioUnitario}
                                         onChange={e => setEditOTEditLineaForm(f => ({ ...f, precioUnitario: e.target.value === '' ? '' : Number(e.target.value) }))}
                                         className="px-2 py-1.5 border border-blue-300 rounded-lg text-xs font-mono focus:outline-none" placeholder="Precio venta € *" />
                                     )}
-                                    <input type="number" min="0" step="0.01" value={editOTEditLineaForm.costoUnitario}
+                                    <InputPrecio value={editOTEditLineaForm.costoUnitario}
                                       onChange={e => setEditOTEditLineaForm(f => ({ ...f, costoUnitario: e.target.value === '' ? '' : Number(e.target.value) }))}
                                       className="px-2 py-1.5 border border-blue-300 rounded-lg text-xs font-mono focus:outline-none"
                                       placeholder={editFormEsFlota ? 'Coste (uso interno) € *' : 'Coste taller €'} />
@@ -1122,12 +1123,12 @@ export default function OrdenesTrabajoTab({ ordenes, vehiculos, clientes, tecnic
                         placeholder={editOTNewLinea.tipo === 'mano_de_obra' ? 'Horas *' : 'Cantidad *'}
                         className="px-2 py-1.5 border border-slate-200 rounded-lg text-xs font-mono focus:outline-none" />
                       {!editFormEsFlota && (
-                        <input type="number" min="0" step="0.01" value={editOTNewLinea.precioUnitario}
+                        <InputPrecio value={editOTNewLinea.precioUnitario}
                           onChange={e => setEditOTNewLinea(f => ({ ...f, precioUnitario: e.target.value === '' ? '' : Number(e.target.value) }))}
                           placeholder="Precio venta € *"
                           className="px-2 py-1.5 border border-slate-200 rounded-lg text-xs font-mono focus:outline-none" />
                       )}
-                      <input type="number" min="0" step="0.01" value={editOTNewLinea.costoUnitario}
+                      <InputPrecio value={editOTNewLinea.costoUnitario}
                         onChange={e => setEditOTNewLinea(f => ({ ...f, costoUnitario: e.target.value === '' ? '' : Number(e.target.value) }))}
                         placeholder={editFormEsFlota ? 'Coste (uso interno) € *' : 'Coste taller €'}
                         className="px-2 py-1.5 border border-slate-200 rounded-lg text-xs font-mono focus:outline-none" />
@@ -1374,11 +1375,11 @@ export default function OrdenesTrabajoTab({ ordenes, vehiculos, clientes, tecnic
                                       className="px-2 py-1.5 border border-blue-300 rounded-lg text-xs font-mono focus:outline-none"
                                       placeholder={editLineaForm.tipo === 'mano_de_obra' ? 'Horas *' : 'Cantidad *'} />
                                     {!otFormEsFlota && (
-                                      <input type="number" min="0" step="0.01" value={editLineaForm.precioUnitario}
+                                      <InputPrecio value={editLineaForm.precioUnitario}
                                         onChange={e => setEditLineaForm(f => ({ ...f, precioUnitario: e.target.value === '' ? '' : Number(e.target.value) }))}
                                         className="px-2 py-1.5 border border-blue-300 rounded-lg text-xs font-mono focus:outline-none" placeholder="Precio venta € *" />
                                     )}
-                                    <input type="number" min="0" step="0.01" value={editLineaForm.costoUnitario}
+                                    <InputPrecio value={editLineaForm.costoUnitario}
                                       onChange={e => setEditLineaForm(f => ({ ...f, costoUnitario: e.target.value === '' ? '' : Number(e.target.value) }))}
                                       className="px-2 py-1.5 border border-blue-300 rounded-lg text-xs font-mono focus:outline-none"
                                       placeholder={otFormEsFlota ? 'Coste (uso interno) € *' : 'Coste taller €'} />
@@ -1431,11 +1432,11 @@ export default function OrdenesTrabajoTab({ ordenes, vehiculos, clientes, tecnic
                         onChange={e => setNewLinea(l => ({ ...l, cantidad: e.target.value === '' ? '' : Math.max(1, Math.round(Number(e.target.value))) }))}
                         className="px-2 py-1.5 border border-slate-200 rounded-lg text-xs font-mono focus:outline-none" />
                       {!otFormEsFlota && (
-                        <input type="number" min="0" step="0.01" placeholder="Precio venta € *" value={newLinea.precioUnitario}
+                        <InputPrecio placeholder="Precio venta € *" value={newLinea.precioUnitario}
                           onChange={e => setNewLinea(l => ({ ...l, precioUnitario: e.target.value === '' ? '' : Number(e.target.value) }))}
                           className="px-2 py-1.5 border border-slate-200 rounded-lg text-xs font-mono focus:outline-none" />
                       )}
-                      <input type="number" min="0" step="0.01" placeholder={otFormEsFlota ? 'Coste (uso interno) € *' : 'Coste taller €'} value={newLinea.costoUnitario}
+                      <InputPrecio placeholder={otFormEsFlota ? 'Coste (uso interno) € *' : 'Coste taller €'} value={newLinea.costoUnitario}
                         onChange={e => setNewLinea(l => ({ ...l, costoUnitario: e.target.value === '' ? '' : Number(e.target.value) }))}
                         className="px-2 py-1.5 border border-slate-200 rounded-lg text-xs font-mono focus:outline-none" />
                     </div>
