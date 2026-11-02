@@ -20,8 +20,9 @@ import { validarHorasReserva, fechaConHora, ordenarProximas, ordenarHistorial } 
 import Hora24Field from './Hora24Field';
 import { LUGARES_HABITUALES, lugaresReserva } from '../utils/lugarReserva';
 import { buscarReservas } from '../utils/buscarReservas';
-import { FilaDuracion, FilaCalculo, FilaComplementos } from './DuracionReserva';
-import { extrasManuales, extrasDePedidoWeb, totalExtras, etiquetaPrecioComplemento, resumenExtras } from '../utils/complementos';
+import { datosReservaWeb, lineasDePedidoWeb } from '../utils/pedidoWeb';
+import { FilaDuracion, DesgloseFicha } from './DuracionReserva';
+import { extrasManuales, totalExtras, etiquetaPrecioComplemento, resumenExtras } from '../utils/complementos';
 import ContratoVisor from './ContratoVisor';
 import { downloadCsv, slugify } from '../utils/csvExport';
 import { genId } from '../utils/id';
@@ -172,15 +173,12 @@ export default function RentalsTab({
         lugarRecogida: formLugarRecogida.trim() || undefined,
         lugarDevolucion: formLugarDevolucion.trim() || undefined,
         temporada: formTemporada,
-        tarifaDiaria: Math.round((solicitudActiva.vehiculoTotal / duration) * 100) / 100,
         totalCobrado: solicitudActiva.total,
         estado: 'confirmada',
-        incluyeSeguroTodoRiesgo: incluyeCobertura(solicitudActiva.extras),
         fianza: parseFianza(formFianza) ?? undefined,
-        seguroDia: seguroDiaElegido ?? undefined,
         origen: 'web',
-        // Lo que cobró la web por los complementos (con sus descuentos); las coberturas ya van en el seguro.
-        extras: extrasDePedidoWeb(solicitudActiva.extras),
+        // Cada línea a su precio de lista y el descuento del pedido aparte; el total es el que cobró la web.
+        ...datosReservaWeb(solicitudActiva, duration),
       };
     }
     const extras = extrasManuales(complementosActivos, formExtras, duration);
@@ -1120,47 +1118,36 @@ export default function RentalsTab({
                   {avisoDias && <p role="status" data-testid="aviso-dias" className="text-[11px] font-semibold text-emerald-700 bg-emerald-50 border border-emerald-200 rounded-md px-2 py-1">{avisoDias}</p>}
                 </div>
 
-                {/* Financial overview */}
-                <div className="p-3 bg-blue-50 text-blue-900 rounded-xl border border-blue-100/30 space-y-1.5">
-                  <div className="flex justify-between text-xs font-semibold">
-                    <span>Base Alquiler:</span>
-                    <span>{selectedReserva.tarifaDiaria.toFixed(2)} € / día</span>
-                  </div>
-                  <div className="flex justify-between text-xs font-semibold">
-                    <span>Seguro Todo Riesgo:</span>
-                    <span>{selectedReserva.incluyeSeguroTodoRiesgo ? (selectedReserva.seguroDia != null ? `${selectedReserva.seguroDia.toFixed(2)} € / día` : 'Incluido') : 'No incluido'}</span>
-                  </div>
-                  <div className="flex justify-between items-center gap-2 text-xs font-semibold" id="reserva-fianza-ficha">
-                    <span>Fianza (depósito):</span>
-                    {editandoFianza ? (
-                      <span className="flex items-center gap-1.5">
-                        <input
-                          type="number" min="0" step="0.01" inputMode="decimal" aria-label="Fianza en euros"
-                          className="w-24 px-2 h-[30px] border border-blue-200 rounded-md text-right text-xs text-slate-800 bg-white focus:outline-none focus:ring-1 focus:ring-blue-500"
-                          value={editandoFianza.valor}
-                          onChange={e => setEditandoFianza({ valor: e.target.value, error: '' })}
-                          autoFocus
-                        />
-                        <span>€</span>
-                        <button type="button" onClick={handleGuardarFianza} className="px-2 py-1 rounded-md bg-blue-600 hover:bg-blue-700 text-white text-[10px] font-bold cursor-pointer">Guardar</button>
-                        <button type="button" onClick={() => setEditandoFianza(null)} className="px-2 py-1 rounded-md border border-blue-200 text-blue-800 text-[10px] font-bold cursor-pointer">Cancelar</button>
-                      </span>
-                    ) : (
-                      <span className="flex items-center gap-2">
-                        <span>{selectedReserva.fianza != null && selectedReserva.fianza > 0 ? `${selectedReserva.fianza.toFixed(2)} €` : 'Sin fianza'}</span>
-                        {selectedReserva.estado !== 'cancelada' && (
-                          <button type="button" onClick={() => setEditandoFianza({ valor: String(selectedReserva.fianza ?? 0), error: '' })}
-                            className="text-[10px] font-bold text-blue-800 underline cursor-pointer">Cambiar</button>
-                        )}
-                      </span>
-                    )}
-                  </div>
-                  {editandoFianza?.error && <p role="alert" className="text-[11px] text-rose-600 font-medium">{editandoFianza.error}</p>}
-                  <FilaComplementos extras={selectedReserva.extras} />
-                  <FilaCalculo reserva={selectedReserva} />
-                  <div className="flex justify-between border-t border-blue-200 pt-1.5 text-xs font-bold text-blue-800">
-                    <span>LIQUIDACIÓN TOTAL:</span>
-                    <span>{selectedReserva.totalCobrado.toFixed(2)} €</span>
+                {/* Desglose económico: cada concepto a su precio, el descuento aparte y la fianza fuera del total */}
+                <div className="p-3 bg-blue-50 text-blue-900 rounded-xl border border-blue-100/30 space-y-2">
+                  <DesgloseFicha reserva={selectedReserva} />
+                  <div className="border-t border-dashed border-blue-200 pt-2 space-y-1.5">
+                    <div className="flex justify-between items-center gap-2 text-xs font-semibold" id="reserva-fianza-ficha">
+                      <span>Fianza (depósito aparte, no incluida en el total):</span>
+                      {editandoFianza ? (
+                        <span className="flex items-center gap-1.5">
+                          <input
+                            type="number" min="0" step="0.01" inputMode="decimal" aria-label="Fianza en euros"
+                            className="w-24 px-2 h-[30px] border border-blue-200 rounded-md text-right text-xs text-slate-800 bg-white focus:outline-none focus:ring-1 focus:ring-blue-500"
+                            value={editandoFianza.valor}
+                            onChange={e => setEditandoFianza({ valor: e.target.value, error: '' })}
+                            autoFocus
+                          />
+                          <span>€</span>
+                          <button type="button" onClick={handleGuardarFianza} className="px-2 py-1 rounded-md bg-blue-600 hover:bg-blue-700 text-white text-[10px] font-bold cursor-pointer">Guardar</button>
+                          <button type="button" onClick={() => setEditandoFianza(null)} className="px-2 py-1 rounded-md border border-blue-200 text-blue-800 text-[10px] font-bold cursor-pointer">Cancelar</button>
+                        </span>
+                      ) : (
+                        <span className="flex items-center gap-2">
+                          <span>{selectedReserva.fianza != null && selectedReserva.fianza > 0 ? `${selectedReserva.fianza.toFixed(2)} €` : 'Sin fianza'}</span>
+                          {selectedReserva.estado !== 'cancelada' && (
+                            <button type="button" onClick={() => setEditandoFianza({ valor: String(selectedReserva.fianza ?? 0), error: '' })}
+                              className="text-[10px] font-bold text-blue-800 underline cursor-pointer">Cambiar</button>
+                          )}
+                        </span>
+                      )}
+                    </div>
+                    {editandoFianza?.error && <p role="alert" className="text-[11px] text-rose-600 font-medium">{editandoFianza.error}</p>}
                   </div>
                 </div>
               </div>
@@ -1294,9 +1281,15 @@ export default function RentalsTab({
                       <div>Pidió: <strong>{descripcionVehiculoWeb(solicitudActiva)}</strong></div>
                       <div>Recogida: {fechaHoraWeb(solicitudActiva.fechaRecogida)} · {solicitudActiva.lugarRecogida ?? '—'}</div>
                       <div>Devolución: {fechaHoraWeb(solicitudActiva.fechaDevolucion)} · {solicitudActiva.lugarDevolucion ?? '—'}</div>
-                      {solicitudActiva.extras.length > 0 && (
-                        <div>Extras: {solicitudActiva.extras.map(e => `${e.nombre} (${e.total.toFixed(2)} €)`).join(', ')}</div>
-                      )}
+                      <div data-testid="lineas-pedido-web" className="mt-1 pt-1 border-t border-blue-100 space-y-0.5">
+                        <div className="text-[10px] font-bold uppercase tracking-wider text-blue-600">Lo que cobró la web</div>
+                        {lineasDePedidoWeb(solicitudActiva).map((l, i) => (
+                          <div key={i} className="flex justify-between gap-3">
+                            <span>{l.texto}</span>
+                            <span className={`font-mono shrink-0 ${l.importe < 0 ? 'text-emerald-700' : ''}`}>{l.importe < 0 ? '−' : ''}{Math.abs(l.importe).toFixed(2)} €</span>
+                          </div>
+                        ))}
+                      </div>
                       {solicitudActiva.carnetCategoria && <div>Carnet: categoría {solicitudActiva.carnetCategoria}</div>}
                       {solicitudActiva.clienteDocumento && <div>Documento: <strong>{solicitudActiva.clienteDocumento}</strong></div>}
                       {!solicitudActiva.clienteDocumento && (clienteNuevo || !clientes.find(c => c.id === formClienteId)?.nifNiePasaporte) && (
@@ -1522,7 +1515,7 @@ export default function RentalsTab({
                       </span>
                       <span>
                         {solicitudActiva
-                          ? `${currentDuration} días · vehículo ${solicitudActiva.vehiculoTotal.toFixed(2)} € + extras${solicitudActiva.pagado ? ' · pagado' : ' · pago al recoger'}`
+                          ? `${currentDuration} días${solicitudActiva.descuento > 0 && solicitudActiva.vehiculoSubtotal != null ? ` · incluye ${solicitudActiva.descuento.toFixed(2)} € de descuento` : ''}${solicitudActiva.pagado ? ' · pagado' : ' · pago al recoger'}`
                           : `Alquiler: ${currentDuration} días a ${formTarifa}€ / día${importeExtrasForm > 0 ? ` + complementos ${importeExtrasForm.toFixed(2)} €` : ''}`}
                       </span>
                     </div>

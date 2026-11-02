@@ -92,9 +92,14 @@ const ESTADOS_CANCELADOS = new Set(['cancelled', 'refunded', 'failed']);
 /** El pedido se canceló, reembolsó o falló en la web. */
 export const canceladaEnWeb = (sol: SolicitudReserva): boolean => ESTADOS_CANCELADOS.has(sol.estadoExterno);
 
-/** Algún extra es una cobertura/seguro (equivale al "todo riesgo" de la reserva). */
-export const incluyeCobertura = (extras: SolicitudExtra[]): boolean =>
-  extras.some(e => /cobertura|seguro|todo riesgo/i.test(e.nombre));
+const esLineaDeCobertura = (e: SolicitudExtra): boolean => /cobertura|seguro|todo riesgo/i.test(e.nombre);
+
+/** La cobertura de PAGO del pedido (Plus Relax: equivale al «todo riesgo» de la reserva). La «Básica» es gratis y no cuenta. */
+export const coberturaDePago = (extras: SolicitudExtra[]): SolicitudExtra | undefined =>
+  extras.find(e => esLineaDeCobertura(e) && (e.subtotal ?? e.total) > 0);
+
+/** El pedido incluye una cobertura de pago (seguro a todo riesgo). */
+export const incluyeCobertura = (extras: SolicitudExtra[]): boolean => coberturaDePago(extras) != null;
 
 /** Texto y color del estado del pedido en la web. */
 export function estadoWebMeta(sol: SolicitudReserva): { label: string; cls: string } {

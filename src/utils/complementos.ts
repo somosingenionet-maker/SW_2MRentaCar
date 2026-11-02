@@ -30,11 +30,12 @@ export function recalcularExtras(extras: ExtraReserva[] | undefined, dias: numbe
     e.precio != null && e.porDia != null ? { ...e, total: totalComplemento({ precio: e.precio, porDia: e.porDia }, e.cantidad, dias) } : e);
 }
 
-/** Complementos de un pedido de la web, sin coberturas, tal como los cobró la web. */
+/** Complementos de un pedido de la web, sin coberturas, a su precio de lista (o, en pedidos antiguos, lo que cobró la web). */
 export function extrasDePedidoWeb(extras: SolicitudExtra[] | undefined): ExtraReserva[] {
   return (extras ?? [])
     .filter(e => !esCobertura(e.nombre))
-    .map(e => ({ nombre: e.nombre, cantidad: e.cantidad > 0 ? e.cantidad : 1, total: e.total }));
+    // A precio de lista: el descuento del pedido se resta aparte, no se reparte entre las líneas.
+    .map(e => ({ nombre: e.nombre, cantidad: e.cantidad > 0 ? e.cantidad : 1, total: e.subtotal ?? e.total }));
 }
 
 /** Complementos elegidos del catálogo para una reserva manual, con sus importes a los días indicados. */

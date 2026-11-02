@@ -63,6 +63,9 @@ describe('estado de la solicitud web', () => {
   it('reconoce coberturas y seguros entre los extras', () => {
     expect(incluyeCobertura([{ nombre: 'Cobertura Plus Relax - 15€/día', cantidad: 1, total: 45 }])).toBe(true);
     expect(incluyeCobertura([{ nombre: 'Sillita infantil - 8€/día', cantidad: 1, total: 32 }])).toBe(false);
+    // La cobertura «Básica» (franquicia de 500 €) es gratis: no es el seguro a todo riesgo.
+    expect(incluyeCobertura([{ nombre: 'Cobertura Básica - 500€', cantidad: 1, total: 0 }])).toBe(false);
+    expect(incluyeCobertura([{ nombre: 'Cobertura Básica - 500€', cantidad: 1, total: 0 }, { nombre: 'Cobertura Plus Relax - 15€/día', cantidad: 1, total: 42.5, subtotal: 45 }])).toBe(true);
     expect(incluyeCobertura([])).toBe(false);
   });
   it('separa fecha y hora', () => {

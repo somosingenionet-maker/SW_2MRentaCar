@@ -5,6 +5,7 @@ import { fechaConHora } from '../utils/horaReserva';
 import { resumenCarnet } from '../utils/carnet';
 import { lugaresReserva } from '../utils/lugarReserva';
 import { nombreComplemento } from '../utils/complementos';
+import { desgloseReserva, type LineaDesglose } from '../utils/desgloseReserva';
 import { fechaHoraFirma, referenciaCorta } from '../utils/firmaContrato';
 import { TEXTOS_CONTRATO, etiquetaTransmisionContrato, type IdiomaContrato } from '../utils/contratoTextos';
 
@@ -34,6 +35,24 @@ export default function ContratoAlquiler({ reserva, cliente, vehiculo, empresa, 
   const c = cliente;
   const v = vehiculo;
   const lugares = lugaresReserva(reserva, solicitud ?? undefined);
+  const dias = reserva.dias ?? diasAlquiler(reserva.fechaInicio, reserva.fechaFin, reserva.horaInicio, reserva.horaFin);
+  const desglose = desgloseReserva(reserva, dias);
+  const euros = (n: number) => `${n < 0 ? '−' : ''}${Math.abs(n).toFixed(2)} €`;
+  // Cada línea económica con su texto en el idioma del contrato: concepto (y cómo se calcula) e importe.
+  const lineasEconomicas = desglose.lineas.map((l: LineaDesglose) => {
+    switch (l.tipo) {
+      case 'alquiler': return { etiqueta: `${tx.alquiler} (${tx.diasPorPrecio(l.dias, l.precio.toFixed(2))})`, importe: euros(l.importe) };
+      case 'seguro': return { etiqueta: `${tx.seguroCompleto} (${tx.diasPorPrecio(l.dias, l.precio.toFixed(2))})`, importe: euros(l.importe) };
+      case 'seguro-incluido': return { etiqueta: tx.seguroCompleto, importe: tx.incluido };
+      case 'terceros': return { etiqueta: tx.polizaTerceros, importe: tx.incluida };
+      case 'extra': {
+        const cuenta = l.precio != null && l.porDia != null ? ` (${l.precio.toFixed(2)} ${l.porDia ? tx.porDia : `€, ${tx.precioFijo}`})` : '';
+        return { etiqueta: `${nombreComplemento(l.nombre)}${l.cantidad > 1 ? ` × ${l.cantidad}` : ''}${cuenta}`, importe: euros(l.importe) };
+      }
+      case 'descuento': return { etiqueta: `${tx.descuento}${l.cupon ? ` (${tx.cupon} ${l.cupon})` : ''}`, importe: euros(l.importe), descuento: true };
+      case 'ajuste': return { etiqueta: Math.abs(l.importe) > 0.05 ? tx.otrosAjustes : tx.redondeo, importe: euros(l.importe) };
+    }
+  });
 
   return (
     <div className="p-8 md:p-12 space-y-6 text-slate-800 font-sans print:p-0 print:space-y-3" id="contract-printable-area" lang={idioma}>
@@ -134,43 +153,28 @@ export default function ContratoAlquiler({ reserva, cliente, vehiculo, empresa, 
           <p><strong>{tx.lugarEntrega}:</strong> {lugares.recogida || tx.noInformado}</p>
           <p><strong>{tx.fechaHoraRetorno}:</strong> {fechaConHora(reserva.fechaFin, reserva.horaFin, fecha)}</p>
           <p><strong>{tx.lugarDevolucion}:</strong> {lugares.devolucion || tx.noInformado}</p>
-          <p><strong>{tx.jornadas}:</strong> {tx.diasNaturales(reserva.dias ?? diasAlquiler(reserva.fechaInicio, reserva.fechaFin, reserva.horaInicio, reserva.horaFin))}</p>
+          <p><strong>{tx.jornadas}:</strong> {tx.diasNaturales(dias)}</p>
           <p className="text-slate-500 italic text-[10px]">{tx.retraso}</p>
         </div>
 
         <div className="p-4 print:p-3 bg-blue-50/50 border border-blue-200 rounded-xl space-y-1.5 break-inside-avoid" id="contract-financial-specs">
           <h5 className="font-bold text-blue-950 uppercase text-[10px] pb-1 border-b border-blue-200">{tx.s5}</h5>
-          <div className="flex justify-between font-sans">
-            <span>{tx.precioBase}:</span>
-            <strong className="font-mono">{reserva.tarifaDiaria.toFixed(2)} {tx.porDia}</strong>
-          </div>
-          <div className="flex justify-between font-sans">
-            <span>{tx.seguroCompleto}:</span>
-            <strong className="font-mono">
-              {reserva.incluyeSeguroTodoRiesgo
-                ? (reserva.seguroDia != null ? `${reserva.seguroDia.toFixed(2)} ${tx.porDia}` : tx.incluido)
-                : tx.polizaTerceros}
-            </strong>
-          </div>
-          {reserva.fianza != null && reserva.fianza > 0 && (
-            <div className="flex justify-between font-sans">
-              <span>{tx.fianza}:</span>
-              <strong className="font-mono">{reserva.fianza.toFixed(2)} €</strong>
-            </div>
-          )}
-          {(reserva.extras ?? []).map((e, i) => (
-            <div key={i} data-testid="complemento-contrato" className="flex justify-between gap-2 font-sans">
-              <span>
-                {nombreComplemento(e.nombre)}{e.cantidad > 1 ? ` × ${e.cantidad}` : ''}
-                {e.precio != null && e.porDia != null ? ` (${e.precio.toFixed(2)} ${e.porDia ? tx.porDia : `€, ${tx.precioFijo}`})` : ''}:
-              </span>
-              <strong className="font-mono shrink-0">{e.total.toFixed(2)} €</strong>
+          {lineasEconomicas.map((l, i) => (
+            <div key={i} data-testid="linea-economica" className="flex justify-between gap-2 font-sans">
+              <span>{l.etiqueta}:</span>
+              <strong className={`font-mono shrink-0 ${l.descuento ? 'text-emerald-800' : ''}`}>{l.importe}</strong>
             </div>
           ))}
           <div className="flex justify-between border-t border-blue-300 pt-1 text-blue-900 font-extrabold font-sans">
             <span>{tx.importeNeto}:</span>
-            <strong className="font-mono text-blue-950">{reserva.totalCobrado.toFixed(2)} €</strong>
+            <strong className="font-mono text-blue-950">{euros(desglose.total)}</strong>
           </div>
+          {desglose.fianza > 0 && (
+            <div data-testid="fianza-contrato" className="flex justify-between gap-2 border-t border-dashed border-blue-300 pt-1.5 text-[10px] text-slate-600 font-sans">
+              <span>{tx.fianzaAparte}:</span>
+              <strong className="font-mono shrink-0">{euros(desglose.fianza)}</strong>
+            </div>
+          )}
         </div>
       </div>
 

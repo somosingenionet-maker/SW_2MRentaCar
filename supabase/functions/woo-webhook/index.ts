@@ -12,6 +12,7 @@
 // SUPABASE_URL y SUPABASE_SERVICE_ROLE_KEY los inyecta Supabase solos.
 
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
+import { preciosDePedido } from './precios.ts';
 
 const encoder = new TextEncoder();
 
@@ -73,7 +74,7 @@ function parseFecha(txt: unknown): string | null {
 }
 
 type Meta = { key: string; value: unknown };
-type LineItem = { name?: string; product_id?: number; quantity?: number; total?: string };
+type LineItem = { name?: string; product_id?: number; quantity?: number; subtotal?: string; total?: string };
 
 // Quita datos personales/técnicos que no hacen falta para operar (minimización RGPD).
 function sanear(order: Record<string, unknown>): Record<string, unknown> {
@@ -239,8 +240,9 @@ Deno.serve(async (req: Request) => {
     return tipo ? tipo === 'vehiculo' : /o similar/i.test(i.name ?? '');
   };
   const items = order.line_items as LineItem[];
-  const vehiculo = items.find(esVehiculo);
-  const extras = items.filter(i => i !== vehiculo);
+  // Importes a precio de lista y a lo cobrado, y cupones (ver precios.ts).
+  const precios = preciosDePedido(items, order.coupon_lines, esVehiculo);
+  const vehiculo = precios.vehiculo;
 
   // Solo columnas de datos del pedido: estado_gestion, cliente_id y reserva_id
   // no se envían, así que una actualización desde la web nunca pisa lo que ya
@@ -265,8 +267,10 @@ Deno.serve(async (req: Request) => {
     lugar_devolucion: (meta('order_drop_location') as string) || null,
     vehiculo_nombre: vehiculo?.name ?? '',
     vehiculo_web_id: vehiculo?.product_id != null ? String(vehiculo.product_id) : null,
-    vehiculo_total: Number(vehiculo?.total ?? 0),
-    extras: extras.map(i => ({ nombre: i.name ?? '', cantidad: i.quantity ?? 1, total: Number(i.total ?? 0) })),
+    vehiculo_total: precios.vehiculo_total,
+    vehiculo_subtotal: precios.vehiculo_subtotal,
+    extras: precios.extras,
+    cupones: precios.cupones,
     descuento: Number(order.discount_total ?? 0),
     total: Number(order.total ?? 0),
     metodo_pago: (order.payment_method_title as string) || null,

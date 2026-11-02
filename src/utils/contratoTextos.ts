@@ -65,14 +65,22 @@ export interface TextosContrato {
   retraso: string;
   // 5. Tarifas
   s5: string;
-  precioBase: string;
   porDia: string;
+  precioFijo: string;
+  alquiler: string;
+  /** «3 días × 40,00 €» */
+  diasPorPrecio: (dias: number, precio: string) => string;
   seguroCompleto: string;
   incluido: string;
+  incluida: string;
   polizaTerceros: string;
-  fianza: string;
-  precioFijo: string;
+  descuento: string;
+  cupon: string;
+  redondeo: string;
+  otrosAjustes: string;
   importeNeto: string;
+  /** La fianza es un depósito aparte: no suma al importe. */
+  fianzaAparte: string;
   // Final
   declaracion: string;
   /** Título de la caja de firma del cliente (se muestra en mayúsculas). */
@@ -134,14 +142,20 @@ const ES: TextosContrato = {
   diasNaturales: n => `${n} días naturales`,
   retraso: 'El retraso superior a 59 minutos en la devolución facultará el cobro de un día adicional con penalización.',
   s5: '5. LIQUIDACIÓN DE TARIFAS (I.V.A. INCLUIDO)',
-  precioBase: 'Precio unitario base',
   porDia: '€ / día',
+  precioFijo: 'precio fijo',
+  alquiler: 'Alquiler',
+  diasPorPrecio: (dias, precio) => `${dias} ${dias === 1 ? 'día' : 'días'} × ${precio} €`,
   seguroCompleto: 'Seguro Técnico Completo',
   incluido: 'Incluido',
-  polizaTerceros: 'Póliza Terceros Básica',
-  fianza: 'Fianza (depósito reembolsable)',
-  precioFijo: 'precio fijo',
+  incluida: 'Incluida',
+  polizaTerceros: 'Póliza de terceros básica',
+  descuento: 'Descuento',
+  cupon: 'cupón',
+  redondeo: 'Redondeo',
+  otrosAjustes: 'Otros ajustes',
   importeNeto: 'IMPORTE FACTURADO NETO',
+  fianzaAparte: 'Fianza (depósito reembolsable, no incluida en el importe)',
   declaracion: DECLARACION_ES,
   firmaConductor: 'Firma conductor',
   firmadoElectronicamente: (fecha, ref) => `Firmado electrónicamente el ${fecha} · Ref. ${ref}`,
@@ -199,14 +213,20 @@ const EN: TextosContrato = {
   diasNaturales: n => `${n} calendar days`,
   retraso: 'A delay of more than 59 minutes in returning the vehicle entitles the Lessor to charge an additional day with a penalty.',
   s5: '5. RATES AND CHARGES (VAT INCLUDED)',
-  precioBase: 'Base unit price',
   porDia: '€ / day',
+  precioFijo: 'fixed price',
+  alquiler: 'Rental',
+  diasPorPrecio: (dias, precio) => `${dias} ${dias === 1 ? 'day' : 'days'} × ${precio} €`,
   seguroCompleto: 'Comprehensive insurance',
   incluido: 'Included',
+  incluida: 'Included',
   polizaTerceros: 'Basic third-party policy',
-  fianza: 'Deposit (refundable)',
-  precioFijo: 'fixed price',
+  descuento: 'Discount',
+  cupon: 'coupon',
+  redondeo: 'Rounding',
+  otrosAjustes: 'Other adjustments',
   importeNeto: 'NET INVOICED AMOUNT',
+  fianzaAparte: 'Deposit (refundable, not included in the amount)',
   declaracion: DECLARACION_EN,
   firmaConductor: "Driver's signature",
   firmadoElectronicamente: (fecha, ref) => `Electronically signed on ${fecha} · Ref. ${ref}`,

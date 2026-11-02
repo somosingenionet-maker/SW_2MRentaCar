@@ -162,6 +162,10 @@ export interface Reserva {
   devolucion?: MovimientoVehiculo | null;
   /** Complementos que lleva la reserva (sillitas, baca, portabicicletas...). No incluye coberturas: las modelan los campos de seguro. */
   extras?: ExtraReserva[];
+  /** Descuento total aplicado en la web (cupón u otro). Las líneas de la reserva van a precio de lista y este importe se resta aparte. */
+  descuento?: number;
+  /** Código(s) del cupón de la web, si el pedido lo trae. */
+  cupon?: string;
 }
 
 /**
@@ -204,7 +208,10 @@ export interface MovimientoVehiculo {
 export interface SolicitudExtra {
   nombre: string;
   cantidad: number;
+  /** Lo que cobró la web por esta línea, ya con su parte del descuento. */
   total: number;
+  /** Precio de lista de la línea, antes de descuentos. Los pedidos antiguos sin este dato usan `total`. */
+  subtotal?: number;
 }
 
 /**
@@ -239,6 +246,10 @@ export interface SolicitudReserva {
   vehiculoWebId?: string;
   /** Lo que se cobra por el vehículo solo, ya con descuento. */
   vehiculoTotal: number;
+  /** Precio de lista del alquiler del vehículo, antes de descuentos. Ausente en pedidos antiguos. */
+  vehiculoSubtotal?: number;
+  /** Cupones aplicados al pedido (código e importe descontado). Puede haber descuento sin cupón: el descuento total está en `descuento`. */
+  cupones?: { codigo: string; importe: number }[];
   extras: SolicitudExtra[];
   descuento: number;
   total: number;
@@ -394,7 +405,7 @@ export interface EmpresaContrato {
 
 /** Copia congelada de lo que el cliente firmó: el contrato no cambia aunque se editen la reserva, el cliente o el coche. */
 export interface SnapshotContrato {
-  reserva: Pick<Reserva, 'id' | 'vehiculoId' | 'clienteId' | 'fechaInicio' | 'fechaFin' | 'horaInicio' | 'horaFin' | 'lugarRecogida' | 'lugarDevolucion' | 'tarifaDiaria' | 'totalCobrado' | 'incluyeSeguroTodoRiesgo' | 'fianza' | 'seguroDia' | 'extras'> & {
+  reserva: Pick<Reserva, 'id' | 'vehiculoId' | 'clienteId' | 'fechaInicio' | 'fechaFin' | 'horaInicio' | 'horaFin' | 'lugarRecogida' | 'lugarDevolucion' | 'tarifaDiaria' | 'totalCobrado' | 'incluyeSeguroTodoRiesgo' | 'fianza' | 'seguroDia' | 'extras' | 'descuento' | 'cupon'> & {
     /** Días de alquiler tal como se contaron al firmar. Los contratos sin firmar lo calculan al vuelo. */
     dias?: number;
   };

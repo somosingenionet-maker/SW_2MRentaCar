@@ -81,7 +81,7 @@ describe('contrato en los dos idiomas', () => {
     expect(t).toContain('Fecha y hora acordadas de retorno: 2 nov. 2026 · 09:30');
     expect(t).toContain('Carnet de conducir: ABC12345 · expedido 1 mar. 2018 · vence 1 mar. 2028');
     expect(t).toContain('Automático');
-    expect(t).toContain('Fianza (depósito reembolsable): 500.00 €');
+    expect(t).toContain('Fianza (depósito reembolsable, no incluida en el importe): 500.00 €');
   });
 
   it('en inglés traduce títulos, etiquetas y fechas, y conserva las horas', () => {
@@ -92,7 +92,7 @@ describe('contrato en los dos idiomas', () => {
     expect(t).toContain('Agreed return date and time: 2 Nov 2026 · 09:30');
     expect(t).toContain('Driving licence: ABC12345 · issued 1 Mar 2018 · expires 1 Mar 2028');
     expect(t).toContain('Automatic');
-    expect(t).toContain('Deposit (refundable): 500.00 €');
+    expect(t).toContain('Deposit (refundable, not included in the amount): 500.00 €');
     for (const espanol of ['DATOS DEL', 'Contrato de', 'Fecha y hora', 'Kilometraje', 'Matrícula', 'oct.', 'Arrendador', 'Arrendatario', 'conductor']) expect(t).not.toContain(espanol);
   });
 
@@ -102,10 +102,10 @@ describe('contrato en los dos idiomas', () => {
   });
 
   it('seguro: completo con precio, o terceros básico, traducido', () => {
-    expect(texto('es')).toContain('15.00 € / día');
-    expect(texto('en')).toContain('15.00 € / day');
-    expect(texto('es', { reserva: { incluyeSeguroTodoRiesgo: false } })).toContain('Póliza Terceros Básica');
-    expect(texto('en', { reserva: { incluyeSeguroTodoRiesgo: false } })).toContain('Basic third-party policy');
+    expect(texto('es')).toContain('Seguro Técnico Completo (2 días × 15.00 €): 30.00 €');
+    expect(texto('en')).toContain('Comprehensive insurance (2 days × 15.00 €): 30.00 €');
+    expect(texto('es', { reserva: { incluyeSeguroTodoRiesgo: false } })).toContain('Póliza de terceros básica: Incluida');
+    expect(texto('en', { reserva: { incluyeSeguroTodoRiesgo: false } })).toContain('Basic third-party policy: Included');
   });
 
   it('un cliente o un vehículo que ya no existen no rompen el contrato', () => {
@@ -428,7 +428,8 @@ describe('complementos en el contrato', () => {
   it('la línea va dentro del cuadro económico, antes del importe neto', () => {
     const t = conExtras('es');
     expect(t.indexOf('Baca coche')).toBeLessThan(t.indexOf('IMPORTE FACTURADO NETO'));
-    expect(t.indexOf('Fianza')).toBeLessThan(t.indexOf('Baca coche'));
+    // La fianza es un depósito aparte: va DESPUÉS del importe neto, no entre las líneas que lo forman.
+    expect(t.indexOf('Fianza')).toBeGreaterThan(t.indexOf('IMPORTE FACTURADO NETO'));
   });
 
   it('quita el precio que la web pone en el nombre', () => {
@@ -446,5 +447,58 @@ describe('complementos en el contrato', () => {
     expect(con.reserva.extras).toEqual(extras);
     expect(JSON.parse(JSON.stringify(con))).toEqual(con);
     expect('extras' in crearSnapshot(reserva, cliente, vehiculo, undefined, empresa).reserva).toBe(false);
+  });
+});
+
+describe('desglose económico del contrato: cada línea a su precio, el descuento aparte', () => {
+  // Pedido real 2178 de la web: 3 días, cupón de 10 € repartido por WooCommerce; aquí cada línea a su precio de lista.
+  const pedido = {
+    fechaInicio: '2026-10-29', fechaFin: '2026-11-01', horaInicio: '04:00', horaFin: '04:00',
+    tarifaDiaria: 40, seguroDia: 15, incluyeSeguroTodoRiesgo: true, totalCobrado: 219, fianza: 500,
+    extras: [{ nombre: 'Sillita infantil - 8€/día', cantidad: 1, total: 24 }, { nombre: 'Portabicicletas', cantidad: 1, total: 40 }],
+    descuento: 10, cupon: '10mallorca',
+  } as Partial<Reserva>;
+
+  it('el portabicicletas sale a 40 € y el cupón de 10 € aparte, y todo suma el importe neto', () => {
+    const t = texto('es', { reserva: pedido });
+    expect(t).toContain('Alquiler (3 días × 40.00 €): 120.00 €');
+    expect(t).toContain('Seguro Técnico Completo (3 días × 15.00 €): 45.00 €');
+    expect(t).toContain('Sillita infantil: 24.00 €');
+    expect(t).toContain('Portabicicletas: 40.00 €');
+    expect(t).toContain('Descuento (cupón 10mallorca): −10.00 €');
+    expect(t).toContain('IMPORTE FACTURADO NETO: 219.00 €');
+    expect(t).not.toContain('37.50');
+    expect(120 + 45 + 24 + 40 - 10).toBe(219);
+  });
+
+  it('en inglés, mismas líneas traducidas', () => {
+    const t = texto('en', { reserva: pedido });
+    expect(t).toContain('Rental (3 days × 40.00 €): 120.00 €');
+    expect(t).toContain('Comprehensive insurance (3 days × 15.00 €): 45.00 €');
+    expect(t).toContain('Discount (coupon 10mallorca): −10.00 €');
+    expect(t).toContain('NET INVOICED AMOUNT: 219.00 €');
+    expect(t).toContain('Deposit (refundable, not included in the amount): 500.00 €');
+  });
+
+  it('un descuento sin código de cupón se llama solo «Descuento»', () => {
+    const t = texto('es', { reserva: { ...pedido, descuento: 18, cupon: undefined, totalCobrado: 211, extras: [], tarifaDiaria: 40 } as Partial<Reserva> });
+    expect(t).toContain('Descuento: −18.00 €');
+    expect(t).not.toContain('cupón');
+  });
+
+  it('las líneas van en orden y la fianza, aparte y después del importe', () => {
+    const t = texto('es', { reserva: pedido });
+    const orden = ['Alquiler (', 'Seguro Técnico Completo (', 'Sillita infantil', 'Portabicicletas', 'Descuento (', 'IMPORTE FACTURADO NETO', 'Fianza (depósito'].map(x => t.indexOf(x));
+    expect(orden.every(i => i >= 0)).toBe(true);
+    expect([...orden].sort((a, b) => a - b)).toEqual(orden);
+  });
+
+  it('si el total guardado no sale de la cuenta, el contrato lo enseña como «Otros ajustes» en vez de esconderlo', () => {
+    const t = texto('es', { reserva: { ...pedido, totalCobrado: 200 } as Partial<Reserva> });
+    expect(t).toContain('Otros ajustes: −19.00 €');
+  });
+
+  it('sin fianza no sale la línea de fianza', () => {
+    expect(texto('es', { reserva: { ...pedido, fianza: 0 } as Partial<Reserva> })).not.toContain('Fianza');
   });
 });
