@@ -14,7 +14,7 @@ import { AnimatePresence } from 'motion/react';
 import ConfirmDialog from './ConfirmDialog';
 import Pagination from './Pagination';
 import { formatDate } from '../utils/dateFormat';
-import { formatEuros } from '../utils/moneda';
+import { formatEuros, fmt2 } from '../utils/moneda';
 import { avisoCarnetReserva } from '../utils/carnet';
 import { validarHorasReserva, fechaConHora, ordenarProximas, ordenarHistorial } from '../utils/horaReserva';
 import Hora24Field from './Hora24Field';
@@ -369,8 +369,8 @@ export default function RentalsTab({
     setSelectedReserva(actualizada);
     setEditandoHoras(null);
     if (t.diasAntes === t.diasDespues) setAvisoDias(null);
-    else if (t.recalculado) setAvisoDias(`Con las nuevas horas el alquiler pasa de ${t.diasAntes} a ${t.diasDespues} días y el total se ha recalculado: ${t.total.toFixed(2)} €.`);
-    else if (selectedReserva.origen === 'web') setAvisoDias(`Con las nuevas horas el alquiler pasa de ${t.diasAntes} a ${t.diasDespues} días. El total (${t.total.toFixed(2)} €) lo fija la web y no se ha cambiado.`);
+    else if (t.recalculado) setAvisoDias(`Con las nuevas horas el alquiler pasa de ${t.diasAntes} a ${t.diasDespues} días y el total se ha recalculado: ${fmt2(t.total)} €.`);
+    else if (selectedReserva.origen === 'web') setAvisoDias(`Con las nuevas horas el alquiler pasa de ${t.diasAntes} a ${t.diasDespues} días. El total (${fmt2(t.total)} €) lo fija la web y no se ha cambiado.`);
     else setAvisoDias(`Con las nuevas horas el alquiler pasa de ${t.diasAntes} a ${t.diasDespues} días. El total no se ha cambiado porque no coincidía con días × tarifa: revísalo.`);
   };
 
@@ -382,7 +382,7 @@ export default function RentalsTab({
     onUpdateReserva(actualizada);
     setSelectedReserva(actualizada);
     setEditandoComplementos(null);
-    setAvisoComplementos(r.cambio === 0 ? null : `Complementos actualizados: el total pasa a ${r.total.toFixed(2)} € (${r.cambio > 0 ? '+' : '−'}${Math.abs(r.cambio).toFixed(2)} €).`);
+    setAvisoComplementos(r.cambio === 0 ? null : `Complementos actualizados: el total pasa a ${fmt2(r.total)} € (${r.cambio > 0 ? '+' : '−'}${fmt2(Math.abs(r.cambio))} €).`);
   };
 
   const handleGuardarLugares = () => {
@@ -565,7 +565,7 @@ export default function RentalsTab({
                     </div>
                   </div>
                   <div className="lg:w-40 text-left lg:text-right">
-                    <div className="font-mono font-extrabold text-sm text-slate-800">{sol.total.toFixed(2)} €</div>
+                    <div className="font-mono font-extrabold text-sm text-slate-800">{fmt2(sol.total)} €</div>
                     <span className={`px-2 py-0.5 rounded text-[10px] font-bold inline-flex ${estadoWeb.cls}`}>{estadoWeb.label}</span>
                   </div>
                   <div className="lg:w-56 flex lg:justify-end gap-2 flex-wrap">
@@ -966,8 +966,8 @@ export default function RentalsTab({
                             <span className="text-[10px] text-slate-400 font-medium">{calculateDays(res.fechaInicio, res.fechaFin, res.horaInicio, res.horaFin)} días de contrato</span>
                           </td>
                           <td className="py-3 px-2 text-right">
-                            <span className="font-mono font-extrabold text-slate-800 block text-xs">{res.totalCobrado.toFixed(2)} €</span>
-                            <span className="text-[9px] text-slate-400">{res.tarifaDiaria.toFixed(2)}€/día {res.incluyeSeguroTodoRiesgo && '+ todo riesgo'}</span>
+                            <span className="font-mono font-extrabold text-slate-800 block text-xs">{fmt2(res.totalCobrado)} €</span>
+                            <span className="text-[9px] text-slate-400">{fmt2(res.tarifaDiaria)}€/día {res.incluyeSeguroTodoRiesgo && '+ todo riesgo'}</span>
                           </td>
                           <td className="py-3 px-2 text-right space-x-1" onClick={e => e.stopPropagation()}>
                             {(() => {
@@ -1173,7 +1173,7 @@ export default function RentalsTab({
                         </span>
                       ) : (
                         <span className="flex items-center gap-2">
-                          <span>{selectedReserva.fianza != null && selectedReserva.fianza > 0 ? `${selectedReserva.fianza.toFixed(2)} €` : 'Sin fianza'}</span>
+                          <span>{selectedReserva.fianza != null && selectedReserva.fianza > 0 ? `${fmt2(selectedReserva.fianza)} €` : 'Sin fianza'}</span>
                           {selectedReserva.estado !== 'cancelada' && (
                             <button type="button" onClick={() => setEditandoFianza({ valor: String(selectedReserva.fianza ?? 0), error: '' })}
                               className="text-[10px] font-bold text-blue-800 underline cursor-pointer">Cambiar</button>
@@ -1320,7 +1320,7 @@ export default function RentalsTab({
                         {lineasDePedidoWeb(solicitudActiva).map((l, i) => (
                           <div key={i} className="flex justify-between gap-3">
                             <span>{l.texto}</span>
-                            <span className={`font-mono shrink-0 ${l.importe < 0 ? 'text-emerald-700' : ''}`}>{l.importe < 0 ? '−' : ''}{Math.abs(l.importe).toFixed(2)} €</span>
+                            <span className={`font-mono shrink-0 ${l.importe < 0 ? 'text-emerald-700' : ''}`}>{l.importe < 0 ? '−' : ''}{fmt2(Math.abs(l.importe))} €</span>
                           </div>
                         ))}
                       </div>
@@ -1476,7 +1476,7 @@ export default function RentalsTab({
                                 className={`flex flex-col items-center py-2 px-1 rounded-lg border text-xs transition ${active ? 'border-blue-500 bg-blue-50 text-blue-700 font-bold' : 'border-slate-200 text-slate-600 hover:border-slate-300'}`}
                               >
                                 <span>{label}</span>
-                                {precio !== null && <span className="font-mono mt-0.5 text-[11px]">{precio.toFixed(2)}€/día</span>}
+                                {precio !== null && <span className="font-mono mt-0.5 text-[11px]">{fmt2(precio)}€/día</span>}
                               </button>
                             );
                           })}
@@ -1516,7 +1516,7 @@ export default function RentalsTab({
                     />
                     <label htmlFor="opt-seguro" className="text-xs text-slate-600 block cursor-pointer select-none">
                       <strong className="font-bold text-slate-700">Incluir Cobertura de Seguro a Todo Riesgo</strong>
-                      <span className="block text-[10px] text-slate-400">Suplemento de +{seguroDiaElegido?.toFixed(2)} €/día. Protege el vehículo contra accidentes, fuegos o colisiones en vía pública.</span>
+                      <span className="block text-[10px] text-slate-400">Suplemento de +{fmt2(seguroDiaElegido ?? 0)} €/día. Protege el vehículo contra accidentes, fuegos o colisiones en vía pública.</span>
                     </label>
                   </div>
                   )}
@@ -1552,12 +1552,12 @@ export default function RentalsTab({
                       </span>
                       <span>
                         {solicitudActiva
-                          ? `${currentDuration} días${solicitudActiva.descuento > 0 && solicitudActiva.vehiculoSubtotal != null ? ` · incluye ${solicitudActiva.descuento.toFixed(2)} € de descuento` : ''}${solicitudActiva.pagado ? ' · pagado' : ' · pago al recoger'}`
-                          : `Alquiler: ${currentDuration} días a ${formTarifa.toFixed(2)}€ / día${importeExtrasForm > 0 ? ` + complementos ${importeExtrasForm.toFixed(2)} €` : ''}`}
+                          ? `${currentDuration} días${solicitudActiva.descuento > 0 && solicitudActiva.vehiculoSubtotal != null ? ` · incluye ${fmt2(solicitudActiva.descuento)} € de descuento` : ''}${solicitudActiva.pagado ? ' · pagado' : ' · pago al recoger'}`
+                          : `Alquiler: ${currentDuration} días a ${fmt2(formTarifa)}€ / día${importeExtrasForm > 0 ? ` + complementos ${fmt2(importeExtrasForm)} €` : ''}`}
                       </span>
                     </div>
                     <div className="text-right font-mono text-base font-extrabold text-blue-900">
-                      {(solicitudActiva ? solicitudActiva.total : calculatedTotal).toFixed(2)} €
+                      {fmt2(solicitudActiva ? solicitudActiva.total : calculatedTotal)} €
                     </div>
                   </div>
 
@@ -1573,7 +1573,7 @@ export default function RentalsTab({
                     />
                     <p className="text-[11px] text-slate-400 mt-1">
                       {vehiculoElegido
-                        ? `Importe habitual de este vehículo: ${(vehiculoElegido.fianza ?? 0).toFixed(2)} €. Cámbialo si para esta reserva se pide otro; pon 0 si no hay fianza.`
+                        ? `Importe habitual de este vehículo: ${fmt2(vehiculoElegido.fianza ?? 0)} €. Cámbialo si para esta reserva se pide otro; pon 0 si no hay fianza.`
                         : 'Elige un vehículo para ver su importe habitual.'}
                       {vehiculoElegido?.transmision ? ` · Cambio ${etiquetaTransmision(vehiculoElegido.transmision).toLowerCase()}` : ''}
                     </p>

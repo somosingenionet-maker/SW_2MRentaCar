@@ -37,15 +37,15 @@ describe('desglose económico de la ficha', () => {
 
   it('reserva manual: alquiler, seguro y total (4 días × 30 € + 4 días × 15 € = 180 €)', () => {
     const h = renderToString(<DesgloseFicha reserva={reserva()} />);
-    expect(lineas(h)).toEqual(['Alquiler (4 días × 30.00 €) 120.00 €', 'Seguro todo riesgo (4 días × 15.00 €) 60.00 €']);
-    expect(texto(h)).toContain('LIQUIDACIÓN TOTAL 180.00 €');
+    expect(lineas(h)).toEqual(['Alquiler (4 días × 30,00 €) 120,00 €', 'Seguro todo riesgo (4 días × 15,00 €) 60,00 €']);
+    expect(texto(h)).toContain('LIQUIDACIÓN TOTAL 180,00 €');
     expect(h).not.toContain('total-no-cuadra');
   });
 
   it('con complementos: los manuales enseñan cómo se cobran; por día y precio fijo', () => {
     const l = lineas(renderToString(<DesgloseFicha reserva={reserva({ extras, totalCobrado: 262 })} />));
-    expect(l).toContain('Sillita infantil (8.00 € / día) 32.00 €');
-    expect(l).toContain('Baca coche (50.00 €, precio fijo) 50.00 €');
+    expect(l).toContain('Sillita infantil (8,00 € / día) 32,00 €');
+    expect(l).toContain('Baca coche (50,00 €, precio fijo) 50,00 €');
   });
 
   it('pedido de la web con cupón: portabicicletas a 40 € y el descuento aparte, en negativo', () => {
@@ -55,16 +55,16 @@ describe('desglose económico de la ficha', () => {
       extras: [{ nombre: 'Sillita infantil - 8€/día', cantidad: 1, total: 24 }, { nombre: 'Portabicicletas', cantidad: 1, total: 40 }],
     })} />);
     expect(lineas(h)).toEqual([
-      'Alquiler (3 días × 40.00 €) 120.00 €', 'Seguro todo riesgo (3 días × 15.00 €) 45.00 €',
-      'Sillita infantil 24.00 €', 'Portabicicletas 40.00 €', 'Descuento (cupón 10mallorca) −10.00 €',
+      'Alquiler (3 días × 40,00 €) 120,00 €', 'Seguro todo riesgo (3 días × 15,00 €) 45,00 €',
+      'Sillita infantil 24,00 €', 'Portabicicletas 40,00 €', 'Descuento (cupón 10mallorca) −10,00 €',
     ]);
-    expect(texto(h)).toContain('LIQUIDACIÓN TOTAL 219.00 €');
+    expect(texto(h)).toContain('LIQUIDACIÓN TOTAL 219,00 €');
     expect(h).not.toContain('total-no-cuadra');
   });
 
   it('descuento sin cupón: «Descuento»', () => {
     const l = lineas(renderToString(<DesgloseFicha reserva={reserva({ origen: 'web', descuento: 18, totalCobrado: 162 })} />));
-    expect(l).toContain('Descuento −18.00 €');
+    expect(l).toContain('Descuento −18,00 €');
   });
 
   it('sin seguro a todo riesgo sale la póliza de terceros, incluida', () => {
@@ -73,14 +73,14 @@ describe('desglose económico de la ficha', () => {
 
   it('el caso de Alejandro: un total de 135 € con 4 días no suma, y la ficha lo avisa y enseña el ajuste', () => {
     const h = renderToString(<DesgloseFicha reserva={reserva({ totalCobrado: 135 })} />);
-    expect(lineas(h)).toContain('Otros ajustes −45.00 €');
+    expect(lineas(h)).toContain('Otros ajustes −45,00 €');
     expect(h).toContain('total-no-cuadra');
     expect(texto(h)).toContain('Ojo: los conceptos no suman el total guardado');
   });
 
   it('un redondeo de céntimos se ve, pero no salta la alarma', () => {
     const h = renderToString(<DesgloseFicha reserva={reserva({ totalCobrado: 180.01 })} />);
-    expect(lineas(h)).toContain('Redondeo 0.01 €');
+    expect(lineas(h)).toContain('Redondeo 0,01 €');
     expect(h).not.toContain('total-no-cuadra');
   });
 });

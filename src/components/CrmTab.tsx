@@ -20,6 +20,7 @@ import { downloadCsv, slugify } from '../utils/csvExport';
 import { genId } from '../utils/id';
 import { PedirDatosModal, RevisarDatosModal, PanelDatosRecibidos } from './DatosClientePanel';
 import ContratoVisor from './ContratoVisor';
+import { fmt2 } from '../utils/moneda';
 
 interface CrmTabProps {
   clientes: Cliente[];
@@ -700,7 +701,7 @@ export default function CrmTab({
                                 {expanded ? <ChevronDown className="w-3 h-3 text-blue-500" /> : <ChevronRight className="w-3 h-3 text-blue-500" />}
                                 {ot.numero} <span className="font-normal text-slate-500">— {OT_ESTADO_META[ot.estado].label}</span>
                               </p>
-                              <span className="text-xs font-bold text-slate-800 font-mono">{ot.total.toFixed(2)} €</span>
+                              <span className="text-xs font-bold text-slate-800 font-mono">{fmt2(ot.total)} €</span>
                             </div>
                           </button>
 
@@ -753,7 +754,7 @@ export default function CrmTab({
                               </div>
                             </div>
                             <div className="text-right shrink-0">
-                              <span className="font-bold text-slate-900 block font-mono">{res.totalCobrado.toFixed(2)} €</span>
+                              <span className="font-bold text-slate-900 block font-mono">{fmt2(res.totalCobrado)} €</span>
                               {(() => {
                                 const e = ESTADO_META[estadoReserva(res, hoyISO())];
                                 return <span className={`inline-block text-[9px] font-bold uppercase rounded px-1.5 ${e.cls}`}>{e.label}</span>;
@@ -787,7 +788,7 @@ export default function CrmTab({
                             </div>
                           </div>
                           <div className="text-right shrink-0">
-                            <span className="font-bold text-slate-900 block font-mono">{sol.total.toFixed(2)} €</span>
+                            <span className="font-bold text-slate-900 block font-mono">{fmt2(sol.total)} €</span>
                             <span className={`inline-block text-[9px] font-bold uppercase rounded px-1.5 ${canceladaEnWeb(sol) ? web.cls : sol.estadoGestion === 'pendiente' ? 'bg-amber-50 text-amber-700' : 'bg-slate-100 text-slate-500'}`}>
                               {canceladaEnWeb(sol) ? web.label : sol.estadoGestion === 'pendiente' ? 'Por asignar' : 'Histórico'}
                             </span>
@@ -819,7 +820,7 @@ export default function CrmTab({
                           <div className="text-[10px] text-slate-500">{formatDate(f.fecha)}</div>
                         </div>
                         <div className="text-right">
-                          <span className="font-bold text-slate-900 block font-mono">{f.total.toFixed(2)} €</span>
+                          <span className="font-bold text-slate-900 block font-mono">{fmt2(f.total)} €</span>
                           <span className={`inline-block text-[9px] font-bold uppercase rounded px-1.5 ${FACTURA_ESTADO_META[f.estado].cls}`}>
                             {FACTURA_ESTADO_META[f.estado].label}
                           </span>

@@ -2,12 +2,13 @@ import type { Reserva } from '../types';
 import { diasAlquiler, duracionExacta } from '../utils/solicitudes';
 import { nombreComplemento } from '../utils/complementos';
 import { desgloseReserva, hayAjusteImportante, type LineaDesglose } from '../utils/desgloseReserva';
+import { fmt2 } from '../utils/moneda';
 
 type Fechas = Pick<Reserva, 'fechaInicio' | 'fechaFin' | 'horaInicio' | 'horaFin'>;
 type ReservaEconomica = Fechas & Pick<Reserva, 'tarifaDiaria' | 'seguroDia' | 'incluyeSeguroTodoRiesgo' | 'totalCobrado' | 'fianza' | 'extras' | 'descuento' | 'cupon'>;
 
 const dias = (n: number) => `${n} ${n === 1 ? 'día' : 'días'}`;
-const euros = (n: number) => `${n < 0 ? '−' : ''}${Math.abs(n).toFixed(2)} €`;
+const euros = (n: number) => `${n < 0 ? '−' : ''}${fmt2(Math.abs(n))} €`;
 
 /** Fila destacada de la ficha: cuántos días dura el alquiler y, si las horas añaden una fracción, de dónde sale ese número. */
 export function FilaDuracion({ reserva }: { reserva: Fechas }) {

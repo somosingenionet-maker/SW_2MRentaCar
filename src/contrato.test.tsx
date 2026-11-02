@@ -81,7 +81,7 @@ describe('contrato en los dos idiomas', () => {
     expect(t).toContain('Fecha y hora acordadas de retorno: 2 nov. 2026 · 09:30');
     expect(t).toContain('Carnet de conducir: ABC12345 · expedido 1 mar. 2018 · vence 1 mar. 2028');
     expect(t).toContain('Automático');
-    expect(t).toContain('Fianza (depósito reembolsable, no incluida en el importe): 500.00 €');
+    expect(t).toContain('Fianza (depósito reembolsable, no incluida en el importe): 500,00 €');
   });
 
   it('en inglés traduce títulos, etiquetas y fechas, y conserva las horas', () => {
@@ -102,7 +102,7 @@ describe('contrato en los dos idiomas', () => {
   });
 
   it('seguro: completo con precio, o terceros básico, traducido', () => {
-    expect(texto('es')).toContain('Seguro Técnico Completo (2 días × 15.00 €): 30.00 €');
+    expect(texto('es')).toContain('Seguro Técnico Completo (2 días × 15,00 €): 30,00 €');
     expect(texto('en')).toContain('Comprehensive insurance (2 days × 15.00 €): 30.00 €');
     expect(texto('es', { reserva: { incluyeSeguroTodoRiesgo: false } })).toContain('Póliza de terceros básica: Incluida');
     expect(texto('en', { reserva: { incluyeSeguroTodoRiesgo: false } })).toContain('Basic third-party policy: Included');
@@ -414,9 +414,9 @@ describe('complementos en el contrato', () => {
 
   it('lista cada complemento con su importe: por día, precio fijo y los de la web (sin desglose)', () => {
     const t = conExtras('es');
-    expect(t).toContain('Sillita infantil × 2 (8.00 € / día): 64.00 €');
-    expect(t).toContain('Baca coche (50.00 €, precio fijo): 50.00 €');
-    expect(t).toContain('Portabicicletas: 37.50 €');
+    expect(t).toContain('Sillita infantil × 2 (8,00 € / día): 64,00 €');
+    expect(t).toContain('Baca coche (50,00 €, precio fijo): 50,00 €');
+    expect(t).toContain('Portabicicletas: 37,50 €');
   });
 
   it('en inglés traduce el tipo de precio', () => {
@@ -434,7 +434,7 @@ describe('complementos en el contrato', () => {
 
   it('quita el precio que la web pone en el nombre', () => {
     const t = texto('es', { reserva: { extras: [{ nombre: 'Maxi-Cosi - 8€/día', cantidad: 1, total: 64 }] } as Partial<Reserva> });
-    expect(t).toContain('Maxi-Cosi: 64.00 €');
+    expect(t).toContain('Maxi-Cosi: 64,00 €');
     expect(t).not.toContain('8€/día');
   });
 
@@ -461,12 +461,12 @@ describe('desglose económico del contrato: cada línea a su precio, el descuent
 
   it('el portabicicletas sale a 40 € y el cupón de 10 € aparte, y todo suma el importe neto', () => {
     const t = texto('es', { reserva: pedido });
-    expect(t).toContain('Alquiler (3 días × 40.00 €): 120.00 €');
-    expect(t).toContain('Seguro Técnico Completo (3 días × 15.00 €): 45.00 €');
-    expect(t).toContain('Sillita infantil: 24.00 €');
-    expect(t).toContain('Portabicicletas: 40.00 €');
-    expect(t).toContain('Descuento (cupón 10mallorca): −10.00 €');
-    expect(t).toContain('IMPORTE FACTURADO NETO: 219.00 €');
+    expect(t).toContain('Alquiler (3 días × 40,00 €): 120,00 €');
+    expect(t).toContain('Seguro Técnico Completo (3 días × 15,00 €): 45,00 €');
+    expect(t).toContain('Sillita infantil: 24,00 €');
+    expect(t).toContain('Portabicicletas: 40,00 €');
+    expect(t).toContain('Descuento (cupón 10mallorca): −10,00 €');
+    expect(t).toContain('IMPORTE FACTURADO NETO: 219,00 €');
     expect(t).not.toContain('37.50');
     expect(120 + 45 + 24 + 40 - 10).toBe(219);
   });
@@ -482,7 +482,7 @@ describe('desglose económico del contrato: cada línea a su precio, el descuent
 
   it('un descuento sin código de cupón se llama solo «Descuento»', () => {
     const t = texto('es', { reserva: { ...pedido, descuento: 18, cupon: undefined, totalCobrado: 211, extras: [], tarifaDiaria: 40 } as Partial<Reserva> });
-    expect(t).toContain('Descuento: −18.00 €');
+    expect(t).toContain('Descuento: −18,00 €');
     expect(t).not.toContain('cupón');
   });
 
@@ -495,7 +495,7 @@ describe('desglose económico del contrato: cada línea a su precio, el descuent
 
   it('si el total guardado no sale de la cuenta, el contrato lo enseña como «Otros ajustes» en vez de esconderlo', () => {
     const t = texto('es', { reserva: { ...pedido, totalCobrado: 200 } as Partial<Reserva> });
-    expect(t).toContain('Otros ajustes: −19.00 €');
+    expect(t).toContain('Otros ajustes: −19,00 €');
   });
 
   it('sin fianza no sale la línea de fianza', () => {

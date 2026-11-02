@@ -1,7 +1,8 @@
 import type { ExtraReserva } from '../types';
 import { aplicarFilasEditor, etiquetaPrecioComplemento, nombreComplemento, type FilaEditorExtras } from '../utils/complementos';
+import { fmt2 } from '../utils/moneda';
 
-const euros = (n: number) => `${n < 0 ? '−' : n > 0 ? '+' : ''}${Math.abs(n).toFixed(2)} €`;
+const euros = (n: number) => `${n < 0 ? '−' : n > 0 ? '+' : ''}${fmt2(Math.abs(n))} €`;
 
 interface Props {
   /** Reserva que se edita: solo importan sus complementos y su total. */
@@ -52,7 +53,7 @@ export function EditorComplementos({ reserva, filas, dias, firmada, onCambiar, o
       )}
       <div className="flex items-center justify-between gap-2 border-t border-slate-100 pt-2 text-xs">
         <span data-testid="editor-complementos-total" className="font-bold">
-          Total: {total.toFixed(2)} €{cambio !== 0 && <span className="ml-1 font-semibold text-slate-500">({euros(cambio)})</span>}
+          Total: {fmt2(total)} €{cambio !== 0 && <span className="ml-1 font-semibold text-slate-500">({euros(cambio)})</span>}
         </span>
         <span className="flex gap-2 text-[11px] font-bold">
           <button type="button" onClick={onCancelar} className="cursor-pointer rounded-lg border border-slate-200 px-3 py-1.5 text-slate-500 hover:bg-slate-50">Cancelar</button>

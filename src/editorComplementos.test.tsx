@@ -20,15 +20,15 @@ describe('editor de complementos de una reserva', () => {
     const t = pinta([], 120);
     expect(t).toContain('Sillita infantil');
     expect(t).toContain('Baca coche');
-    expect(t).toContain('Total: 120.00 €');
+    expect(t).toContain('Total: 120,00 €');
     expect(t).not.toContain('ya firmó');
   });
 
   it('muestra el total nuevo y la diferencia cuando hay cambios', () => {
     const filas = filasEditorExtras([], catalogo).map(f => f.clave === 'c1' ? { ...f, cantidad: 2 } : f);
     const t = pinta([], 120, false, filas);
-    expect(t).toContain('Total: 184.00 €');
-    expect(t).toContain('+64.00 €');
+    expect(t).toContain('Total: 184,00 €');
+    expect(t).toContain('+64,00 €');
   });
 
   it('avisa de que hay que volver a firmar si el contrato ya está firmado', () => {

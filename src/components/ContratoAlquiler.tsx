@@ -8,6 +8,7 @@ import { nombreComplemento } from '../utils/complementos';
 import { desgloseReserva, type LineaDesglose } from '../utils/desgloseReserva';
 import { fechaHoraFirma, referenciaCorta } from '../utils/firmaContrato';
 import { TEXTOS_CONTRATO, etiquetaTransmisionContrato, type IdiomaContrato } from '../utils/contratoTextos';
+import { fmt2 } from '../utils/moneda';
 
 /** Firma del cliente ya registrada: se dibuja dentro de su caja. */
 interface FirmaVisible {
@@ -37,16 +38,18 @@ export default function ContratoAlquiler({ reserva, cliente, vehiculo, empresa, 
   const lugares = lugaresReserva(reserva, solicitud ?? undefined);
   const dias = reserva.dias ?? diasAlquiler(reserva.fechaInicio, reserva.fechaFin, reserva.horaInicio, reserva.horaFin);
   const desglose = desgloseReserva(reserva, dias);
-  const euros = (n: number) => `${n < 0 ? '−' : ''}${Math.abs(n).toFixed(2)} €`;
+  // Importes con la coma española; el contrato en inglés los lleva con punto.
+  const f2 = (n: number) => fmt2(n, tx.locale);
+  const euros = (n: number) => `${n < 0 ? '−' : ''}${f2(Math.abs(n))} €`;
   // Cada línea económica con su texto en el idioma del contrato: concepto (y cómo se calcula) e importe.
   const lineasEconomicas = desglose.lineas.map((l: LineaDesglose) => {
     switch (l.tipo) {
-      case 'alquiler': return { etiqueta: `${tx.alquiler} (${tx.diasPorPrecio(l.dias, l.precio.toFixed(2))})`, importe: euros(l.importe) };
-      case 'seguro': return { etiqueta: `${tx.seguroCompleto} (${tx.diasPorPrecio(l.dias, l.precio.toFixed(2))})`, importe: euros(l.importe) };
+      case 'alquiler': return { etiqueta: `${tx.alquiler} (${tx.diasPorPrecio(l.dias, f2(l.precio))})`, importe: euros(l.importe) };
+      case 'seguro': return { etiqueta: `${tx.seguroCompleto} (${tx.diasPorPrecio(l.dias, f2(l.precio))})`, importe: euros(l.importe) };
       case 'seguro-incluido': return { etiqueta: tx.seguroCompleto, importe: tx.incluido };
       case 'terceros': return { etiqueta: tx.polizaTerceros, importe: tx.incluida };
       case 'extra': {
-        const cuenta = l.precio != null && l.porDia != null ? ` (${l.precio.toFixed(2)} ${l.porDia ? tx.porDia : `€, ${tx.precioFijo}`})` : '';
+        const cuenta = l.precio != null && l.porDia != null ? ` (${f2(l.precio)} ${l.porDia ? tx.porDia : `€, ${tx.precioFijo}`})` : '';
         return { etiqueta: `${nombreComplemento(l.nombre)}${l.cantidad > 1 ? ` × ${l.cantidad}` : ''}${cuenta}`, importe: euros(l.importe) };
       }
       case 'descuento': return { etiqueta: `${tx.descuento}${l.cupon ? ` (${tx.cupon} ${l.cupon})` : ''}`, importe: euros(l.importe), descuento: true };

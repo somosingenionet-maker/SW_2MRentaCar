@@ -18,6 +18,7 @@ import { formatDate } from '../utils/dateFormat';
 import { downloadCsv, slugify } from '../utils/csvExport';
 import { getEmpresaConfig } from '../data/empresaConfig';
 import { genId } from '../utils/id';
+import { fmt2 } from '../utils/moneda';
 
 interface VehiclesTabProps {
   vehiculos: Vehiculo[];
@@ -438,14 +439,14 @@ export default function VehiclesTab({
                       return (
                         <div key={key} className="bg-white rounded-lg border border-blue-100 p-2 text-center">
                           <div className="text-[10px] text-slate-400 font-semibold uppercase">{label}</div>
-                          <div className="text-sm font-extrabold text-slate-800 mt-0.5">{precio != null ? `${precio.toFixed(2)} €` : '—'}</div>
+                          <div className="text-sm font-extrabold text-slate-800 mt-0.5">{precio != null ? `${fmt2(precio)} €` : '—'}</div>
                         </div>
                       );
                     })}
                     {precioConvenio(selectedVehiculo.tarifasAlquiler) != null && (
                       <div data-testid="tarjeta-convenio" className="bg-white rounded-lg border border-amber-200 p-2 text-center">
                         <div className="text-[10px] text-amber-600 font-semibold uppercase">Convenio</div>
-                        <div className="text-sm font-extrabold text-slate-800 mt-0.5">{precioConvenio(selectedVehiculo.tarifasAlquiler)?.toFixed(2)} €</div>
+                        <div className="text-sm font-extrabold text-slate-800 mt-0.5">{fmt2(precioConvenio(selectedVehiculo.tarifasAlquiler) ?? 0)} €</div>
                       </div>
                     )}
                   </div>
@@ -457,8 +458,8 @@ export default function VehiclesTab({
                 <div className="grid grid-cols-3 gap-2">
                   {[
                     { label: 'Transmisión', valor: etiquetaTransmision(selectedVehiculo.transmision) },
-                    { label: 'Fianza habitual', valor: selectedVehiculo.fianza ? `${selectedVehiculo.fianza.toFixed(2)} €` : '—' },
-                    { label: 'Seguro ampliado', valor: selectedVehiculo.seguroAmpliadoDia != null ? `${selectedVehiculo.seguroAmpliadoDia.toFixed(2)} €/día` : 'No ofrece' },
+                    { label: 'Fianza habitual', valor: selectedVehiculo.fianza ? `${fmt2(selectedVehiculo.fianza)} €` : '—' },
+                    { label: 'Seguro ampliado', valor: selectedVehiculo.seguroAmpliadoDia != null ? `${fmt2(selectedVehiculo.seguroAmpliadoDia)} €/día` : 'No ofrece' },
                   ].map(({ label, valor }) => (
                     <div key={label} className="bg-white rounded-lg border border-blue-100 p-2 text-center">
                       <div className="text-[10px] text-slate-400 font-semibold uppercase">{label}</div>
@@ -509,7 +510,7 @@ export default function VehiclesTab({
                                 </div>
                                 <div className="flex items-center justify-between mt-1 text-[10px] text-slate-400">
                                   <span>{formatDate(ot.fechaRecepcion)}</span>
-                                  <span className="font-semibold text-slate-600">{ot.total.toLocaleString('es-ES', { style: 'currency', currency: 'EUR' })}</span>
+                                  <span className="font-semibold text-slate-600">{fmt2(ot.total)} €</span>
                                 </div>
                               </button>
 

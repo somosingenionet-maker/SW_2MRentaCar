@@ -44,7 +44,7 @@ describe('configuración de la empresa por secciones', () => {
   it.each([
     ['apariencia', 'seccion-apariencia', ['Logo', 'Color de marca', 'Vista previa del header']],
     ['taller', 'seccion-taller', ['Capacidad del taller', 'Técnicos del taller', 'Mario', 'Fran', 'Crear enlace']],
-    ['alquiler', 'seccion-alquiler', ['Complementos de alquiler', 'Sillita infantil', 'Baca coche', '50.00 € (precio fijo)']],
+    ['alquiler', 'seccion-alquiler', ['Complementos de alquiler', 'Sillita infantil', 'Baca coche', '50,00 € (precio fijo)']],
   ] as const)('la sección %s enseña lo suyo', (seccion, marca, contenido) => {
     const h = pinta(seccion);
     expect(h).toContain(`data-testid="${marca}"`);

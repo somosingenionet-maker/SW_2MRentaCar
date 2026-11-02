@@ -1,4 +1,5 @@
 import type { Complemento, ExtraReserva, Reserva, SolicitudExtra } from '../types';
+import { fmt2 } from './moneda';
 
 /** Las coberturas y seguros no son complementos: ya los modelan los campos de seguro de la reserva. */
 export const esCobertura = (nombre: string): boolean => /^\s*cobertura|seguro|todo riesgo/i.test(nombre);
@@ -50,7 +51,7 @@ export function extrasManuales(catalogo: Complemento[], cantidades: Record<strin
 
 /** «8,00 € / día» o «50,00 € (precio fijo)». */
 export const etiquetaPrecioComplemento = (c: { precio: number; porDia: boolean }): string =>
-  `${c.precio.toFixed(2)} €${c.porDia ? ' / día' : ' (precio fijo)'}`;
+  `${fmt2(c.precio)} €${c.porDia ? ' / día' : ' (precio fijo)'}`;
 
 /** Resumen de una línea para listados: «Sillita infantil × 2, Baca coche». */
 export const resumenExtras = (extras: ExtraReserva[] | undefined): string =>

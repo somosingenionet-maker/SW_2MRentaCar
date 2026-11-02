@@ -19,6 +19,7 @@ import {
 } from 'lucide-react';
 import { EmpresaConfig, getEmpresaConfig } from './data/empresaConfig';
 import { loadEmpresaConfig, saveEmpresaConfigDb } from './data/empresaDb';
+import { fmt2 } from './utils/moneda';
 
 // Cada pestaña se descarga solo cuando se abre: el primer arranque (sobre todo
 // en el móvil) carga mucho menos código que con todo en un único archivo.
@@ -257,7 +258,7 @@ export default function App() {
         id: genId('int-cli-aut-res'),
         fecha: new Date().toISOString().split('T')[0],
         tipo: 'registro_contrato',
-        notas: `Reserva de alquiler registrada del coche (${targetVeh.marca} con matrícula ${targetVeh.matricula}). Rango: ${nueva.fechaInicio}${nueva.horaInicio ? ` ${nueva.horaInicio}` : ''} al ${nueva.fechaFin}${nueva.horaFin ? ` ${nueva.horaFin}` : ''}. Liquidado total: ${nueva.totalCobrado.toFixed(2)} €.`
+        notas: `Reserva de alquiler registrada del coche (${targetVeh.marca} con matrícula ${targetVeh.matricula}). Rango: ${nueva.fechaInicio}${nueva.horaInicio ? ` ${nueva.horaInicio}` : ''} al ${nueva.fechaFin}${nueva.horaFin ? ` ${nueva.horaFin}` : ''}. Liquidado total: ${fmt2(nueva.totalCobrado)} €.`
       };
       const updatedCli = { ...targetCli, interacciones: [nuevaInteraccion, ...targetCli.interacciones] };
       handleUpdateCliente(updatedCli);
@@ -311,7 +312,7 @@ export default function App() {
       id: genId('int-cli-aut-res'),
       fecha: new Date().toISOString().split('T')[0],
       tipo: 'registro_contrato',
-      notas: `Reserva recibida por la web y asignada al coche ${veh ? `${veh.marca} ${veh.modelo} (${veh.matricula})` : ''}. Rango: ${reserva.fechaInicio}${reserva.horaInicio ? ` ${reserva.horaInicio}` : ''} al ${reserva.fechaFin}${reserva.horaFin ? ` ${reserva.horaFin}` : ''}. Total: ${reserva.totalCobrado.toFixed(2)} €.`,
+      notas: `Reserva recibida por la web y asignada al coche ${veh ? `${veh.marca} ${veh.modelo} (${veh.matricula})` : ''}. Rango: ${reserva.fechaInicio}${reserva.horaInicio ? ` ${reserva.horaInicio}` : ''} al ${reserva.fechaFin}${reserva.horaFin ? ` ${reserva.horaFin}` : ''}. Total: ${fmt2(reserva.totalCobrado)} €.`,
     };
     const existente = clienteNuevo ? null : clientes.find(c => c.id === reserva.clienteId) ?? null;
     // Si la web ya trajo el documento y la ficha existente lo tiene vacío, se completa.

@@ -15,8 +15,8 @@ describe('catálogo de complementos en Empresa', () => {
   it('lista cada complemento con su precio, distinguiendo por día y precio fijo, en su orden', () => {
     const h = pinta(catalogo);
     const t = texto(h);
-    expect(t).toContain('Sillita infantil 8.00 € / día');
-    expect(t).toContain('Baca coche 50.00 € (precio fijo)');
+    expect(t).toContain('Sillita infantil 8,00 € / día');
+    expect(t).toContain('Baca coche 50,00 € (precio fijo)');
     expect(h.indexOf('Sillita infantil')).toBeLessThan(h.indexOf('Baca coche'));
     expect((h.match(/data-testid="fila-complemento"/g) ?? []).length).toBe(3);
   });

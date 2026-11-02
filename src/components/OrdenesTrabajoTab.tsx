@@ -19,6 +19,7 @@ import TableroTaller from './TableroTaller';
 import { enlaceWhatsApp, mensajeAvisoMecanico } from '../utils/tallerMecanico';
 import { genId } from '../utils/id';
 import { InputPrecio } from './InputPrecio';
+import { fmt2 } from '../utils/moneda';
 
 interface Props {
   ordenes: OrdenTrabajo[];
@@ -483,7 +484,7 @@ export default function OrdenesTrabajoTab({ ordenes, vehiculos, clientes, tecnic
                       <td className="px-4 py-3 text-slate-500 text-xs">{ot.fechaRecepcion}</td>
                       <td className="px-4 py-3"><BadgeEstado estado={ot.estado} presupuestoEstado={ot.presupuestoEstado} presupuestoAprobado={ot.presupuestoAprobado} notificacionEnviada={ot.notificacionEnviada} /></td>
                       <td className="px-4 py-3 text-right font-mono font-semibold text-slate-800">
-                        {ot.total > 0 ? `${ot.total.toFixed(2)} €` : <span className="text-slate-300 font-normal text-xs">Por definir</span>}
+                        {ot.total > 0 ? `${fmt2(ot.total)} €` : <span className="text-slate-300 font-normal text-xs">Por definir</span>}
                       </td>
                       <td className="px-4 py-3 text-right">
                         <ChevronRight size={14} className="text-slate-300 inline" />
@@ -667,8 +668,8 @@ export default function OrdenesTrabajoTab({ ordenes, vehiculos, clientes, tecnic
                                 </span>
                               </td>
                               <td className="px-3 py-2 text-right text-slate-600">{l.cantidad}</td>
-                              <td className="px-3 py-2 text-right font-mono">{l.precioUnitario.toFixed(2)} €</td>
-                              <td className="px-3 py-2 text-right font-mono font-semibold">{l.subtotal.toFixed(2)} €</td>
+                              <td className="px-3 py-2 text-right font-mono">{fmt2(l.precioUnitario)} €</td>
+                              <td className="px-3 py-2 text-right font-mono font-semibold">{fmt2(l.subtotal)} €</td>
                             </tr>
                           ))}
                         </tbody>
@@ -682,15 +683,15 @@ export default function OrdenesTrabajoTab({ ordenes, vehiculos, clientes, tecnic
                   <div className="bg-slate-50 rounded-xl p-4 space-y-1.5 text-sm">
                     <div className="flex justify-between text-slate-500">
                       <span>Subtotal</span>
-                      <span className="font-mono">{totalesSelected.subtotal.toFixed(2)} €</span>
+                      <span className="font-mono">{fmt2(totalesSelected.subtotal)} €</span>
                     </div>
                     <div className="flex justify-between text-slate-500">
                       <span>IVA ({selected.ivaPct}%)</span>
-                      <span className="font-mono">{totalesSelected.totalIva.toFixed(2)} €</span>
+                      <span className="font-mono">{fmt2(totalesSelected.totalIva)} €</span>
                     </div>
                     <div className="flex justify-between font-bold text-slate-800 border-t border-slate-200 pt-2 mt-1">
                       <span>Total</span>
-                      <span className="font-mono text-base">{totalesSelected.total.toFixed(2)} €</span>
+                      <span className="font-mono text-base">{fmt2(totalesSelected.total)} €</span>
                     </div>
                   </div>
                 )}
@@ -1087,8 +1088,8 @@ export default function OrdenesTrabajoTab({ ordenes, vehiculos, clientes, tecnic
                             <tr key={l.id}>
                               <td className="px-3 py-1.5 text-slate-700">{l.descripcion} <span className="text-slate-400 text-[9px]">({TIPO_META[l.tipo].label})</span></td>
                               <td className="px-3 py-1.5 text-right">{l.cantidad}</td>
-                              <td className="px-3 py-1.5 text-right font-mono">{l.precioUnitario.toFixed(2)} €</td>
-                              <td className="px-3 py-1.5 text-right font-mono font-semibold">{l.subtotal.toFixed(2)} €</td>
+                              <td className="px-3 py-1.5 text-right font-mono">{fmt2(l.precioUnitario)} €</td>
+                              <td className="px-3 py-1.5 text-right font-mono font-semibold">{fmt2(l.subtotal)} €</td>
                               <td className="px-3 py-1.5 text-right">
                                 <div className="flex items-center justify-end gap-2">
                                   <button type="button" onClick={() => {
@@ -1161,7 +1162,7 @@ export default function OrdenesTrabajoTab({ ordenes, vehiculos, clientes, tecnic
                     className="w-20 px-2 py-1.5 border border-slate-200 rounded-lg text-sm font-mono focus:outline-none focus:ring-1 focus:ring-blue-500" />
                   {editOTLineas.length > 0 && (() => {
                     const t = calcTotals(editOTLineas, editForm.ivaPct);
-                    return <div className="flex-1 text-right text-sm"><span className="text-slate-400">Base: {t.subtotal.toFixed(2)} € · IVA: {t.totalIva.toFixed(2)} € · </span><strong className="text-slate-800 font-mono">{t.total.toFixed(2)} €</strong></div>;
+                    return <div className="flex-1 text-right text-sm"><span className="text-slate-400">Base: {fmt2(t.subtotal)} € · IVA: {fmt2(t.totalIva)} € · </span><strong className="text-slate-800 font-mono">{fmt2(t.total)} €</strong></div>;
                   })()}
                 </div>
 
@@ -1399,8 +1400,8 @@ export default function OrdenesTrabajoTab({ ordenes, vehiculos, clientes, tecnic
                             <tr key={l.id}>
                               <td className="px-3 py-1.5 text-slate-700">{l.descripcion} <span className="text-slate-400 text-[9px]">({TIPO_META[l.tipo].label})</span></td>
                               <td className="px-3 py-1.5 text-right">{l.cantidad}</td>
-                              <td className="px-3 py-1.5 text-right font-mono">{l.precioUnitario.toFixed(2)} €</td>
-                              <td className="px-3 py-1.5 text-right font-mono font-semibold">{l.subtotal.toFixed(2)} €</td>
+                              <td className="px-3 py-1.5 text-right font-mono">{fmt2(l.precioUnitario)} €</td>
+                              <td className="px-3 py-1.5 text-right font-mono font-semibold">{fmt2(l.subtotal)} €</td>
                               <td className="px-3 py-1.5 text-right">
                                 <div className="flex items-center justify-end gap-2">
                                   <button type="button" onClick={() => openEditLinea(l)} className="text-slate-300 hover:text-blue-500 transition"><Pencil size={11} /></button>
@@ -1457,8 +1458,8 @@ export default function OrdenesTrabajoTab({ ordenes, vehiculos, clientes, tecnic
                     const t = calcTotals(formLineas, otForm.ivaPct);
                     return (
                       <div className="flex-1 text-right text-sm">
-                        <span className="text-slate-400">Base: {t.subtotal.toFixed(2)} € · IVA: {t.totalIva.toFixed(2)} € · </span>
-                        <strong className="text-slate-800 font-mono">{t.total.toFixed(2)} €</strong>
+                        <span className="text-slate-400">Base: {fmt2(t.subtotal)} € · IVA: {fmt2(t.totalIva)} € · </span>
+                        <strong className="text-slate-800 font-mono">{fmt2(t.total)} €</strong>
                       </div>
                     );
                   })()}
@@ -1721,8 +1722,8 @@ export default function OrdenesTrabajoTab({ ordenes, vehiculos, clientes, tecnic
                                 <td className="py-2 text-slate-800">{l.descripcion}</td>
                                 <td className="py-2 text-center text-xs text-slate-500">{TIPO_META[l.tipo].label}</td>
                                 <td className="py-2 text-right font-mono text-slate-600">{l.cantidad}</td>
-                                <td className="py-2 text-right font-mono text-slate-600">{l.precioUnitario.toFixed(2)} €</td>
-                                <td className="py-2 text-right font-mono font-semibold text-slate-800">{l.subtotal.toFixed(2)} €</td>
+                                <td className="py-2 text-right font-mono text-slate-600">{fmt2(l.precioUnitario)} €</td>
+                                <td className="py-2 text-right font-mono font-semibold text-slate-800">{fmt2(l.subtotal)} €</td>
                               </tr>
                             ))}
                           </tbody>
@@ -1734,15 +1735,15 @@ export default function OrdenesTrabajoTab({ ordenes, vehiculos, clientes, tecnic
                     <div className="border-t-2 border-slate-200 pt-4 space-y-1.5">
                       <div className="flex justify-between text-sm text-slate-500">
                         <span>Base imponible</span>
-                        <span className="font-mono">{ot.subtotal.toFixed(2)} €</span>
+                        <span className="font-mono">{fmt2(ot.subtotal)} €</span>
                       </div>
                       <div className="flex justify-between text-sm text-slate-500">
                         <span>IVA ({ot.ivaPct}%)</span>
-                        <span className="font-mono">{ot.totalIva.toFixed(2)} €</span>
+                        <span className="font-mono">{fmt2(ot.totalIva)} €</span>
                       </div>
                       <div className="flex justify-between text-base font-bold text-slate-900 pt-2 border-t border-slate-200">
                         <span>TOTAL</span>
-                        <span className="font-mono text-lg">{ot.total.toFixed(2)} €</span>
+                        <span className="font-mono text-lg">{fmt2(ot.total)} €</span>
                       </div>
                     </div>
 

@@ -14,6 +14,7 @@ import {
   calcularHuella, cambiosTrasFirma, crearSnapshot, fechaHoraFirma, integridadCorrecta, referenciaCorta,
 } from '../utils/firmaContrato';
 import { anularContratoFirmado, fetchContratoFirmado, guardarContratoFirmado } from '../data/contratosFirmadosDb';
+import { fmt2 } from '../utils/moneda';
 
 /** Estado de la firma de la reserva: se está comprobando, no se pudo comprobar, o ya se sabe (firmada o no). */
 export type EstadoFirma = { fase: 'cargando' } | { fase: 'error' } | { fase: 'listo'; firmado: ContratoFirmado | null };
@@ -62,7 +63,7 @@ export function ContratoVisorVista({
     desde: fechaConHora(r.fechaInicio, r.horaInicio, fecha),
     hasta: fechaConHora(r.fechaFin, r.horaFin, fecha),
     dias: r.dias ?? diasAlquiler(r.fechaInicio, r.fechaFin, r.horaInicio, r.horaFin),
-    total: r.totalCobrado.toFixed(2),
+    total: fmt2(r.totalCobrado, tx.locale),
     empresa: empresa.nombre,
   });
   const tel = cliente?.telefono?.replace(/\D/g, '') ?? '';

@@ -12,6 +12,7 @@ import { genId } from '../utils/id';
 import ConfirmDialog from './ConfirmDialog';
 import { mensajeFactura } from '../utils/mensajeFactura';
 import { InputPrecio } from './InputPrecio';
+import { fmt2 } from '../utils/moneda';
 
 interface FacturasTabProps {
   facturas: Factura[];
@@ -42,7 +43,7 @@ const ESTADO_FACTURA_COLORS: Record<Factura['estado'], string> = {
   cancelada: 'bg-slate-200 text-slate-500',
 };
 
-const fmt = (n: number) => n.toLocaleString('es-ES', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+const fmt = (n: number) => fmt2(n);
 
 const calcLineTotals = (lines: LineaDocumento[], ivaPct: number) => {
   const subtotal = lines.reduce((s, l) => s + l.subtotal, 0);

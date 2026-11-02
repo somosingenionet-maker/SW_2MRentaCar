@@ -72,8 +72,8 @@ describe('textos', () => {
     expect(nombreComplemento('Cobertura Básica - 500€')).toBe('Cobertura Básica - 500€');
   });
   it('etiqueta del precio y resumen', () => {
-    expect(etiquetaPrecioComplemento(catalogo[0])).toBe('8.00 € / día');
-    expect(etiquetaPrecioComplemento(catalogo[1])).toBe('50.00 € (precio fijo)');
+    expect(etiquetaPrecioComplemento(catalogo[0])).toBe('8,00 € / día');
+    expect(etiquetaPrecioComplemento(catalogo[1])).toBe('50,00 € (precio fijo)');
     expect(resumenExtras([{ nombre: 'Sillita infantil - 8€/día', cantidad: 2, total: 40 }, { nombre: 'Baca Coche', cantidad: 1, total: 50 }])).toBe('Sillita infantil × 2, Baca Coche');
     expect(resumenExtras(undefined)).toBe('');
   });

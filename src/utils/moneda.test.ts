@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { formatEuros } from './moneda';
+import { formatEuros, fmt2 } from './moneda';
 
 // El espacio entre la cifra y el € es un espacio duro: se normaliza para comparar.
 const texto = (n: number) => formatEuros(n).replace(/\s/g, ' ');
@@ -24,5 +24,20 @@ describe('formatEuros', () => {
   it('respeta los negativos', () => {
     expect(texto(-25)).toBe('-25,00 €');
     expect(texto(-25.5)).toBe('-25,50 €');
+  });
+});
+
+describe('fmt2', () => {
+  it('siempre dos decimales y coma decimal', () => {
+    expect(fmt2(45)).toBe('45,00');
+    expect(fmt2(45.5)).toBe('45,50');
+    expect(fmt2(0.1 + 0.2)).toBe('0,30');
+    expect(fmt2(99.99000000000001)).toBe('99,99');
+    expect(fmt2(1234.5)).toBe('1234,50');
+    expect(fmt2(12345.6)).toBe('12.345,60');
+  });
+  it('el contrato en inglés lo pide con punto', () => {
+    expect(fmt2(45.5, 'en-GB')).toBe('45.50');
+    expect(fmt2(12345.6, 'en-GB')).toBe('12,345.60');
   });
 });
