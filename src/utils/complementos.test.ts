@@ -121,3 +121,69 @@ describe('el total de la reserva incluye los complementos', () => {
     expect(totalTrasCambioDeHoras(reserva({ totalCobrado: 200 }), '12:00', '19:00').recalculado).toBe(false);
   });
 });
+
+import { filasEditorExtras, aplicarFilasEditor } from './complementos';
+
+describe('editar los complementos de una reserva ya creada', () => {
+  const cat: Complemento[] = [
+    { id: 'sillita', nombre: 'Sillita infantil', precio: 8, porDia: true, activo: true, orden: 3 },
+    { id: 'baca', nombre: 'Baca coche', precio: 50, porDia: false, activo: true, orden: 5 },
+    { id: 'cuna', nombre: 'Cuna', precio: 10, porDia: true, activo: false, orden: 9 },
+  ];
+  const reserva = (extra: Partial<Reserva> = {}) => ({
+    totalCobrado: 262, extras: [
+      { nombre: 'Sillita infantil', cantidad: 1, precio: 8, porDia: true, total: 32 },
+      { nombre: 'Baca coche', cantidad: 1, precio: 50, porDia: false, total: 50 },
+    ], ...extra,
+  }) as Reserva;
+
+  it('las filas son los complementos disponibles con la cantidad actual; los no disponibles no salen', () => {
+    const f = filasEditorExtras(reserva().extras, cat);
+    expect(f.map(x => [x.nombre, x.cantidad])).toEqual([['Sillita infantil', 1], ['Baca coche', 1]]);
+  });
+
+  it('un complemento que la reserva lleva pero ya no está disponible sale aparte, para poder quitarlo', () => {
+    const f = filasEditorExtras([...reserva().extras!, { nombre: 'Cuna', cantidad: 2, precio: 10, porDia: true, total: 80 }], cat);
+    const cuna = f.find(x => x.nombre === 'Cuna')!;
+    expect(cuna).toMatchObject({ cantidad: 2, fueraDeCatalogo: true, precio: 10, porDia: true });
+  });
+
+  it('los complementos de un pedido de la web no se editan: no salen como fila y se conservan', () => {
+    const r = reserva({ extras: [{ nombre: 'Portabicicletas', cantidad: 1, total: 40 }, ...reserva().extras!] });
+    expect(filasEditorExtras(r.extras, cat).map(x => x.nombre)).toEqual(['Sillita infantil', 'Baca coche']);
+    const filas = filasEditorExtras(r.extras, cat).map(x => ({ ...x, cantidad: 0 }));
+    expect(aplicarFilasEditor(r, filas, 4).extras).toEqual([{ nombre: 'Portabicicletas', cantidad: 1, total: 40 }]);
+  });
+
+  it('añadir uno: el total sube justo lo que cuesta (sillita ×2 a 4 días = 64 en vez de 32 → +32)', () => {
+    const filas = filasEditorExtras(reserva().extras, cat).map(f => f.nombre === 'Sillita infantil' ? { ...f, cantidad: 2 } : f);
+    const r = aplicarFilasEditor(reserva(), filas, 4);
+    expect(r.cambio).toBe(32);
+    expect(r.total).toBe(294);
+    expect(r.extras.find(e => e.nombre === 'Sillita infantil')).toMatchObject({ cantidad: 2, total: 64 });
+  });
+
+  it('quitar uno: el total baja lo que costaba (la baca fija, −50)', () => {
+    const filas = filasEditorExtras(reserva().extras, cat).map(f => f.nombre === 'Baca coche' ? { ...f, cantidad: 0 } : f);
+    const r = aplicarFilasEditor(reserva(), filas, 4);
+    expect(r).toMatchObject({ cambio: -50, total: 212 });
+    expect(r.extras.map(e => e.nombre)).toEqual(['Sillita infantil']);
+  });
+
+  it('añadir a una reserva sin complementos', () => {
+    const filas = filasEditorExtras([], cat).map(f => f.nombre === 'Baca coche' ? { ...f, cantidad: 1 } : f);
+    expect(aplicarFilasEditor(reserva({ extras: [], totalCobrado: 180 }), filas, 4)).toMatchObject({ total: 230, extras: [{ nombre: 'Baca coche', total: 50 }] });
+  });
+
+  it('sin tocar nada no cambia el total; y un total pactado distinto de días × tarifa no se pierde', () => {
+    const filas = filasEditorExtras(reserva().extras, cat);
+    expect(aplicarFilasEditor(reserva(), filas, 4)).toMatchObject({ cambio: 0, total: 262 });
+    const pactado = aplicarFilasEditor(reserva({ totalCobrado: 240 }), filas.map(f => f.nombre === 'Baca coche' ? { ...f, cantidad: 0 } : f), 4);
+    expect(pactado.total).toBe(190);
+  });
+
+  it('un precio por día se calcula con los días actuales', () => {
+    const filas = filasEditorExtras([], cat).map(f => f.nombre === 'Sillita infantil' ? { ...f, cantidad: 1 } : f);
+    expect(aplicarFilasEditor(reserva({ extras: [], totalCobrado: 100 }), filas, 10).total).toBe(180);
+  });
+});

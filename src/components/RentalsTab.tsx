@@ -21,8 +21,10 @@ import Hora24Field from './Hora24Field';
 import { LUGARES_HABITUALES, lugaresReserva } from '../utils/lugarReserva';
 import { buscarReservas } from '../utils/buscarReservas';
 import { datosReservaWeb, lineasDePedidoWeb } from '../utils/pedidoWeb';
+import { tarifaDeTemporada, precioConvenio } from '../utils/tarifasAlquiler';
 import { FilaDuracion, DesgloseFicha } from './DuracionReserva';
-import { extrasManuales, totalExtras, etiquetaPrecioComplemento, resumenExtras } from '../utils/complementos';
+import { extrasManuales, totalExtras, etiquetaPrecioComplemento, resumenExtras, filasEditorExtras, aplicarFilasEditor, type FilaEditorExtras } from '../utils/complementos';
+import { EditorComplementos } from './EditorComplementos';
 import ContratoVisor from './ContratoVisor';
 import { downloadCsv, slugify } from '../utils/csvExport';
 import { genId } from '../utils/id';
@@ -99,8 +101,10 @@ export default function RentalsTab({
   const [editandoLugares, setEditandoLugares] = useState<{ recogida: string; devolucion: string } | null>(null);
   // Aviso tras cambiar las horas de una reserva cuando eso cambia los días (y quizá el total).
   const [avisoDias, setAvisoDias] = useState<string | null>(null);
+  const [editandoComplementos, setEditandoComplementos] = useState<FilaEditorExtras[] | null>(null);
+  const [avisoComplementos, setAvisoComplementos] = useState<string | null>(null);
   const [formTarifa, setFormTarifa] = useState<number>(45.00);
-  const [formTemporada, setFormTemporada] = useState<'alta' | 'media' | 'baja'>('media');
+  const [formTemporada, setFormTemporada] = useState<Reserva['temporada']>('media');
   const [formSeguro, setFormSeguro] = useState(true);
   // Complementos elegidos en el alta manual: { id del complemento: cantidad }.
   const [formExtras, setFormExtras] = useState<Record<string, number>>({});
@@ -336,7 +340,7 @@ export default function RentalsTab({
   };
 
   // Al elegir otra reserva se descarta una edición de horas a medias.
-  useEffect(() => { setEditandoHoras(null); setEditandoFianza(null); setEditandoLugares(null); setAvisoDias(null); }, [selectedReserva?.id]);
+  useEffect(() => { setEditandoHoras(null); setEditandoFianza(null); setEditandoLugares(null); setAvisoDias(null); setEditandoComplementos(null); setAvisoComplementos(null); }, [selectedReserva?.id]);
 
   const handleGuardarFianza = () => {
     if (!selectedReserva || !editandoFianza) return;
@@ -367,6 +371,17 @@ export default function RentalsTab({
     else if (t.recalculado) setAvisoDias(`Con las nuevas horas el alquiler pasa de ${t.diasAntes} a ${t.diasDespues} días y el total se ha recalculado: ${t.total.toFixed(2)} €.`);
     else if (selectedReserva.origen === 'web') setAvisoDias(`Con las nuevas horas el alquiler pasa de ${t.diasAntes} a ${t.diasDespues} días. El total (${t.total.toFixed(2)} €) lo fija la web y no se ha cambiado.`);
     else setAvisoDias(`Con las nuevas horas el alquiler pasa de ${t.diasAntes} a ${t.diasDespues} días. El total no se ha cambiado porque no coincidía con días × tarifa: revísalo.`);
+  };
+
+  const handleGuardarComplementos = () => {
+    if (!selectedReserva || !editandoComplementos) return;
+    const dias = diasAlquiler(selectedReserva.fechaInicio, selectedReserva.fechaFin, selectedReserva.horaInicio, selectedReserva.horaFin);
+    const r = aplicarFilasEditor(selectedReserva, editandoComplementos, dias);
+    const actualizada = { ...selectedReserva, extras: r.extras, totalCobrado: r.total };
+    onUpdateReserva(actualizada);
+    setSelectedReserva(actualizada);
+    setEditandoComplementos(null);
+    setAvisoComplementos(r.cambio === 0 ? null : `Complementos actualizados: el total pasa a ${r.total.toFixed(2)} € (${r.cambio > 0 ? '+' : '−'}${Math.abs(r.cambio).toFixed(2)} €).`);
   };
 
   const handleGuardarLugares = () => {
@@ -1121,6 +1136,24 @@ export default function RentalsTab({
                 {/* Desglose económico: cada concepto a su precio, el descuento aparte y la fianza fuera del total */}
                 <div className="p-3 bg-blue-50 text-blue-900 rounded-xl border border-blue-100/30 space-y-2">
                   <DesgloseFicha reserva={selectedReserva} />
+                  {selectedReserva.estado !== 'cancelada' && (editandoComplementos ? (
+                    <EditorComplementos
+                      reserva={selectedReserva}
+                      filas={editandoComplementos}
+                      dias={diasAlquiler(selectedReserva.fechaInicio, selectedReserva.fechaFin, selectedReserva.horaInicio, selectedReserva.horaFin)}
+                      firmada={!!firmasVigentes[selectedReserva.id]}
+                      onCambiar={(clave, cantidad) => setEditandoComplementos(fs => fs && fs.map(f => f.clave === clave ? { ...f, cantidad } : f))}
+                      onGuardar={handleGuardarComplementos}
+                      onCancelar={() => setEditandoComplementos(null)}
+                    />
+                  ) : (
+                    <button type="button" data-testid="editar-complementos"
+                      onClick={() => { setAvisoComplementos(null); setEditandoComplementos(filasEditorExtras(selectedReserva.extras, complementos)); }}
+                      className="w-full cursor-pointer rounded-lg border border-blue-200 bg-white/70 py-1.5 text-[11px] font-bold text-blue-700 transition hover:bg-white">
+                      Editar complementos
+                    </button>
+                  ))}
+                  {avisoComplementos && <p role="status" data-testid="aviso-complementos" className="rounded-md border border-emerald-200 bg-emerald-50 px-2 py-1 text-[11px] font-semibold text-emerald-700">{avisoComplementos}</p>}
                   <div className="border-t border-dashed border-blue-200 pt-2 space-y-1.5">
                     <div className="flex justify-between items-center gap-2 text-xs font-semibold" id="reserva-fianza-ficha">
                       <span>Fianza (depósito aparte, no incluida en el total):</span>
@@ -1308,8 +1341,11 @@ export default function RentalsTab({
                         const veh = vehiculos.find(v => v.id === val);
                         // Al cambiar de coche, la fianza vuelve a su importe habitual (se puede volver a cambiar).
                         setFormFianza(fianzaSugerida(veh));
-                        const precio = veh?.tarifasAlquiler?.[`temporada${formTemporada.charAt(0).toUpperCase() + formTemporada.slice(1)}` as 'temporadaAlta' | 'temporadaMedia' | 'temporadaBaja'];
-                        if (precio !== undefined) setFormTarifa(precio);
+                        // Si el coche nuevo no tiene el convenio que estaba elegido, se vuelve a la temporada media.
+                        const temporada = formTemporada === 'convenio' && precioConvenio(veh?.tarifasAlquiler) == null ? 'media' : formTemporada;
+                        if (temporada !== formTemporada) setFormTemporada(temporada);
+                        const precio = tarifaDeTemporada(veh?.tarifasAlquiler, temporada);
+                        if (precio !== null) setFormTarifa(precio);
                         // El seguro depende del coche: se marca por defecto si lo ofrece y se quita si no.
                         if (!solicitudActiva) setFormSeguro(ofreceSeguro(veh));
                       }}
@@ -1416,15 +1452,17 @@ export default function RentalsTab({
                     {(() => {
                       const veh = vehiculos.find(v => v.id === formVehiculoId);
                       const tarifas = veh?.tarifasAlquiler;
-                      const TEMPORADAS: { key: 'alta' | 'media' | 'baja'; label: string }[] = [
+                      const TEMPORADAS: { key: Reserva['temporada']; label: string }[] = [
                         { key: 'alta', label: 'Temporada Alta' },
                         { key: 'media', label: 'Temporada Media' },
                         { key: 'baja', label: 'Temporada Baja' },
+                        // Precio pactado en convenios con clientes: solo si el coche lo tiene.
+                        ...(precioConvenio(tarifas) != null ? [{ key: 'convenio' as const, label: 'Convenio' }] : []),
                       ];
                       return (
-                        <div className="grid grid-cols-3 gap-2">
+                        <div className={`grid gap-2 ${TEMPORADAS.length > 3 ? 'grid-cols-2 sm:grid-cols-4' : 'grid-cols-3'}`} data-testid="selector-temporada">
                           {TEMPORADAS.map(({ key, label }) => {
-                            const precio = tarifas?.[`temporada${key.charAt(0).toUpperCase() + key.slice(1)}` as keyof typeof tarifas] ?? null;
+                            const precio = tarifaDeTemporada(tarifas, key);
                             const active = formTemporada === key;
                             return (
                               <button

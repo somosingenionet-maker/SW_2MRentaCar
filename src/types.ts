@@ -3,6 +3,8 @@ export interface TarifasAlquiler {
   temporadaAlta: number;
   temporadaMedia: number;
   temporadaBaja: number;
+  /** Precio por día (€) pactado en convenios con clientes. Opcional: si no hay convenio, no se guarda. */
+  precioPersonalizado?: number;
 }
 
 export interface Vehiculo {
@@ -129,7 +131,7 @@ export interface Cliente {
   vehiculosAsociados?: string[];
 }
 
-type TemporadaAlquiler = 'alta' | 'media' | 'baja';
+type TemporadaAlquiler = 'alta' | 'media' | 'baja' | 'convenio';
 
 export interface Reserva {
   id: string;

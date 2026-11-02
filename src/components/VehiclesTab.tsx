@@ -6,6 +6,7 @@ import { CONDICIONES_POR_DEFECTO, etiquetaTransmision } from '../utils/condicion
 import { useSeleccion } from '../utils/useSeleccion';
 import { datoDuplicado } from '../utils/vehiculoDuplicado';
 import { Vehiculo, OrdenTrabajo, OTEstado, TarifasAlquiler } from '../types';
+import { cambiarTarifa, precioConvenio } from '../utils/tarifasAlquiler';
 import {
   Car, Search, Plus, Wrench, Calendar, Shield, CreditCard, PenTool, Trash2, X, Check, Save, Download, ClipboardList
 } from 'lucide-react';
@@ -166,31 +167,11 @@ export default function VehiclesTab({
     }
   };
 
-  // Actualiza una tarifa de temporada manteniendo las otras dos.
-  const updateAddTarifa = (key: keyof TarifasAlquiler, value: string) => {
-    const num = value === '' ? 0 : Number(value);
-    setFormData(fd => ({
-      ...fd,
-      tarifasAlquiler: {
-        temporadaAlta: fd.tarifasAlquiler?.temporadaAlta ?? 0,
-        temporadaMedia: fd.tarifasAlquiler?.temporadaMedia ?? 0,
-        temporadaBaja: fd.tarifasAlquiler?.temporadaBaja ?? 0,
-        [key]: num,
-      },
-    }));
-  };
-  const updateEditTarifa = (key: keyof TarifasAlquiler, value: string) => {
-    const num = value === '' ? 0 : Number(value);
-    setEditFormData(ef => ef ? {
-      ...ef,
-      tarifasAlquiler: {
-        temporadaAlta: ef.tarifasAlquiler?.temporadaAlta ?? 0,
-        temporadaMedia: ef.tarifasAlquiler?.temporadaMedia ?? 0,
-        temporadaBaja: ef.tarifasAlquiler?.temporadaBaja ?? 0,
-        [key]: num,
-      },
-    } : ef);
-  };
+  // Actualiza una tarifa manteniendo las demás (el precio personalizado de convenios es opcional: vacío = sin convenio).
+  const updateAddTarifa = (key: keyof TarifasAlquiler, value: string) =>
+    setFormData(fd => ({ ...fd, tarifasAlquiler: cambiarTarifa(fd.tarifasAlquiler, key, value) }));
+  const updateEditTarifa = (key: keyof TarifasAlquiler, value: string) =>
+    setEditFormData(ef => ef ? { ...ef, tarifasAlquiler: cambiarTarifa(ef.tarifasAlquiler, key, value) } : ef);
 
   const handleDeleteClick = (id: string) => {
     setConfirmDialog({ isOpen: true, vehiculoId: id });
@@ -446,7 +427,7 @@ export default function VehiclesTab({
                   <div className="text-[10px] text-blue-500 font-semibold uppercase flex items-center gap-1 mb-2">
                     <Calendar className="w-3 h-3 text-blue-500" /> Tarifas de alquiler (€/día)
                   </div>
-                  <div className="grid grid-cols-3 gap-2">
+                  <div className={`grid gap-2 ${precioConvenio(selectedVehiculo.tarifasAlquiler) != null ? 'grid-cols-4' : 'grid-cols-3'}`}>
                     {([
                       { key: 'temporadaAlta' as const, label: 'Alta' },
                       { key: 'temporadaMedia' as const, label: 'Media' },
@@ -460,6 +441,12 @@ export default function VehiclesTab({
                         </div>
                       );
                     })}
+                    {precioConvenio(selectedVehiculo.tarifasAlquiler) != null && (
+                      <div data-testid="tarjeta-convenio" className="bg-white rounded-lg border border-amber-200 p-2 text-center">
+                        <div className="text-[10px] text-amber-600 font-semibold uppercase">Convenio</div>
+                        <div className="text-sm font-extrabold text-slate-800 mt-0.5">{precioConvenio(selectedVehiculo.tarifasAlquiler)} €</div>
+                      </div>
+                    )}
                   </div>
                 </div>
               )}
@@ -741,6 +728,23 @@ export default function VehiclesTab({
                             </div>
                           ))}
                         </div>
+                        <div className="mt-2.5" data-testid="campo-precio-convenio">
+                          <label htmlFor="precio-convenio-alta" className="block text-[10px] font-semibold text-blue-700 mb-0.5">Precio personalizado — convenios con clientes (opcional)</label>
+                          <div className="relative sm:max-w-[14rem]">
+                            <input
+                              id="precio-convenio-alta"
+                              type="number"
+                              min="0"
+                              step="0.01"
+                              value={formData.tarifasAlquiler?.precioPersonalizado ?? ''}
+                              onChange={e => updateAddTarifa('precioPersonalizado', e.target.value)}
+                              className="w-full border border-blue-200 rounded-lg pl-2 pr-12 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400 bg-white"
+                              placeholder="Sin convenio"
+                            />
+                            <span className="absolute right-2 top-1/2 -translate-y-1/2 text-xs text-slate-400">€/día</span>
+                          </div>
+                          <p className="text-[10px] text-blue-500 mt-1">Aparece como un botón «Convenio» al crear una reserva con este coche. Déjalo vacío si no hay ningún convenio.</p>
+                        </div>
                       </div>
                     )}
                     {formData.esFlotaAlquiler && (
@@ -926,6 +930,23 @@ export default function VehiclesTab({
                               </div>
                             </div>
                           ))}
+                        </div>
+                        <div className="mt-2.5" data-testid="campo-precio-convenio">
+                          <label htmlFor="precio-convenio-edicion" className="block text-[10px] font-semibold text-blue-700 mb-0.5">Precio personalizado — convenios con clientes (opcional)</label>
+                          <div className="relative sm:max-w-[14rem]">
+                            <input
+                              id="precio-convenio-edicion"
+                              type="number"
+                              min="0"
+                              step="0.01"
+                              value={editFormData.tarifasAlquiler?.precioPersonalizado ?? ''}
+                              onChange={e => updateEditTarifa('precioPersonalizado', e.target.value)}
+                              className="w-full border border-blue-200 rounded-lg pl-2 pr-12 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400 bg-white"
+                              placeholder="Sin convenio"
+                            />
+                            <span className="absolute right-2 top-1/2 -translate-y-1/2 text-xs text-slate-400">€/día</span>
+                          </div>
+                          <p className="text-[10px] text-blue-500 mt-1">Aparece como un botón «Convenio» al crear una reserva con este coche. Déjalo vacío si no hay ningún convenio.</p>
                         </div>
                       </div>
                     )}
