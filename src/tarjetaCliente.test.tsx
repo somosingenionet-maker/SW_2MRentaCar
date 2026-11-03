@@ -3,19 +3,19 @@ import { renderToString } from 'react-dom/server';
 import TarjetaClienteFields from './components/TarjetaClienteFields';
 
 describe('campos de la tarjeta del cliente', () => {
-  const h = renderToString(<TarjetaClienteFields value={{ tarjetaMarca: 'Visa', tarjetaUltimos4: '4242', tarjetaCaducidad: '08/28', tarjetaTitular: 'Ana Pérez' }} onChange={() => undefined} />);
+  const h = renderToString(<TarjetaClienteFields value={{ tarjetaNumero: '4242424242424242', tarjetaCaducidad: '08/28' }} onChange={() => undefined} />);
 
-  it('muestra titular, marca, últimos 4 y caducidad con su valor', () => {
-    expect(h).toContain('Tarjeta');
-    expect(h).toContain('value="Ana Pérez"');
-    expect(h).toContain('value="4242"');
+  it('solo tiene número y caducidad, el número en grupos de 4', () => {
+    expect(h.match(/<input/g)).toHaveLength(2);
+    expect(h).toContain('Número de tarjeta');
+    expect(h).toContain('value="4242 4242 4242 4242"');
     expect(h).toContain('value="08/28"');
-    expect(h).toContain('<option value="Mastercard">');
+    expect(h).not.toContain('Titular');
+    expect(h).not.toContain('<select');
   });
 
-  it('deja claro que no se guarda el número completo ni el CVV y no pide ninguno de los dos', () => {
-    expect(h).toContain('Nunca anotes aquí el número completo ni el CVV');
-    expect(h.toLowerCase()).not.toContain('cvv"');
-    expect(h).not.toContain('maxlength="16"');
+  it('no pide el CVV y lo dice', () => {
+    expect(h).toContain('no se guarda: no lo anotes');
+    expect(h.toLowerCase()).not.toMatch(/id="[^"]*cvv/);
   });
 });

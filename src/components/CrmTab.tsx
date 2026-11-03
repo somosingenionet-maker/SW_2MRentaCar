@@ -1,11 +1,11 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { ESTADO_META, estadoReserva } from '../utils/entregaDevolucion';
 import { hoyISO } from '../utils/fechas';
 import { validarCarnet, estadoCarnet } from '../utils/carnet';
 import { fechaConHora } from '../utils/horaReserva';
 import CarnetConducirFields from './CarnetConducirFields';
 import TarjetaClienteFields from './TarjetaClienteFields';
-import { validarTarjeta, estadoTarjeta, resumenTarjeta } from '../utils/tarjeta';
+import { validarTarjeta, estadoTarjeta, enmascararNumero, formatearNumero } from '../utils/tarjeta';
 import { usePaginacion } from '../utils/usePaginacion';
 import { useSeleccion } from '../utils/useSeleccion';
 import { Cliente, Reserva, InteraccionCliente, Vehiculo, OrdenTrabajo, Factura, OTEstado, InvitacionCliente, SolicitudReserva } from '../types';
@@ -89,6 +89,9 @@ export default function CrmTab({
   // Contrato de un alquiler abierto desde la ficha del cliente.
   const [contratoAbierto, setContratoAbierto] = useState<Reserva | null>(null);
   const [selectedCliente, setSelectedCliente] = useSeleccion(clientes);
+  // El número de la tarjeta sale oculto salvo los 4 últimos hasta que se pide verlo; al cambiar de cliente vuelve a ocultarse.
+  const [verTarjeta, setVerTarjeta] = useState(false);
+  useEffect(() => { setVerTarjeta(false); }, [selectedCliente?.id]);
   // Autorregistro: modal para generar el enlace (cliente null = persona nueva) y revisión de lo recibido.
   const [pedirDatos, setPedirDatos] = useState<{ cliente: Cliente | null } | null>(null);
   const [revisando, setRevisando] = useState<InvitacionCliente | null>(null);
@@ -539,15 +542,26 @@ export default function CrmTab({
                   <CreditCard className="w-4 h-4 text-slate-400 shrink-0" />
                   <div>
                     <span className="text-slate-400 mr-1 block text-[10px] uppercase font-bold">Tarjeta</span>
-                    {resumenTarjeta(selectedCliente) ? (
+                    {selectedCliente.tarjetaNumero || selectedCliente.tarjetaCaducidad ? (
                       <span className="text-slate-700 flex items-center gap-1.5 flex-wrap font-semibold">
-                        {resumenTarjeta(selectedCliente)}
+                        {selectedCliente.tarjetaNumero && (
+                          <span data-testid="tarjeta-numero" className="font-mono">
+                            {verTarjeta ? formatearNumero(selectedCliente.tarjetaNumero) : enmascararNumero(selectedCliente.tarjetaNumero)}
+                          </span>
+                        )}
+                        {selectedCliente.tarjetaCaducidad && <span>· caduca {selectedCliente.tarjetaCaducidad}</span>}
                         {(() => {
                           const e = estadoTarjeta(selectedCliente.tarjetaCaducidad);
                           if (e === 'caducada') return <span className="text-[9px] font-bold px-1.5 py-0.5 rounded-full bg-rose-100 text-rose-700">Caducada</span>;
                           if (e === 'caduca_pronto') return <span className="text-[9px] font-bold px-1.5 py-0.5 rounded-full bg-amber-100 text-amber-700">Caduca pronto</span>;
                           return null;
                         })()}
+                        {selectedCliente.tarjetaNumero && (
+                          <button type="button" data-testid="ver-tarjeta" onClick={() => setVerTarjeta(v => !v)}
+                            className="text-[10px] font-bold text-blue-600 hover:text-blue-800 cursor-pointer">
+                            {verTarjeta ? 'Ocultar' : 'Mostrar'}
+                          </button>
+                        )}
                       </span>
                     ) : (
                       <span className="text-slate-400">Sin informar</span>

@@ -120,10 +120,8 @@ export interface Cliente {
   carnetNumero?: string;
   carnetExpedicion?: string;
   carnetVencimiento?: string;
-  /** Tarjeta con la que se dejó la fianza: solo referencia (titular, marca, últimos 4 dígitos y caducidad MM/AA). Nunca el número completo ni el CVV. */
-  tarjetaTitular?: string;
-  tarjetaMarca?: string;
-  tarjetaUltimos4?: string;
+  /** Tarjeta del cliente: número (solo dígitos) y caducidad MM/AA. El CVV no se guarda nunca. */
+  tarjetaNumero?: string;
   tarjetaCaducidad?: string;
   /**
    * Cuando es `true`, el cliente es exclusivo de alquiler y no se le asocia

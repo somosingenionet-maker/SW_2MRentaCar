@@ -1,16 +1,36 @@
 import { hoyISO } from './fechas';
 
 export interface DatosTarjeta {
-  tarjetaTitular?: string;
-  tarjetaMarca?: string;
-  tarjetaUltimos4?: string;
+  tarjetaNumero?: string;
   tarjetaCaducidad?: string;
 }
 
-export const MARCAS_TARJETA = ['Visa', 'Mastercard', 'American Express', 'Otra'] as const;
+/** Solo dígitos, como máximo 19 (el largo máximo de una tarjeta). */
+export const normalizarNumero = (texto: string): string => texto.replace(/\D/g, '').slice(0, 19);
 
-/** Solo dígitos y, si se pega un número largo, se quedan los 4 últimos: el número completo nunca llega a guardarse. */
-export const normalizarUltimos4 = (texto: string): string => texto.replace(/\D/g, '').slice(-4);
+/** «4111111111111111» → «4111 1111 1111 1111» (para escribirlo y leerlo; se guarda sin espacios). */
+export const formatearNumero = (digitos: string): string => (digitos.match(/.{1,4}/g) ?? []).join(' ');
+
+/** Número oculto salvo los 4 últimos dígitos, con los mismos grupos: «•••• •••• •••• 1111». */
+export function enmascararNumero(digitos: string): string {
+  const d = digitos.replace(/\D/g, '');
+  if (d.length <= 4) return d;
+  let vistos = 0;
+  return formatearNumero(d).split('').reverse().map(c => (/\d/.test(c) && ++vistos > 4 ? '•' : c)).reverse().join('');
+}
+
+/** Comprobación de Luhn: detecta casi cualquier error al teclear el número. */
+export function luhnValido(digitos: string): boolean {
+  let suma = 0;
+  let doble = false;
+  for (let i = digitos.length - 1; i >= 0; i--) {
+    let n = digitos.charCodeAt(i) - 48;
+    if (doble) { n *= 2; if (n > 9) n -= 9; }
+    suma += n;
+    doble = !doble;
+  }
+  return digitos.length > 0 && suma % 10 === 0;
+}
 
 /** «0828», «8/28» o «08/2028» → «08/28» mientras se escribe (solo dígitos, barra tras el mes). */
 export function normalizarCaducidad(texto: string): string {
@@ -20,8 +40,8 @@ export function normalizarCaducidad(texto: string): string {
 
 /** Valida lo que se guarda de la tarjeta. Devuelve el mensaje de error o null si todo es correcto. */
 export function validarTarjeta(d: DatosTarjeta): string | null {
-  const u = d.tarjetaUltimos4 ?? '';
-  if (u && !/^\d{4}$/.test(u)) return 'De la tarjeta se guardan solo los 4 últimos dígitos.';
+  const n = d.tarjetaNumero ?? '';
+  if (n && (!/^\d{13,19}$/.test(n) || !luhnValido(n))) return 'El número de la tarjeta no es válido: revisa los dígitos.';
   const c = d.tarjetaCaducidad ?? '';
   if (c) {
     const m = /^(\d{2})\/(\d{2})$/.exec(c);
@@ -41,13 +61,4 @@ export function estadoTarjeta(caducidad: string | undefined, hoy: string = hoyIS
   const mesHoy = a * 12 + mes;
   if (mesCaduca < mesHoy) return 'caducada';
   return mesCaduca <= mesHoy + 1 ? 'caduca_pronto' : 'vigente';
-}
-
-/** «Visa •••• 4242 · caduca 08/28 · Ana Pérez» (solo lo que haya). */
-export function resumenTarjeta(d: DatosTarjeta): string {
-  return [
-    [d.tarjetaMarca, d.tarjetaUltimos4 ? `•••• ${d.tarjetaUltimos4}` : ''].filter(Boolean).join(' '),
-    d.tarjetaCaducidad ? `caduca ${d.tarjetaCaducidad}` : '',
-    d.tarjetaTitular?.trim() || '',
-  ].filter(Boolean).join(' · ');
 }
