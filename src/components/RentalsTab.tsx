@@ -26,6 +26,11 @@ import { FilaDuracion, DesgloseFicha } from './DuracionReserva';
 import { extrasManuales, totalExtras, etiquetaPrecioComplemento, resumenExtras, filasEditorExtras, aplicarFilasEditor, type FilaEditorExtras } from '../utils/complementos';
 import { EditorComplementos } from './EditorComplementos';
 import { InputPrecio } from './InputPrecio';
+import { CambioVehiculo } from './CambioVehiculo';
+import { VistaSemanaDia } from './VistaSemanaDia';
+import { rangoVisible, moverAncla, anclaAlCambiarVista, etiquetaRango, diasSemana, type VistaCalendario } from '../utils/calendarioVistas';
+import { hoyISO } from '../utils/fechas';
+import { puedeCambiarVehiculo, reservaQueOcupa, avisosCambioVehiculo } from '../utils/cambioVehiculo';
 import ContratoVisor from './ContratoVisor';
 import { downloadCsv, slugify } from '../utils/csvExport';
 import { genId } from '../utils/id';
@@ -104,6 +109,9 @@ export default function RentalsTab({
   const [avisoDias, setAvisoDias] = useState<string | null>(null);
   const [editandoComplementos, setEditandoComplementos] = useState<FilaEditorExtras[] | null>(null);
   const [avisoComplementos, setAvisoComplementos] = useState<string | null>(null);
+  // Cambio del coche de una reserva ya creada: el coche elegido y el error de la última comprobación.
+  const [cambiandoVehiculo, setCambiandoVehiculo] = useState<{ id: string; error: string } | null>(null);
+  const [avisoVehiculo, setAvisoVehiculo] = useState<string | null>(null);
   const [formTarifa, setFormTarifa] = useState<number>(45.00);
   const [formTemporada, setFormTemporada] = useState<Reserva['temporada']>('media');
   const [formSeguro, setFormSeguro] = useState(true);
@@ -127,10 +135,9 @@ export default function RentalsTab({
   const [dayModal, setDayModal] = useState<{ iso: string; reservations: Reserva[] } | null>(null);
   // Pedidos de la web ya pasados de un día del calendario (solo consulta).
   const [webDiaModal, setWebDiaModal] = useState<{ iso: string; pedidos: SolicitudReserva[] } | null>(null);
-  const [calendarDate, setCalendarDate] = useState(() => {
-    const d = new Date();
-    return new Date(d.getFullYear(), d.getMonth(), 1);
-  });
+  // Calendario: vista (mes, semana o día) y la fecha de referencia (cualquier día de lo que se está viendo).
+  const [calVista, setCalVista] = useState<VistaCalendario>('mes');
+  const [ancla, setAncla] = useState(() => hoyISO());
 
   const calculateDays = diasAlquiler;
 
@@ -341,7 +348,7 @@ export default function RentalsTab({
   };
 
   // Al elegir otra reserva se descarta una edición de horas a medias.
-  useEffect(() => { setEditandoHoras(null); setEditandoFianza(null); setEditandoLugares(null); setAvisoDias(null); setEditandoComplementos(null); setAvisoComplementos(null); }, [selectedReserva?.id]);
+  useEffect(() => { setEditandoHoras(null); setEditandoFianza(null); setEditandoLugares(null); setAvisoDias(null); setEditandoComplementos(null); setAvisoComplementos(null); setCambiandoVehiculo(null); setAvisoVehiculo(null); }, [selectedReserva?.id]);
 
   const handleGuardarFianza = () => {
     if (!selectedReserva || !editandoFianza) return;
@@ -383,6 +390,24 @@ export default function RentalsTab({
     setSelectedReserva(actualizada);
     setEditandoComplementos(null);
     setAvisoComplementos(r.cambio === 0 ? null : `Complementos actualizados: el total pasa a ${fmt2(r.total)} € (${r.cambio > 0 ? '+' : '−'}${fmt2(Math.abs(r.cambio))} €).`);
+  };
+
+  const handleCambiarVehiculo = () => {
+    if (!selectedReserva || !cambiandoVehiculo?.id) return;
+    const nuevo = vehiculos.find(v => v.id === cambiandoVehiculo.id);
+    if (!nuevo || nuevo.id === selectedReserva.vehiculoId) return;
+    const ocupa = reservaQueOcupa(reservas, selectedReserva, nuevo.id);
+    if (ocupa) {
+      const cli = clientes.find(c => c.id === ocupa.clienteId);
+      setCambiandoVehiculo({ ...cambiandoVehiculo, error: `Ese coche ya tiene otra reserva en esas fechas (${cli ? `${cli.nombre} ${cli.apellidos}` : 'otro cliente'}, ${formatDate(ocupa.fechaInicio)} → ${formatDate(ocupa.fechaFin)}). Elige otro o anula esa reserva.` });
+      return;
+    }
+    const antes = vehiculos.find(v => v.id === selectedReserva.vehiculoId);
+    const actualizada = { ...selectedReserva, vehiculoId: nuevo.id };
+    onUpdateReserva(actualizada);
+    setSelectedReserva(actualizada);
+    setCambiandoVehiculo(null);
+    setAvisoVehiculo(`Vehículo cambiado${antes ? ` de ${antes.marca} ${antes.modelo} (${antes.matricula})` : ''} a ${nuevo.marca} ${nuevo.modelo} (${nuevo.matricula}).`);
   };
 
   const handleGuardarLugares = () => {
@@ -429,9 +454,8 @@ export default function RentalsTab({
   const empresaCfg = getEmpresaConfig();
 
   // ── Calendar helpers ──────────────────────────────────────────────
-  const MONTH_NAMES = ['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'];
-  const calYear = calendarDate.getFullYear();
-  const calMonth = calendarDate.getMonth();
+  const calYear = Number(ancla.slice(0, 4));
+  const calMonth = Number(ancla.slice(5, 7)) - 1;
 
   // Build grid: 7 cols Mon–Dom (ISO week), padded to fill 6 rows
   const calDays: (Date | null)[] = [];
@@ -475,16 +499,19 @@ export default function RentalsTab({
     'bg-orange-100 text-orange-800 border-orange-200',
   ];
   // Con decenas de coches una paleta de 7 colores se repetiría sin sentido: los colores
-  // se reparten solo entre los vehículos que tienen reservas en el mes que se está viendo.
+  // se reparten solo entre los vehículos que tienen reservas en lo que se está viendo (mes, semana o día).
+  const rango = rangoVisible(ancla, calVista);
   const reservasDelMes = reservas.filter(r =>
-    !esHistorica(r) && r.fechaInicio <= toIso(lastOfMonth) && finEfectivo(r, todayIso) >= toIso(firstOfMonth));
+    !esHistorica(r) && r.fechaInicio <= rango.fin && finEfectivo(r, todayIso) >= rango.ini);
   const vehiculosDelMes = vehiculosAlquiler
     .filter(v => reservasDelMes.some(r => r.vehiculoId === v.id))
     .sort((a, b) => a.matricula.localeCompare(b.matricula));
   vehiculosDelMes.forEach((v, i) => { vehicleColors[v.id] = PALETTE[i % PALETTE.length]; });
   const VEHICULOS_LEYENDA_INICIAL = 6;
   // ¿Este mes tiene pedidos de la web ya pasados? Se pintan en gris solo para consultar.
-  const hayWebPasadasEnMes = calDays.some(d => !!d && webPasadasDelDia(solicitudes, toIso(d)).length > 0);
+  const diasVisibles = calVista === 'mes' ? calDays.filter((d): d is Date => !!d).map(toIso) : calVista === 'semana' ? diasSemana(ancla) : [ancla];
+  const hayWebPasadasEnMes = diasVisibles.some(iso => webPasadasDelDia(solicitudes, iso).length > 0);
+  const periodoVisible = calVista === 'mes' ? 'este mes' : calVista === 'semana' ? 'esta semana' : 'este día';
   // ─────────────────────────────────────────────────────────────────
 
   // Bandeja de la web: pedidos sin asignar + reservas ya asignadas cuyo pedido
@@ -642,26 +669,57 @@ export default function RentalsTab({
           {/* ── Monthly Calendar ── */}
           <div className="border border-slate-100 rounded-xl overflow-hidden">
             {/* Nav header */}
-            <div className="flex items-center justify-between px-4 py-3 bg-slate-50 border-b border-slate-100">
-              <button
-                onClick={() => setCalendarDate(new Date(calYear, calMonth - 1, 1))}
-                title="Mes anterior"
-                className="p-1.5 hover:bg-slate-200 rounded-lg transition text-slate-500"
-              >
-                <ChevronLeft className="w-4 h-4" />
-              </button>
-              <span className="text-sm font-bold text-slate-700">
-                {MONTH_NAMES[calMonth]} {calYear}
+            <div className="flex flex-wrap items-center justify-between gap-2 px-4 py-3 bg-slate-50 border-b border-slate-100">
+              <div className="flex items-center gap-1">
+                <button
+                  onClick={() => setAncla(moverAncla(ancla, calVista, -1))}
+                  title={calVista === 'mes' ? 'Mes anterior' : calVista === 'semana' ? 'Semana anterior' : 'Día anterior'}
+                  className="p-1.5 hover:bg-slate-200 rounded-lg transition text-slate-500 cursor-pointer"
+                >
+                  <ChevronLeft className="w-4 h-4" />
+                </button>
+                <button
+                  onClick={() => setAncla(moverAncla(ancla, calVista, 1))}
+                  title={calVista === 'mes' ? 'Mes siguiente' : calVista === 'semana' ? 'Semana siguiente' : 'Día siguiente'}
+                  className="p-1.5 hover:bg-slate-200 rounded-lg transition text-slate-500 cursor-pointer"
+                >
+                  <ChevronRight className="w-4 h-4" />
+                </button>
+                <button
+                  type="button" data-testid="calendario-hoy" onClick={() => setAncla(todayIso)}
+                  className="ml-1 px-2 py-1 text-[11px] font-bold text-slate-500 border border-slate-200 rounded-lg bg-white hover:bg-slate-100 cursor-pointer"
+                >Hoy</button>
+              </div>
+              <span data-testid="calendario-titulo" className="text-sm font-bold text-slate-700 order-last sm:order-none w-full sm:w-auto text-center">
+                {etiquetaRango(ancla, calVista)}
               </span>
-              <button
-                onClick={() => setCalendarDate(new Date(calYear, calMonth + 1, 1))}
-                title="Mes siguiente"
-                className="p-1.5 hover:bg-slate-200 rounded-lg transition text-slate-500"
-              >
-                <ChevronRight className="w-4 h-4" />
-              </button>
+              <div role="group" aria-label="Vista del calendario" className="flex rounded-lg border border-slate-200 bg-white p-0.5">
+                {([['mes', 'Mes'], ['semana', 'Semana'], ['dia', 'Día']] as const).map(([v, etiqueta]) => (
+                  <button
+                    key={v} type="button" data-testid={`vista-${v}-boton`} aria-pressed={calVista === v}
+                    onClick={() => { if (v !== calVista) { setAncla(anclaAlCambiarVista(ancla, calVista, todayIso)); setCalVista(v); } }}
+                    className={`px-2.5 py-1 text-[11px] font-bold rounded-md transition cursor-pointer ${calVista === v ? 'bg-blue-600 text-white' : 'text-slate-500 hover:bg-slate-100'}`}
+                  >{etiqueta}</button>
+                ))}
+              </div>
             </div>
 
+            {calVista !== 'mes' && (
+              <VistaSemanaDia
+                vista={calVista}
+                dias={calVista === 'semana' ? diasSemana(ancla) : [ancla]}
+                hoy={todayIso}
+                reservasDelDia={reservasForDay}
+                webPasadasDelDia={iso => webPasadasDelDia(solicitudes, iso)}
+                clientes={clientes}
+                vehiculos={vehiculosAlquiler}
+                colorDe={id => vehicleColors[id] ?? PALETTE[0]}
+                onSeleccionar={setSelectedReserva}
+                onWeb={(iso, pedidos) => setWebDiaModal({ iso, pedidos })}
+              />
+            )}
+
+            {calVista === 'mes' && (<>
             {/* Day-of-week headers */}
             <div className="grid grid-cols-7 border-b border-slate-100">
               {['Lun','Mar','Mié','Jue','Vie','Sáb','Dom'].map(d => (
@@ -733,12 +791,13 @@ export default function RentalsTab({
                 );
               })}
             </div>
+            </>)}
 
             {/* Leyenda: solo los coches con reservas en este mes */}
             <div className="px-4 py-3 bg-slate-50 border-t border-slate-100">
               <div className="flex items-center justify-between gap-3 flex-wrap">
                 <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider flex items-center gap-2">
-                  Vehículos con reservas este mes
+                  Vehículos con reservas {periodoVisible}
                   <span className="px-1.5 py-0.5 rounded-full bg-white border border-slate-200 text-slate-500 normal-case tracking-normal">
                     {vehiculosDelMes.length} de {vehiculosAlquiler.length}
                   </span>
@@ -755,7 +814,7 @@ export default function RentalsTab({
               </div>
               {vehiculosDelMes.length === 0 ? (
                 <p className="text-[11px] text-slate-400 mt-2">
-                  {vehiculosAlquiler.length === 0 ? 'Sin vehículos de alquiler registrados.' : 'Ningún vehículo tiene reservas este mes.'}
+                  {vehiculosAlquiler.length === 0 ? 'Sin vehículos de alquiler registrados.' : `Ningún vehículo tiene reservas ${periodoVisible}.`}
                 </p>
               ) : (
                 <div className={`mt-2 flex flex-wrap gap-1.5 ${leyendaAbierta ? 'max-h-40 overflow-y-auto pr-1' : ''}`}>
@@ -1034,6 +1093,37 @@ export default function RentalsTab({
                     })()}
                   </div>
                 </div>
+                {(() => {
+                  const puede = puedeCambiarVehiculo(selectedReserva);
+                  if (!puede.ok) return selectedReserva.estado === 'cancelada' ? null : (
+                    <p data-testid="sin-cambio-vehiculo" className="-mt-1.5 text-[10px] text-slate-400">No se puede cambiar el vehículo. {puede.motivo}</p>
+                  );
+                  if (!cambiandoVehiculo) return (
+                    <>
+                      {avisoVehiculo && <p role="status" data-testid="aviso-vehiculo" className="-mt-1.5 rounded-md border border-emerald-200 bg-emerald-50 px-2 py-1 text-[11px] font-semibold text-emerald-700">{avisoVehiculo}</p>}
+                      <button type="button" data-testid="cambiar-vehiculo" onClick={() => { setAvisoVehiculo(null); setCambiandoVehiculo({ id: '', error: '' }); }}
+                        className="-mt-1.5 w-full cursor-pointer rounded-lg border border-slate-200 bg-white py-1.5 text-[11px] font-bold text-blue-700 transition hover:bg-blue-50">
+                        Cambiar vehículo
+                      </button>
+                    </>
+                  );
+                  const nuevo = vehiculos.find(v => v.id === cambiandoVehiculo.id);
+                  return (
+                    <CambioVehiculo
+                      opciones={vehiculosAlquiler.filter(v => v.id !== selectedReserva.vehiculoId).map(v => ({
+                        value: v.id, label: `${v.marca} ${v.modelo}`,
+                        sublabel: `Matrícula: ${v.matricula}${reservaQueOcupa(reservas, selectedReserva, v.id) ? ' · Ocupado en esas fechas' : ''}`,
+                      }))}
+                      valor={cambiandoVehiculo.id}
+                      avisos={nuevo ? avisosCambioVehiculo(selectedReserva, nuevo) : []}
+                      error={cambiandoVehiculo.error}
+                      firmada={!!firmasVigentes[selectedReserva.id]}
+                      onCambiar={id => setCambiandoVehiculo({ id, error: '' })}
+                      onGuardar={handleCambiarVehiculo}
+                      onCancelar={() => setCambiandoVehiculo(null)}
+                    />
+                  );
+                })()}
 
                 {/* Cliente */}
                 <div className="p-3 bg-slate-50 rounded-xl border border-slate-100 flex gap-2.5 items-center">

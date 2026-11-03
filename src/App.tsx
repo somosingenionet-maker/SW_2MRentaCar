@@ -296,6 +296,16 @@ export default function App() {
         });
       }
     }
+    // Cambio de coche (avería u otro imprevisto): queda apunte en el historial del cliente.
+    if (anterior && anterior.vehiculoId !== editada.vehiculoId) {
+      const antes = vehiculos.find(v => v.id === anterior.vehiculoId);
+      apuntes.push({
+        id: genId('int-cli-veh'),
+        fecha: new Date().toISOString().split('T')[0],
+        tipo: 'registro_contrato',
+        notas: `Cambio de vehículo en la reserva${antes ? ` de ${antes.marca} ${antes.modelo} (${antes.matricula})` : ''}${veh ? ` a ${veh.marca} ${veh.modelo} (${veh.matricula})` : ''}. Rango: ${editada.fechaInicio} al ${editada.fechaFin}.`,
+      });
+    }
     const cli = clientes.find(c => c.id === editada.clienteId);
     if (cli && apuntes.length > 0) handleUpdateCliente({ ...cli, interacciones: [...apuntes, ...cli.interacciones] });
   }, [fallo, reservas, vehiculos, clientes, sincronizarKilometraje, handleUpdateCliente]);

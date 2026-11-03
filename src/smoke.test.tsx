@@ -55,7 +55,7 @@ const clientes: Cliente[] = [
     interacciones: [], fechaRegistro: '2026-09-20', vehiculosAsociados: ['v4'] },
 ];
 const reserva = (id: string, extra: Partial<Reserva>): Reserva => ({
-  id, vehiculoId: 'v1', clienteId: 'c1', fechaInicio: '2026-10-31', fechaFin: '2026-11-02', horaInicio: '10:00', horaFin: '09:30', temporada: 'media', tarifaDiaria: 23,
+  id, vehiculoId: 'v1', clienteId: 'c1', fechaInicio: '2027-05-30', fechaFin: '2027-06-01', horaInicio: '10:00', horaFin: '09:30', temporada: 'media', tarifaDiaria: 23,
   totalCobrado: 46, estado: 'confirmada', incluyeSeguroTodoRiesgo: true, fianza: 500, seguroDia: 15, origen: 'manual', ...extra,
 });
 const reservas: Reserva[] = [
@@ -144,7 +144,7 @@ describe('contenido que no debe perderse', () => {
 
   it('Alquileres lista las activas y próximas de la más cercana a la más lejana', () => {
     const t = texto(alquileres[1], alquileres[2]);
-    const cercana = t.indexOf(formatDate('2026-10-31'));
+    const cercana = t.indexOf(formatDate('2027-05-30'));
     const lejana = t.indexOf(formatDate('2027-06-10'));
     expect(cercana).toBeGreaterThan(-1);
     expect(lejana).toBeGreaterThan(-1);
