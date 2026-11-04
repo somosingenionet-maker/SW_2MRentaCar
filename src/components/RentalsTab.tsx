@@ -3,7 +3,7 @@ import RegistroMovimientoModal, { TarjetaMovimiento } from './RegistroMovimiento
 import { estadoReserva as estadoDeReserva, esHistorica as esHistoricaReserva, finEfectivo, kmRecorridos, ESTADO_META } from '../utils/entregaDevolucion';
 import ModalShell from './ModalShell';
 import { usePaginacion } from '../utils/usePaginacion';
-import { ofreceSeguro, totalAlquiler, etiquetaTransmision, parseFianza, fianzaSugerida, totalTrasCambioDeHoras } from '../utils/condicionesAlquiler';
+import { ofreceSeguro, totalAlquiler, etiquetaTransmision, parseFianza, fianzaSugerida, totalTrasCambioDeHoras, tarifaDeReferencia } from '../utils/condicionesAlquiler';
 import { useSeleccion } from '../utils/useSeleccion';
 import { Reserva, Vehiculo, Cliente, SolicitudReserva, MovimientoVehiculo, Complemento } from '../types';
 import SearchableSelect from './SearchableSelect';
@@ -27,6 +27,8 @@ import { extrasManuales, totalExtras, etiquetaPrecioComplemento, resumenExtras, 
 import { EditorComplementos } from './EditorComplementos';
 import { InputPrecio } from './InputPrecio';
 import { CambioVehiculo } from './CambioVehiculo';
+import { EditorPrecio } from './EditorPrecio';
+import { aplicarPrecio, importePositivo, importeAlquiler, type ModoPrecio } from '../utils/precioAlquiler';
 import { VistaSemanaDia } from './VistaSemanaDia';
 import { rangoVisible, moverAncla, anclaAlCambiarVista, etiquetaRango, diasSemana, type VistaCalendario } from '../utils/calendarioVistas';
 import { hoyISO } from '../utils/fechas';
@@ -112,7 +114,12 @@ export default function RentalsTab({
   // Cambio del coche de una reserva ya creada: el coche elegido y el error de la última comprobación.
   const [cambiandoVehiculo, setCambiandoVehiculo] = useState<{ id: string; error: string } | null>(null);
   const [avisoVehiculo, setAvisoVehiculo] = useState<string | null>(null);
+  // Cambio del precio del alquiler de una reserva ya creada (precio cerrado o tarifa por día).
+  const [editandoPrecio, setEditandoPrecio] = useState<{ modo: ModoPrecio; valor: string; error: string } | null>(null);
+  const [avisoPrecio, setAvisoPrecio] = useState<string | null>(null);
   const [formTarifa, setFormTarifa] = useState<number>(45.00);
+  // Precio cerrado del alquiler (texto; vacío = se calcula por días × tarifa).
+  const [formPrecioFijo, setFormPrecioFijo] = useState('');
   const [formTemporada, setFormTemporada] = useState<Reserva['temporada']>('media');
   const [formSeguro, setFormSeguro] = useState(true);
   // Complementos elegidos en el alta manual: { id del complemento: cantidad }.
@@ -148,7 +155,8 @@ export default function RentalsTab({
   const complementosActivos = complementos.filter(c => c.activo).sort((a, b) => a.orden - b.orden);
   const extrasForm = extrasManuales(complementosActivos, formExtras, currentDuration);
   const importeExtrasForm = totalExtras(extrasForm, currentDuration);
-  const calculatedTotal = Math.round((totalAlquiler(currentDuration, formTarifa, seguroDiaElegido, formSeguro) + importeExtrasForm) * 100) / 100;
+  const precioFijoForm = importePositivo(formPrecioFijo);
+  const calculatedTotal = Math.round((totalAlquiler(currentDuration, formTarifa, seguroDiaElegido, formSeguro, precioFijoForm) + importeExtrasForm) * 100) / 100;
 
   const handleOpenAdd = () => {
     setSolicitudActiva(null);
@@ -165,6 +173,7 @@ export default function RentalsTab({
     setFormLugarDevolucion('');
     setFormExtras({});
     setFormTemporada('media');
+    setFormPrecioFijo('');
     setFormTarifa(vehiculos[0]?.tarifasAlquiler?.temporadaMedia ?? 45);
     setFormSeguro(ofreceSeguro(vehiculos[0]));
     setIsAddingOpen(true);
@@ -194,7 +203,7 @@ export default function RentalsTab({
       };
     }
     const extras = extrasManuales(complementosActivos, formExtras, duration);
-    const total = Math.round((totalAlquiler(duration, Number(formTarifa), seguroDiaElegido, formSeguro) + totalExtras(extras, duration)) * 100) / 100;
+    const total = Math.round((totalAlquiler(duration, Number(formTarifa), seguroDiaElegido, formSeguro, precioFijoForm) + totalExtras(extras, duration)) * 100) / 100;
     return {
       id: genId('res'),
       vehiculoId: formVehiculoId,
@@ -206,7 +215,9 @@ export default function RentalsTab({
       lugarRecogida: formLugarRecogida.trim() || undefined,
       lugarDevolucion: formLugarDevolucion.trim() || undefined,
       temporada: formTemporada,
-      tarifaDiaria: Number(formTarifa),
+      // Con precio cerrado la tarifa por día es solo de referencia (precio ÷ días); lo que se cobra es el precio cerrado.
+      tarifaDiaria: precioFijoForm != null ? tarifaDeReferencia(precioFijoForm, duration) : Number(formTarifa),
+      precioFijo: precioFijoForm ?? undefined,
       totalCobrado: total,
       estado: 'confirmada',
       incluyeSeguroTodoRiesgo: formSeguro && seguroDiaElegido != null,
@@ -228,6 +239,10 @@ export default function RentalsTab({
     }
     if (parseFianza(formFianza) === null) {
       setFormError('Indica la fianza de esta reserva (0 si no se pide fianza).');
+      return;
+    }
+    if (!solicitudActiva && formPrecioFijo.trim() !== '' && precioFijoForm == null) {
+      setFormError('El precio cerrado del alquiler debe ser un importe mayor que 0 (o déjalo vacío para calcularlo por días × tarifa).');
       return;
     }
     const errHoras = validarHorasReserva({ fechaInicio: formFechaInicio, fechaFin: formFechaFin, horaInicio: formHoraInicio, horaFin: formHoraFin });
@@ -323,6 +338,7 @@ export default function RentalsTab({
     setFormLugarRecogida(sol.lugarRecogida ?? '');
     setFormLugarDevolucion(sol.lugarDevolucion ?? '');
     setFormTemporada('media');
+    setFormPrecioFijo('');
     setFormSeguro(incluyeCobertura(sol.extras));
     setFormError('');
     setIsAddingOpen(true);
@@ -348,7 +364,7 @@ export default function RentalsTab({
   };
 
   // Al elegir otra reserva se descarta una edición de horas a medias.
-  useEffect(() => { setEditandoHoras(null); setEditandoFianza(null); setEditandoLugares(null); setAvisoDias(null); setEditandoComplementos(null); setAvisoComplementos(null); setCambiandoVehiculo(null); setAvisoVehiculo(null); }, [selectedReserva?.id]);
+  useEffect(() => { setEditandoHoras(null); setEditandoFianza(null); setEditandoLugares(null); setAvisoDias(null); setEditandoComplementos(null); setAvisoComplementos(null); setCambiandoVehiculo(null); setAvisoVehiculo(null); setEditandoPrecio(null); setAvisoPrecio(null); }, [selectedReserva?.id]);
 
   const handleGuardarFianza = () => {
     if (!selectedReserva || !editandoFianza) return;
@@ -376,6 +392,7 @@ export default function RentalsTab({
     setSelectedReserva(actualizada);
     setEditandoHoras(null);
     if (t.diasAntes === t.diasDespues) setAvisoDias(null);
+    else if (t.recalculado && selectedReserva.precioFijo != null) setAvisoDias(`Con las nuevas horas el alquiler pasa de ${t.diasAntes} a ${t.diasDespues} días. El precio cerrado del alquiler (${fmt2(selectedReserva.precioFijo)} €) no cambia; el total pasa a ${fmt2(t.total)} € por el seguro y los complementos por día.`);
     else if (t.recalculado) setAvisoDias(`Con las nuevas horas el alquiler pasa de ${t.diasAntes} a ${t.diasDespues} días y el total se ha recalculado: ${fmt2(t.total)} €.`);
     else if (selectedReserva.origen === 'web') setAvisoDias(`Con las nuevas horas el alquiler pasa de ${t.diasAntes} a ${t.diasDespues} días. El total (${fmt2(t.total)} €) lo fija la web y no se ha cambiado.`);
     else setAvisoDias(`Con las nuevas horas el alquiler pasa de ${t.diasAntes} a ${t.diasDespues} días. El total no se ha cambiado porque no coincidía con días × tarifa: revísalo.`);
@@ -408,6 +425,20 @@ export default function RentalsTab({
     setSelectedReserva(actualizada);
     setCambiandoVehiculo(null);
     setAvisoVehiculo(`Vehículo cambiado${antes ? ` de ${antes.marca} ${antes.modelo} (${antes.matricula})` : ''} a ${nuevo.marca} ${nuevo.modelo} (${nuevo.matricula}).`);
+  };
+
+  const handleGuardarPrecio = () => {
+    if (!selectedReserva || !editandoPrecio) return;
+    const dias = diasAlquiler(selectedReserva.fechaInicio, selectedReserva.fechaFin, selectedReserva.horaInicio, selectedReserva.horaFin);
+    const r = aplicarPrecio(selectedReserva, editandoPrecio.modo, editandoPrecio.valor, dias);
+    if (!r.ok) { setEditandoPrecio({ ...editandoPrecio, error: r.error }); return; }
+    const actualizada = { ...selectedReserva, tarifaDiaria: r.tarifaDiaria, precioFijo: r.precioFijo, totalCobrado: r.totalCobrado };
+    onUpdateReserva(actualizada);
+    setSelectedReserva(actualizada);
+    setEditandoPrecio(null);
+    setAvisoPrecio(r.totalCobrado === selectedReserva.totalCobrado && r.precioFijo === (selectedReserva.precioFijo ?? null)
+      ? null
+      : `Precio actualizado: ${r.precioFijo != null ? `precio cerrado ${fmt2(r.precioFijo)} €` : `tarifa ${fmt2(r.tarifaDiaria)} €/día`}. El total pasa a ${fmt2(r.totalCobrado)} €.`);
   };
 
   const handleGuardarLugares = () => {
@@ -1026,7 +1057,7 @@ export default function RentalsTab({
                           </td>
                           <td className="py-3 px-2 text-right">
                             <span className="font-mono font-extrabold text-slate-800 block text-xs">{fmt2(res.totalCobrado)} €</span>
-                            <span className="text-[9px] text-slate-400">{fmt2(res.tarifaDiaria)}€/día {res.incluyeSeguroTodoRiesgo && '+ todo riesgo'}</span>
+                            <span className="text-[9px] text-slate-400">{res.precioFijo != null ? 'precio cerrado' : `${fmt2(res.tarifaDiaria)}€/día`} {res.incluyeSeguroTodoRiesgo && '+ todo riesgo'}</span>
                           </td>
                           <td className="py-3 px-2 text-right space-x-1" onClick={e => e.stopPropagation()}>
                             {(() => {
@@ -1227,6 +1258,33 @@ export default function RentalsTab({
                 {/* Desglose económico: cada concepto a su precio, el descuento aparte y la fianza fuera del total */}
                 <div className="p-3 bg-blue-50 text-blue-900 rounded-xl border border-blue-100/30 space-y-2">
                   <DesgloseFicha reserva={selectedReserva} />
+                  {selectedReserva.estado !== 'cancelada' && selectedReserva.origen !== 'web' && (editandoPrecio ? (() => {
+                    const dias = diasAlquiler(selectedReserva.fechaInicio, selectedReserva.fechaFin, selectedReserva.horaInicio, selectedReserva.horaFin);
+                    const prueba = aplicarPrecio(selectedReserva, editandoPrecio.modo, editandoPrecio.valor, dias);
+                    return (
+                      <EditorPrecio
+                        modo={editandoPrecio.modo} valor={editandoPrecio.valor} dias={dias}
+                        totalNuevo={prueba.ok ? prueba.totalCobrado : null} totalActual={selectedReserva.totalCobrado}
+                        error={editandoPrecio.error} firmada={!!firmasVigentes[selectedReserva.id]}
+                        onModo={modo => setEditandoPrecio({ modo, valor: modo === 'fijo' ? String(importeAlquiler(selectedReserva, dias)) : String(selectedReserva.tarifaDiaria), error: '' })}
+                        onValor={valor => setEditandoPrecio({ ...editandoPrecio, valor, error: '' })}
+                        onGuardar={handleGuardarPrecio}
+                        onCancelar={() => setEditandoPrecio(null)}
+                      />
+                    );
+                  })() : (
+                    <button type="button" data-testid="editar-precio"
+                      onClick={() => {
+                        setAvisoPrecio(null);
+                        setEditandoPrecio(selectedReserva.precioFijo != null
+                          ? { modo: 'fijo', valor: String(selectedReserva.precioFijo), error: '' }
+                          : { modo: 'dia', valor: String(selectedReserva.tarifaDiaria), error: '' });
+                      }}
+                      className="w-full cursor-pointer rounded-lg border border-blue-200 bg-white/70 py-1.5 text-[11px] font-bold text-blue-700 transition hover:bg-white">
+                      Cambiar el precio del alquiler
+                    </button>
+                  ))}
+                  {avisoPrecio && <p role="status" data-testid="aviso-precio" className="rounded-md border border-emerald-200 bg-emerald-50 px-2 py-1 text-[11px] font-semibold text-emerald-700">{avisoPrecio}</p>}
                   {selectedReserva.estado !== 'cancelada' && (editandoComplementos ? (
                     <EditorComplementos
                       reserva={selectedReserva}
@@ -1581,10 +1639,22 @@ export default function RentalsTab({
                         className="w-full pl-14 pr-3 py-2 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-1 focus:ring-blue-500 font-mono"
                         value={formTarifa}
                         onChange={e => setFormTarifa(Math.round(Number(e.target.value) * 100) / 100)}
-                        required
+                        disabled={precioFijoForm != null}
+                        required={precioFijoForm == null}
                       />
                     </div>
                     <p className="text-[10px] text-slate-400 mt-1">La tarifa se autocompleta según la temporada. Puedes editarla manualmente si aplica un precio especial.</p>
+                    <div className="mt-3 p-3 bg-slate-50 rounded-lg border border-slate-100" data-testid="campo-precio-cerrado">
+                      <label htmlFor="reserva-precio-cerrado" className="block text-xs font-bold text-slate-500 uppercase">Precio cerrado del alquiler (€) — opcional</label>
+                      <InputPrecio
+                        id="reserva-precio-cerrado"
+                        className="w-full mt-1 px-3 h-[38px] border border-slate-200 rounded-lg text-sm bg-white focus:outline-none focus:ring-1 focus:ring-blue-500 font-mono"
+                        value={formPrecioFijo}
+                        onChange={e => setFormPrecioFijo(e.target.value)}
+                        placeholder="Sin precio cerrado"
+                      />
+                      <p className="text-[10px] text-slate-400 mt-1">Para un alquiler pactado a un precio total fijo. Sustituye a días × tarifa; el seguro y los complementos se suman aparte.</p>
+                    </div>
                       </>
                     )}
                   </div>
@@ -1643,7 +1713,7 @@ export default function RentalsTab({
                       <span>
                         {solicitudActiva
                           ? `${currentDuration} días${solicitudActiva.descuento > 0 && solicitudActiva.vehiculoSubtotal != null ? ` · incluye ${fmt2(solicitudActiva.descuento)} € de descuento` : ''}${solicitudActiva.pagado ? ' · pagado' : ' · pago al recoger'}`
-                          : `Alquiler: ${currentDuration} días a ${fmt2(formTarifa)}€ / día${importeExtrasForm > 0 ? ` + complementos ${fmt2(importeExtrasForm)} €` : ''}`}
+                          : `Alquiler: ${precioFijoForm != null ? `precio cerrado ${fmt2(precioFijoForm)} € (${currentDuration} días)` : `${currentDuration} días a ${fmt2(formTarifa)}€ / día`}${importeExtrasForm > 0 ? ` + complementos ${fmt2(importeExtrasForm)} €` : ''}`}
                       </span>
                     </div>
                     <div className="text-right font-mono text-base font-extrabold text-blue-900">

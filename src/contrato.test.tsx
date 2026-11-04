@@ -502,3 +502,26 @@ describe('desglose económico del contrato: cada línea a su precio, el descuent
     expect(texto('es', { reserva: { ...pedido, fianza: 0 } as Partial<Reserva> })).not.toContain('Fianza');
   });
 });
+
+describe('contrato con alquiler a precio cerrado', () => {
+  const cerrado = {
+    fechaInicio: '2026-10-29', fechaFin: '2026-11-01', horaInicio: '04:00', horaFin: '04:00',
+    tarifaDiaria: 33.33, precioFijo: 100, seguroDia: 15, incluyeSeguroTodoRiesgo: true, totalCobrado: 145, fianza: 500,
+  } as Partial<Reserva>;
+
+  it('en español: una línea de precio pactado, sin días × tarifa ni redondeos', () => {
+    const t = texto('es', { reserva: cerrado });
+    expect(t).toContain('Alquiler (3 días, precio pactado): 100,00 €');
+    expect(t).toContain('Seguro Técnico Completo (3 días × 15,00 €): 45,00 €');
+    expect(t).toContain('IMPORTE FACTURADO NETO: 145,00 €');
+    expect(t).not.toContain('33,33');
+    expect(t).not.toContain('Redondeo');
+    expect(t).not.toContain('Otros ajustes');
+  });
+
+  it('en inglés', () => {
+    const t = texto('en', { reserva: cerrado });
+    expect(t).toContain('Rental (3 days, agreed price): 100.00 €');
+    expect(t).toContain('NET INVOICED AMOUNT: 145.00 €');
+  });
+});

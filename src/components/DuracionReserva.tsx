@@ -5,7 +5,7 @@ import { desgloseReserva, hayAjusteImportante, type LineaDesglose } from '../uti
 import { fmt2 } from '../utils/moneda';
 
 type Fechas = Pick<Reserva, 'fechaInicio' | 'fechaFin' | 'horaInicio' | 'horaFin'>;
-type ReservaEconomica = Fechas & Pick<Reserva, 'tarifaDiaria' | 'seguroDia' | 'incluyeSeguroTodoRiesgo' | 'totalCobrado' | 'fianza' | 'extras' | 'descuento' | 'cupon'>;
+type ReservaEconomica = Fechas & Pick<Reserva, 'tarifaDiaria' | 'precioFijo' | 'seguroDia' | 'incluyeSeguroTodoRiesgo' | 'totalCobrado' | 'fianza' | 'extras' | 'descuento' | 'cupon'>;
 
 const dias = (n: number) => `${n} ${n === 1 ? 'día' : 'días'}`;
 const euros = (n: number) => `${n < 0 ? '−' : ''}${fmt2(Math.abs(n))} €`;
@@ -29,6 +29,7 @@ export function FilaDuracion({ reserva }: { reserva: Fechas }) {
 function textoLinea(l: LineaDesglose): { concepto: string; importe: string; tono?: 'descuento' | 'aviso' } {
   switch (l.tipo) {
     case 'alquiler': return { concepto: `Alquiler (${dias(l.dias)} × ${euros(l.precio)})`, importe: euros(l.importe) };
+    case 'alquiler-fijo': return { concepto: `Alquiler (${dias(l.dias)}, precio pactado)`, importe: euros(l.importe) };
     case 'seguro': return { concepto: `Seguro todo riesgo (${dias(l.dias)} × ${euros(l.precio)})`, importe: euros(l.importe) };
     case 'seguro-incluido': return { concepto: 'Seguro todo riesgo', importe: 'Incluido' };
     case 'terceros': return { concepto: 'Seguro: póliza de terceros básica', importe: 'Incluida' };

@@ -45,6 +45,7 @@ export default function ContratoAlquiler({ reserva, cliente, vehiculo, empresa, 
   const lineasEconomicas = desglose.lineas.map((l: LineaDesglose) => {
     switch (l.tipo) {
       case 'alquiler': return { etiqueta: `${tx.alquiler} (${tx.diasPorPrecio(l.dias, f2(l.precio))})`, importe: euros(l.importe) };
+      case 'alquiler-fijo': return { etiqueta: `${tx.alquiler} (${tx.diasPrecioPactado(l.dias)})`, importe: euros(l.importe) };
       case 'seguro': return { etiqueta: `${tx.seguroCompleto} (${tx.diasPorPrecio(l.dias, f2(l.precio))})`, importe: euros(l.importe) };
       case 'seguro-incluido': return { etiqueta: tx.seguroCompleto, importe: tx.incluido };
       case 'terceros': return { etiqueta: tx.polizaTerceros, importe: tx.incluida };

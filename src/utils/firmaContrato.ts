@@ -21,7 +21,7 @@ export function crearSnapshot(
       id: reserva.id, vehiculoId: reserva.vehiculoId, clienteId: reserva.clienteId,
       fechaInicio: reserva.fechaInicio, fechaFin: reserva.fechaFin, horaInicio: reserva.horaInicio, horaFin: reserva.horaFin,
       lugarRecogida: lugares.recogida || undefined, lugarDevolucion: lugares.devolucion || undefined,
-      tarifaDiaria: reserva.tarifaDiaria, totalCobrado: reserva.totalCobrado,
+      tarifaDiaria: reserva.tarifaDiaria, precioFijo: reserva.precioFijo ?? undefined, totalCobrado: reserva.totalCobrado,
       incluyeSeguroTodoRiesgo: reserva.incluyeSeguroTodoRiesgo, fianza: reserva.fianza, seguroDia: reserva.seguroDia,
       dias: diasAlquiler(reserva.fechaInicio, reserva.fechaFin, reserva.horaInicio, reserva.horaFin),
       extras: reserva.extras?.length ? reserva.extras : undefined,
@@ -82,7 +82,7 @@ export function cambiosTrasFirma(
   if (antes.fechaInicio !== reserva.fechaInicio || antes.fechaFin !== reserva.fechaFin) cambios.push('las fechas');
   if ((antes.horaInicio ?? '') !== (reserva.horaInicio ?? '') || (antes.horaFin ?? '') !== (reserva.horaFin ?? '')) cambios.push('las horas');
   if ((antes.lugarRecogida ?? '') !== lugares.recogida || (antes.lugarDevolucion ?? '') !== lugares.devolucion) cambios.push('los lugares');
-  if (antes.totalCobrado !== reserva.totalCobrado || antes.tarifaDiaria !== reserva.tarifaDiaria) cambios.push('el importe');
+  if (antes.totalCobrado !== reserva.totalCobrado || antes.tarifaDiaria !== reserva.tarifaDiaria || (antes.precioFijo ?? null) !== (reserva.precioFijo ?? null)) cambios.push('el importe');
   if ((antes.fianza ?? 0) !== (reserva.fianza ?? 0)) cambios.push('la fianza');
   return cambios;
 }

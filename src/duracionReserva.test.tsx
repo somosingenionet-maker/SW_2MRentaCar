@@ -84,3 +84,13 @@ describe('desglose económico de la ficha', () => {
     expect(h).not.toContain('total-no-cuadra');
   });
 });
+
+describe('desglose de la ficha con precio cerrado', () => {
+  it('enseña el alquiler a precio pactado y el total cuadra', () => {
+    const h = renderToString(<DesgloseFicha reserva={reserva({ fechaFin: '2027-01-03', horaFin: '12:00', tarifaDiaria: 33.33, precioFijo: 100, incluyeSeguroTodoRiesgo: false, totalCobrado: 100 })} />);
+    const t = texto(h);
+    expect(t).toContain('Alquiler (2 días, precio pactado) 100,00 €');
+    expect(t).toContain('LIQUIDACIÓN TOTAL 100,00 €');
+    expect(h).not.toContain('total-no-cuadra');
+  });
+});

@@ -70,6 +70,8 @@ export interface TextosContrato {
   alquiler: string;
   /** «3 días × 40,00 €» */
   diasPorPrecio: (dias: number, precio: string) => string;
+  /** «4 días, precio pactado»: el alquiler va a un precio total acordado y no a días × tarifa. */
+  diasPrecioPactado: (dias: number) => string;
   seguroCompleto: string;
   incluido: string;
   incluida: string;
@@ -146,6 +148,7 @@ const ES: TextosContrato = {
   precioFijo: 'precio fijo',
   alquiler: 'Alquiler',
   diasPorPrecio: (dias, precio) => `${dias} ${dias === 1 ? 'día' : 'días'} × ${precio} €`,
+  diasPrecioPactado: dias => `${dias} ${dias === 1 ? 'día' : 'días'}, precio pactado`,
   seguroCompleto: 'Seguro Técnico Completo',
   incluido: 'Incluido',
   incluida: 'Incluida',
@@ -217,6 +220,7 @@ const EN: TextosContrato = {
   precioFijo: 'fixed price',
   alquiler: 'Rental',
   diasPorPrecio: (dias, precio) => `${dias} ${dias === 1 ? 'day' : 'days'} × ${precio} €`,
+  diasPrecioPactado: dias => `${dias} ${dias === 1 ? 'day' : 'days'}, agreed price`,
   seguroCompleto: 'Comprehensive insurance',
   incluido: 'Included',
   incluida: 'Included',

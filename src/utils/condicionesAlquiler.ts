@@ -6,15 +6,21 @@ import { totalExtras, recalcularExtras } from './complementos';
 export const ofreceSeguro = (v?: Pick<Vehiculo, 'seguroAmpliadoDia'> | null): boolean =>
   v?.seguroAmpliadoDia != null;
 
-/** Total de un alquiler: días × tarifa, más el seguro por día si se contrata y el vehículo lo ofrece. */
-export function totalAlquiler(dias: number, tarifaDia: number, seguroDia: number | null | undefined, conSeguro: boolean): number {
+/**
+ * Total de un alquiler: días × tarifa (o el precio cerrado, si lo hay), más el seguro por día si se contrata y el
+ * vehículo lo ofrece. El precio cerrado es solo el del alquiler: el seguro por día se suma aparte.
+ */
+export function totalAlquiler(dias: number, tarifaDia: number, seguroDia: number | null | undefined, conSeguro: boolean, precioFijo?: number | null): number {
   const seguro = conSeguro && seguroDia != null ? dias * seguroDia : 0;
-  return Math.round((dias * tarifaDia + seguro) * 100) / 100;
+  return Math.round(((precioFijo ?? dias * tarifaDia) + seguro) * 100) / 100;
 }
 
+/** Tarifa por día de referencia de un precio cerrado (se muestra en listados; el cobro es el precio cerrado). */
+export const tarifaDeReferencia = (precioFijo: number, dias: number): number => Math.round((precioFijo / Math.max(1, dias)) * 100) / 100;
+
 /** Total que corresponde a una reserva con `dias` días: alquiler y seguro, más sus complementos (los de precio por día se recalculan). */
-export function totalDeReserva(r: Pick<Reserva, 'tarifaDiaria' | 'seguroDia' | 'incluyeSeguroTodoRiesgo'> & { extras?: Reserva['extras'] }, dias: number): number {
-  return Math.round((totalAlquiler(dias, r.tarifaDiaria, r.seguroDia, r.incluyeSeguroTodoRiesgo) + totalExtras(r.extras, dias)) * 100) / 100;
+export function totalDeReserva(r: Pick<Reserva, 'tarifaDiaria' | 'seguroDia' | 'incluyeSeguroTodoRiesgo' | 'precioFijo'> & { extras?: Reserva['extras'] }, dias: number): number {
+  return Math.round((totalAlquiler(dias, r.tarifaDiaria, r.seguroDia, r.incluyeSeguroTodoRiesgo, r.precioFijo) + totalExtras(r.extras, dias)) * 100) / 100;
 }
 
 const centimos = (n: number) => Math.round(n * 100);
@@ -25,7 +31,7 @@ const centimos = (n: number) => Math.round(n * 100);
  * web) ni si el total se había pactado distinto.
  */
 export function totalTrasCambioDeHoras(
-  r: Pick<Reserva, 'fechaInicio' | 'fechaFin' | 'horaInicio' | 'horaFin' | 'tarifaDiaria' | 'seguroDia' | 'incluyeSeguroTodoRiesgo' | 'totalCobrado' | 'origen' | 'extras'>,
+  r: Pick<Reserva, 'fechaInicio' | 'fechaFin' | 'horaInicio' | 'horaFin' | 'tarifaDiaria' | 'precioFijo' | 'seguroDia' | 'incluyeSeguroTodoRiesgo' | 'totalCobrado' | 'origen' | 'extras'>,
   horaInicio: string, horaFin: string,
 ): { diasAntes: number; diasDespues: number; total: number; recalculado: boolean; extras: Reserva['extras'] } {
   const diasAntes = diasAlquiler(r.fechaInicio, r.fechaFin, r.horaInicio, r.horaFin);

@@ -3,6 +3,8 @@ import type { Reserva } from '../types';
 /** Una línea del desglose económico de una reserva. El texto lo pone quien lo pinta (ficha o contrato, en su idioma). */
 export type LineaDesglose =
   | { tipo: 'alquiler'; dias: number; precio: number; importe: number }
+  /** Alquiler a un precio total pactado, sin cuenta de días × tarifa. */
+  | { tipo: 'alquiler-fijo'; dias: number; importe: number }
   | { tipo: 'seguro'; dias: number; precio: number; importe: number }
   /** Seguro a todo riesgo incluido pero sin precio guardado (reservas antiguas): sin importe propio. */
   | { tipo: 'seguro-incluido'; importe: null }
@@ -13,7 +15,7 @@ export type LineaDesglose =
   /** Diferencia entre la suma de las líneas y el total guardado: redondeo, o un total que no sale de la cuenta. */
   | { tipo: 'ajuste'; importe: number };
 
-type Datos = Pick<Reserva, 'tarifaDiaria' | 'seguroDia' | 'incluyeSeguroTodoRiesgo' | 'totalCobrado' | 'fianza' | 'extras' | 'descuento' | 'cupon'>;
+type Datos = Pick<Reserva, 'tarifaDiaria' | 'precioFijo' | 'seguroDia' | 'incluyeSeguroTodoRiesgo' | 'totalCobrado' | 'fianza' | 'extras' | 'descuento' | 'cupon'>;
 
 const r2 = (n: number) => Math.round(n * 100) / 100;
 
@@ -23,7 +25,9 @@ const r2 = (n: number) => Math.round(n * 100) / 100;
  * La fianza es un depósito aparte y no forma parte del total.
  */
 export function desgloseReserva(r: Datos, dias: number): { lineas: LineaDesglose[]; total: number; fianza: number } {
-  const lineas: LineaDesglose[] = [{ tipo: 'alquiler', dias, precio: r.tarifaDiaria, importe: r2(dias * r.tarifaDiaria) }];
+  const lineas: LineaDesglose[] = [r.precioFijo != null
+    ? { tipo: 'alquiler-fijo', dias, importe: r2(r.precioFijo) }
+    : { tipo: 'alquiler', dias, precio: r.tarifaDiaria, importe: r2(dias * r.tarifaDiaria) }];
 
   if (r.incluyeSeguroTodoRiesgo) {
     lineas.push(r.seguroDia != null
