@@ -57,6 +57,16 @@ describe('alquiler a precio cerrado', () => {
     expect(importeAlquiler(reserva({ precioFijo: null, tarifaDiaria: 40 }), 3)).toBe(120);
   });
 
+  it('compatibilidad: una reserva sin precio cerrado (null en la base de datos) no cambia nada de lo ya firmado ni de sus cuentas', () => {
+    const empresa = { nombre: 'X' } as never;
+    const antiguo = reserva({ precioFijo: undefined, tarifaDiaria: 40, totalCobrado: 120 });
+    const firmado = crearSnapshot(antiguo, undefined, undefined, undefined, empresa);
+    expect(JSON.stringify(firmado)).not.toContain('precioFijo');
+    expect(cambiosTrasFirma(firmado, { ...antiguo, precioFijo: null })).toEqual([]);
+    expect(totalDeReserva({ ...antiguo, precioFijo: null }, 3)).toBe(120);
+    expect(desgloseReserva({ ...antiguo, precioFijo: null }, 3).lineas[0]).toMatchObject({ tipo: 'alquiler', dias: 3, precio: 40, importe: 120 });
+  });
+
   it('la copia firmada guarda el precio cerrado solo si lo hay, y un cambio de precio invalida lo firmado', () => {
     const empresa = { nombre: 'X' } as never;
     const con = crearSnapshot(reserva(), undefined, undefined, undefined, empresa);
