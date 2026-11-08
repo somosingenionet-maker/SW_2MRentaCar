@@ -83,6 +83,9 @@ export interface TextosContrato {
   redondeo: string;
   otrosAjustes: string;
   importeNeto: string;
+  /** «Método de pago: Efectivo». */
+  metodoPago: string;
+  metodosPago: Record<'efectivo' | 'tarjeta' | 'transferencia', string>;
   /** La fianza es un depósito aparte: no suma al importe. */
   fianzaAparte: string;
   // Final
@@ -161,6 +164,8 @@ const ES: TextosContrato = {
   redondeo: 'Redondeo',
   otrosAjustes: 'Otros ajustes',
   importeNeto: 'IMPORTE FACTURADO NETO',
+  metodoPago: 'Método de pago',
+  metodosPago: { efectivo: 'Efectivo', tarjeta: 'Tarjeta', transferencia: 'Transferencia' },
   fianzaAparte: 'Fianza (depósito reembolsable, no incluida en el importe)',
   declaracion: DECLARACION_ES,
   firmaConductor: 'Firma conductor',
@@ -234,6 +239,8 @@ const EN: TextosContrato = {
   redondeo: 'Rounding',
   otrosAjustes: 'Other adjustments',
   importeNeto: 'NET INVOICED AMOUNT',
+  metodoPago: 'Payment method',
+  metodosPago: { efectivo: 'Cash', tarjeta: 'Card', transferencia: 'Bank transfer' },
   fianzaAparte: 'Deposit (refundable, not included in the amount)',
   declaracion: DECLARACION_EN,
   firmaConductor: "Driver's signature",

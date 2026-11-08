@@ -21,7 +21,7 @@ export function crearSnapshot(
       id: reserva.id, vehiculoId: reserva.vehiculoId, clienteId: reserva.clienteId,
       fechaInicio: reserva.fechaInicio, fechaFin: reserva.fechaFin, horaInicio: reserva.horaInicio, horaFin: reserva.horaFin,
       lugarRecogida: lugares.recogida || undefined, lugarDevolucion: lugares.devolucion || undefined,
-      tarifaDiaria: reserva.tarifaDiaria, precioFijo: reserva.precioFijo ?? undefined, totalCobrado: reserva.totalCobrado,
+      tarifaDiaria: reserva.tarifaDiaria, precioFijo: reserva.precioFijo ?? undefined, metodoPago: reserva.metodoPago ?? undefined, totalCobrado: reserva.totalCobrado,
       incluyeSeguroTodoRiesgo: reserva.incluyeSeguroTodoRiesgo, fianza: reserva.fianza, seguroDia: reserva.seguroDia,
       dias: diasAlquiler(reserva.fechaInicio, reserva.fechaFin, reserva.horaInicio, reserva.horaFin),
       extras: reserva.extras?.length ? reserva.extras : undefined,
@@ -86,6 +86,7 @@ export function cambiosTrasFirma(
   if ((antes.lugarRecogida ?? '') !== lugares.recogida || (antes.lugarDevolucion ?? '') !== lugares.devolucion) cambios.push('los lugares');
   if (antes.totalCobrado !== reserva.totalCobrado || antes.tarifaDiaria !== reserva.tarifaDiaria || (antes.precioFijo ?? null) !== (reserva.precioFijo ?? null)) cambios.push('el importe');
   if ((antes.fianza ?? 0) !== (reserva.fianza ?? 0)) cambios.push('la fianza');
+  if ((antes.metodoPago ?? null) !== (reserva.metodoPago ?? null)) cambios.push('el método de pago');
   // El segundo conductor figura en el contrato: añadirlo o cambiarlo después de firmar obliga a firmar de nuevo.
   if (cliente && jsonCanonico(firmado.cliente?.segundoConductor ?? null) !== jsonCanonico(cliente.segundoConductor ?? null)) cambios.push('el segundo conductor');
   return cambios;

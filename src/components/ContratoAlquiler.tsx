@@ -9,6 +9,7 @@ import { desgloseReserva, type LineaDesglose } from '../utils/desgloseReserva';
 import { fechaHoraFirma, referenciaCorta } from '../utils/firmaContrato';
 import { TEXTOS_CONTRATO, etiquetaTransmisionContrato, type IdiomaContrato } from '../utils/contratoTextos';
 import { fmt2 } from '../utils/moneda';
+import { metodoPagoValido } from '../utils/metodoPago';
 import { traducirPais, traducirLugar, traducirComplemento, traducirAseguradora } from '../utils/contratoTraducciones';
 
 /** Firma del cliente ya registrada: se dibuja dentro de su caja. */
@@ -181,6 +182,12 @@ export default function ContratoAlquiler({ reserva, cliente, vehiculo, empresa, 
             <span>{tx.importeNeto}:</span>
             <strong className="font-mono text-blue-950">{euros(desglose.total)}</strong>
           </div>
+          {metodoPagoValido(reserva.metodoPago) && (
+            <div data-testid="metodo-pago-contrato" className="flex justify-between gap-2 pt-1 text-[11px] text-slate-700 font-sans">
+              <span>{tx.metodoPago}:</span>
+              <strong className="shrink-0">{tx.metodosPago[metodoPagoValido(reserva.metodoPago)!]}</strong>
+            </div>
+          )}
           {desglose.fianza > 0 && (
             <div data-testid="fianza-contrato" className="flex justify-between gap-2 border-t border-dashed border-blue-300 pt-1.5 text-[10px] text-slate-600 font-sans">
               <span>{tx.fianzaAparte}:</span>

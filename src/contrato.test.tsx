@@ -636,3 +636,45 @@ describe('pantalla de firma y mensaje en inglés', () => {
     expect(m).toContain('Hello John');
   });
 });
+
+describe('método de pago en el contrato', () => {
+  it('en español: Efectivo, Tarjeta o Transferencia', () => {
+    expect(texto('es', { reserva: { metodoPago: 'efectivo' } })).toContain('Método de pago: Efectivo');
+    expect(texto('es', { reserva: { metodoPago: 'tarjeta' } })).toContain('Método de pago: Tarjeta');
+    expect(texto('es', { reserva: { metodoPago: 'transferencia' } })).toContain('Método de pago: Transferencia');
+  });
+
+  it('en inglés: Cash, Card o Bank transfer', () => {
+    expect(texto('en', { reserva: { metodoPago: 'efectivo' } })).toContain('Payment method: Cash');
+    expect(texto('en', { reserva: { metodoPago: 'tarjeta' } })).toContain('Payment method: Card');
+    expect(texto('en', { reserva: { metodoPago: 'transferencia' } })).toContain('Payment method: Bank transfer');
+  });
+
+  it('va entre el importe neto y la fianza; sin método (o con null) no aparece nada', () => {
+    const t = texto('es', { reserva: { metodoPago: 'tarjeta' } });
+    expect(t.indexOf('IMPORTE FACTURADO NETO')).toBeLessThan(t.indexOf('Método de pago'));
+    expect(t.indexOf('Método de pago')).toBeLessThan(t.indexOf('Fianza'));
+    expect(texto('es')).not.toContain('Método de pago');
+    expect(texto('en', { reserva: { metodoPago: null } })).not.toContain('Payment method');
+  });
+
+  it('la copia firmada lo guarda solo si lo hay, y cambiarlo después de firmar se avisa', () => {
+    const con = crearSnapshot({ ...reserva, metodoPago: 'efectivo' }, cliente, vehiculo, undefined, empresa);
+    expect(con.reserva.metodoPago).toBe('efectivo');
+    expect(cambiosTrasFirma(con, { ...reserva, metodoPago: 'efectivo' })).toEqual([]);
+    expect(cambiosTrasFirma(con, { ...reserva, metodoPago: 'tarjeta' })).toContain('el método de pago');
+    expect(cambiosTrasFirma(con, { ...reserva, metodoPago: null })).toContain('el método de pago');
+    // un contrato firmado antes de existir el campo no cambia por tener la reserva «sin indicar»
+    const antiguo = crearSnapshot(reserva, cliente, vehiculo, undefined, empresa);
+    expect(JSON.stringify(antiguo)).not.toContain('metodoPago');
+    expect(cambiosTrasFirma(antiguo, { ...reserva, metodoPago: null })).toEqual([]);
+    expect(cambiosTrasFirma(antiguo, { ...reserva, metodoPago: 'efectivo' })).toContain('el método de pago');
+  });
+
+  it('el contrato en inglés con método de pago sigue sin palabras en español', () => {
+    const ESPANOL = /\b(m[eé]todo|pago|efectivo|tarjeta|transferencia)\b/i;
+    for (const m of ['efectivo', 'tarjeta', 'transferencia'] as const) {
+      expect(texto('en', { reserva: { metodoPago: m } }).match(new RegExp(ESPANOL.source, 'gi')) ?? []).toEqual([]);
+    }
+  });
+});

@@ -426,7 +426,7 @@ export interface EmpresaContrato {
 
 /** Copia congelada de lo que el cliente firmó: el contrato no cambia aunque se editen la reserva, el cliente o el coche. */
 export interface SnapshotContrato {
-  reserva: Pick<Reserva, 'id' | 'vehiculoId' | 'clienteId' | 'fechaInicio' | 'fechaFin' | 'horaInicio' | 'horaFin' | 'lugarRecogida' | 'lugarDevolucion' | 'tarifaDiaria' | 'precioFijo' | 'totalCobrado' | 'incluyeSeguroTodoRiesgo' | 'fianza' | 'seguroDia' | 'extras' | 'descuento' | 'cupon'> & {
+  reserva: Pick<Reserva, 'id' | 'vehiculoId' | 'clienteId' | 'fechaInicio' | 'fechaFin' | 'horaInicio' | 'horaFin' | 'lugarRecogida' | 'lugarDevolucion' | 'tarifaDiaria' | 'precioFijo' | 'metodoPago' | 'totalCobrado' | 'incluyeSeguroTodoRiesgo' | 'fianza' | 'seguroDia' | 'extras' | 'descuento' | 'cupon'> & {
     /** Días de alquiler tal como se contaron al firmar. Los contratos sin firmar lo calculan al vuelo. */
     dias?: number;
   };
