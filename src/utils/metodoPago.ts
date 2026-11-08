@@ -11,3 +11,10 @@ export const etiquetaMetodoPago = (m: string | null | undefined): string => METO
 
 /** Lo que llega de la base de datos o de un formulario → un método válido o null. */
 export const metodoPagoValido = (m: string | null | undefined): MetodoPago | null => METODOS_PAGO.find(x => x.id === m)?.id ?? null;
+
+/** Colores de la etiqueta de cada método en el listado de reservas. */
+export const ESTILO_METODO_PAGO: Record<MetodoPago, string> = {
+  efectivo: 'bg-emerald-50 text-emerald-700 border border-emerald-100',
+  tarjeta: 'bg-blue-50 text-blue-700 border border-blue-100',
+  transferencia: 'bg-violet-50 text-violet-700 border border-violet-100',
+};

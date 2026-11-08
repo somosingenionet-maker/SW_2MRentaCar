@@ -59,10 +59,10 @@ const reserva = (id: string, extra: Partial<Reserva>): Reserva => ({
   totalCobrado: 46, estado: 'confirmada', incluyeSeguroTodoRiesgo: true, fianza: 500, seguroDia: 15, origen: 'manual', ...extra,
 });
 const reservas: Reserva[] = [
-  reserva('r1', {}),
+  reserva('r1', { metodoPago: 'efectivo' }),
   reserva('r2', { vehiculoId: 'v2', clienteId: 'c2', fechaInicio: '2026-10-27', fechaFin: '2026-11-01', horaInicio: undefined, horaFin: undefined, fianza: undefined, estado: 'cancelada' }),
   reserva('r3', { vehiculoId: 'v3', fechaInicio: '2026-10-20', fechaFin: '2026-10-25', entrega: mov, devolucion: { ...mov, km: 120400 }, fianza: 0 }),
-  reserva('r4', { fechaInicio: '2027-06-10', fechaFin: '2027-06-22', horaInicio: '11:00', horaFin: '11:00', origen: 'web' }),
+  reserva('r4', { fechaInicio: '2027-06-10', fechaFin: '2027-06-22', horaInicio: '11:00', horaFin: '11:00', origen: 'web', metodoPago: 'transferencia' }),
 ];
 const sol = (id: string, extra: Partial<SolicitudReserva>): SolicitudReserva => ({
   id, origen: 'web', referenciaExterna: id.replace('web-', ''), estadoExterno: 'on-hold', estadoGestion: 'pendiente', clienteNombre: 'Pedro', clienteApellidos: 'Sol',
@@ -140,6 +140,15 @@ describe('contenido que no debe perderse', () => {
     const t = texto(alquileres[1], alquileres[2]);
     expect(t).toContain('Entrega 10:00 · Devolución 09:30');
     expect(t).toContain('Entrega 11:00 · Devolución 11:00');
+  });
+
+  it('Alquileres muestra el método de pago entre las fechas y las finanzas', () => {
+    const t = texto(alquileres[1], alquileres[2]);
+    expect(t).toMatch(/Fechas Alquiler\s+Método de pago\s+Finanzas/);
+    // r1 (efectivo) y r4 (transferencia) en su propia columna; el importe de cada una ya no lleva el método pegado
+    expect(t).toMatch(/días de contrato\s+Efectivo\s+46,00 €/);
+    expect(t).toMatch(/días de contrato\s+Transferencia\s+46,00 €/);
+    expect(t).not.toContain('todo riesgo · ');
   });
 
   it('Alquileres lista las activas y próximas de la más cercana a la más lejana', () => {

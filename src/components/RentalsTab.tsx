@@ -29,7 +29,7 @@ import { InputPrecio } from './InputPrecio';
 import { CambioVehiculo } from './CambioVehiculo';
 import { EditorPrecio } from './EditorPrecio';
 import MetodoPagoCampo from './MetodoPagoCampo';
-import { METODOS_PAGO, etiquetaMetodoPago, metodoPagoValido } from '../utils/metodoPago';
+import { METODOS_PAGO, ESTILO_METODO_PAGO, etiquetaMetodoPago, metodoPagoValido } from '../utils/metodoPago';
 import { aplicarPrecio, importePositivo, importeAlquiler, type ModoPrecio } from '../utils/precioAlquiler';
 import { VistaSemanaDia } from './VistaSemanaDia';
 import { rangoVisible, moverAncla, anclaAlCambiarVista, etiquetaRango, diasSemana, type VistaCalendario } from '../utils/calendarioVistas';
@@ -1009,6 +1009,7 @@ export default function RentalsTab({
                     <th className="py-2.5 px-2">Vehículo</th>
                     <th className="py-2.5 px-2">Cliente</th>
                     <th className="py-2.5 px-2">Fechas Alquiler</th>
+                    <th className="py-2.5 px-2">Método de pago</th>
                     <th className="py-2.5 px-2 text-right font-medium">Finanzas</th>
                     <th className="py-2.5 px-2 text-right">Estado / Contratos</th>
                   </tr>
@@ -1016,7 +1017,7 @@ export default function RentalsTab({
                 <tbody className="divide-y divide-slate-50">
                   {reservasVista.length === 0 ? (
                     <tr>
-                      <td colSpan={6} className="py-10 text-center">
+                      <td colSpan={7} className="py-10 text-center">
                         <Calendar className="w-8 h-8 text-slate-200 mx-auto mb-2" />
                         <p className="text-xs font-semibold text-slate-400">
                           {busqueda.trim()
@@ -1068,9 +1069,14 @@ export default function RentalsTab({
                             )}
                             <span className="text-[10px] text-slate-400 font-medium">{calculateDays(res.fechaInicio, res.fechaFin, res.horaInicio, res.horaFin)} días de contrato</span>
                           </td>
+                          <td className="py-3 px-2 whitespace-nowrap" data-testid="metodo-pago-fila">
+                            {etiquetaMetodoPago(res.metodoPago)
+                              ? <span className={`inline-block px-2 py-0.5 rounded-full text-[10px] font-bold ${ESTILO_METODO_PAGO[metodoPagoValido(res.metodoPago)!]}`}>{etiquetaMetodoPago(res.metodoPago)}</span>
+                              : <span className="text-slate-300" title="Sin indicar">—</span>}
+                          </td>
                           <td className="py-3 px-2 text-right">
                             <span className="font-mono font-extrabold text-slate-800 block text-xs">{fmt2(res.totalCobrado)} €</span>
-                            <span className="text-[9px] text-slate-400">{res.precioFijo != null ? 'precio cerrado' : `${fmt2(res.tarifaDiaria)}€/día`} {res.incluyeSeguroTodoRiesgo && '+ todo riesgo'}{etiquetaMetodoPago(res.metodoPago) && ` · ${etiquetaMetodoPago(res.metodoPago)}`}</span>
+                            <span className="text-[9px] text-slate-400">{res.precioFijo != null ? 'precio cerrado' : `${fmt2(res.tarifaDiaria)}€/día`} {res.incluyeSeguroTodoRiesgo && '+ todo riesgo'}</span>
                           </td>
                           <td className="py-3 px-2 text-right space-x-1" onClick={e => e.stopPropagation()}>
                             {(() => {
