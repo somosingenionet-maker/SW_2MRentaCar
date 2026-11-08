@@ -5,6 +5,8 @@ import { validarCarnet, estadoCarnet } from '../utils/carnet';
 import { fechaConHora } from '../utils/horaReserva';
 import CarnetConducirFields from './CarnetConducirFields';
 import TarjetaClienteFields from './TarjetaClienteFields';
+import SegundoConductorFields from './SegundoConductorFields';
+import { validarSegundoConductor, segundoConductorParaGuardar } from '../utils/segundoConductor';
 import { validarTarjeta, estadoTarjeta, enmascararNumero, formatearNumero } from '../utils/tarjeta';
 import { usePaginacion } from '../utils/usePaginacion';
 import { useSeleccion } from '../utils/useSeleccion';
@@ -174,11 +176,12 @@ export default function CrmTab({
       setAddFormError('Por favor complete Nombre, Apellidos y Documento (DNI/NIE/Pasaporte).');
       return;
     }
-    const errCarnet = validarCarnet(formData) ?? validarTarjeta(formData);
+    const errCarnet = validarCarnet(formData) ?? validarTarjeta(formData) ?? validarSegundoConductor(formData);
     if (errCarnet) { setAddFormError(errCarnet); return; }
     setAddFormError('');
     const nuevo: Cliente = {
       ...formData,
+      segundoConductor: segundoConductorParaGuardar(formData),
       id: genId('cli'),
       fechaRegistro: new Date().toISOString().split('T')[0],
       interacciones: [
@@ -205,12 +208,14 @@ export default function CrmTab({
   const handleEditSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (editFormData) {
-      const errCarnet = validarCarnet(editFormData) ?? validarTarjeta(editFormData);
+      const errCarnet = validarCarnet(editFormData) ?? validarTarjeta(editFormData) ?? validarSegundoConductor(editFormData);
       if (errCarnet) { setEditFormError(errCarnet); return; }
-      onUpdateCliente(editFormData);
+      // null (y no «sin campo») cuando se desmarca: así se borra también en la base de datos.
+      const guardado = { ...editFormData, segundoConductor: segundoConductorParaGuardar(editFormData) };
+      onUpdateCliente(guardado);
       setIsEditing(false);
-      if (selectedCliente?.id === editFormData.id) {
-        setSelectedCliente(editFormData);
+      if (selectedCliente?.id === guardado.id) {
+        setSelectedCliente(guardado);
       }
     }
   };
@@ -566,6 +571,19 @@ export default function CrmTab({
                     ) : (
                       <span className="text-slate-400">Sin informar</span>
                     )}
+                  </div>
+                </div>
+                )}
+
+                {selectedCliente.esClienteAlquiler && selectedCliente.segundoConductor && (
+                <div className="flex items-center gap-3 text-xs" id="cliente-segundo-conductor" data-testid="cliente-segundo-conductor">
+                  <UserPlus className="w-4 h-4 text-slate-400 shrink-0" />
+                  <div>
+                    <span className="text-slate-400 mr-1 block text-[10px] uppercase font-bold">Segundo conductor</span>
+                    <span className="font-bold text-slate-700 block">{selectedCliente.segundoConductor.nombre}</span>
+                    <span className="text-slate-500 block">
+                      <span className="font-mono">{selectedCliente.segundoConductor.dni}</span> · Permiso <span className="font-mono">{selectedCliente.segundoConductor.permiso}</span>
+                    </span>
                   </div>
                 </div>
                 )}
@@ -965,6 +983,9 @@ export default function CrmTab({
                 {formData.esClienteAlquiler && (
                   <TarjetaClienteFields value={formData} onChange={c => setFormData({ ...formData, ...c })} />
                 )}
+                {formData.esClienteAlquiler && (
+                  <SegundoConductorFields value={formData} onChange={c => { setFormData({ ...formData, ...c }); if (addFormError) setAddFormError(''); }} />
+                )}
 
                 <div>
                   <label className="block text-xs font-bold text-slate-500 uppercase">Correo Electrónico</label>
@@ -1177,6 +1198,9 @@ export default function CrmTab({
                 )}
                 {editFormData.esClienteAlquiler && (
                   <TarjetaClienteFields value={editFormData} onChange={c => { setEditFormData({ ...editFormData, ...c }); if (editFormError) setEditFormError(''); }} />
+                )}
+                {editFormData.esClienteAlquiler && (
+                  <SegundoConductorFields value={editFormData} onChange={c => { setEditFormData({ ...editFormData, ...c }); if (editFormError) setEditFormError(''); }} />
                 )}
 
                 <div>

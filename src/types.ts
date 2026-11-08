@@ -106,6 +106,13 @@ export interface InteraccionCliente {
   notas: string;
 }
 
+/** Segundo conductor de un cliente de alquiler: nombre, documento y número del permiso de conducir. */
+export interface SegundoConductor {
+  nombre: string;
+  dni: string;
+  permiso: string;
+}
+
 export interface Cliente {
   id: string;
   nombre: string;
@@ -123,6 +130,8 @@ export interface Cliente {
   /** Tarjeta del cliente: número (solo dígitos) y caducidad MM/AA. El CVV no se guarda nunca. */
   tarjetaNumero?: string;
   tarjetaCaducidad?: string;
+  /** Segundo conductor del alquiler (casilla «Añadir segundo conductor»). null = sin segundo conductor. */
+  segundoConductor?: SegundoConductor | null;
   /**
    * Cuando es `true`, el cliente es exclusivo de alquiler y no se le asocia
    * un vehículo de flota propio (el selector de vehículo se oculta en el CRM).
