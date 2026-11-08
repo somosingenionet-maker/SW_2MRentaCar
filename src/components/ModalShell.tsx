@@ -1,4 +1,4 @@
-import { ReactNode } from 'react';
+import { ReactNode, useEffect } from 'react';
 import { motion } from 'motion/react';
 import { X } from 'lucide-react';
 
@@ -11,6 +11,10 @@ interface Props {
   id?: string;
   /** Contenido fijo al pie (botones de guardar), fuera de la zona con scroll. */
   pie?: ReactNode;
+  /** Cerrar con la tecla Escape (por defecto no: así un cuadro con un formulario no se pierde sin querer). */
+  cerrarConEscape?: boolean;
+  /** Cerrar al pulsar fuera del cuadro (por defecto no). */
+  cerrarAlPulsarFuera?: boolean;
   children: ReactNode;
 }
 
@@ -20,10 +24,16 @@ interface Props {
  * el cuerpo (la cabecera y el pie quedan a la vista). El contenedor exterior deja que la
  * página también se desplace en pantallas muy bajas, así la parte de arriba nunca se recorta.
  */
-export default function ModalShell({ titulo, icono, onClose, ancho = 'max-w-lg', id, pie, children }: Props) {
+export default function ModalShell({ titulo, icono, onClose, ancho = 'max-w-lg', id, pie, cerrarConEscape = false, cerrarAlPulsarFuera = false, children }: Props) {
+  useEffect(() => {
+    if (!cerrarConEscape) return;
+    const alPulsar = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose(); };
+    window.addEventListener('keydown', alPulsar);
+    return () => window.removeEventListener('keydown', alPulsar);
+  }, [cerrarConEscape, onClose]);
   return (
     <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-xs z-50 overflow-y-auto">
-      <div className="flex min-h-full items-center justify-center p-4">
+      <div className="flex min-h-full items-center justify-center p-4" onMouseDown={e => { if (cerrarAlPulsarFuera && e.target === e.currentTarget) onClose(); }}>
         <motion.div
           initial={{ scale: 0.95, opacity: 0 }}
           animate={{ scale: 1, opacity: 1 }}

@@ -151,6 +151,9 @@ export default function RentalsTab({
   const [ancla, setAncla] = useState(() => hoyISO());
 
   const calculateDays = diasAlquiler;
+  // La ficha de la reserva (ventana) no se cierra con Escape ni al pulsar fuera si hay otra ventana encima o algo a medio editar.
+  const hayModalEncima = !!(movimientoModal || viewingContract || confirmAnular.isOpen);
+  const hayEdicionAbierta = !!(editandoHoras || editandoFianza || editandoLugares || editandoComplementos || cambiandoVehiculo || editandoPrecio);
 
   const currentDuration = calculateDays(formFechaInicio, formFechaFin, formHoraInicio, formHoraFin);
   // Condiciones del vehículo elegido: el seguro y la fianza son suyos, no valores fijos.
@@ -674,10 +677,10 @@ export default function RentalsTab({
       )}
 
       {/* Visual Calendar Block & List split */}
-      <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
+      <div className="grid grid-cols-1 gap-6">
         
         {/* Reservation Visual Timeline calendar */}
-        <div className="lg:col-span-8 bg-white p-6 rounded-2xl border border-slate-100 shadow-sm space-y-5">
+        <div className="bg-white p-6 rounded-2xl border border-slate-100 shadow-sm space-y-5">
           <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3">
             <div>
               <h2 className="text-lg font-bold text-slate-800 flex items-center gap-2 font-display">
@@ -961,6 +964,7 @@ export default function RentalsTab({
             <div className="flex items-center justify-between gap-2 border-b border-slate-50 pb-2 flex-wrap">
               <h3 className="text-xs font-bold text-slate-700 uppercase tracking-widest">
                 {reservaView === 'historial' ? 'Historial de Reservas' : 'Reservas Activas y Próximas'}
+                <span className="block normal-case tracking-normal font-medium text-[11px] text-slate-400 mt-0.5">Pulsa una reserva de la tabla o del calendario para gestionarla.</span>
               </h3>
               <div className="inline-flex rounded-lg border border-slate-200 overflow-hidden text-[11px] font-bold">
                 <button
@@ -1098,346 +1102,337 @@ export default function RentalsTab({
           </div>
         </div>
 
-        {/* Selected Rental Detailed interactive action block */}
-        <div className="lg:col-span-4 text-slate-700">
-          {selectedReserva ? (
-            <div className="bg-white p-6 rounded-2xl border border-slate-100 shadow-sm space-y-5" id={`res-detail-${selectedReserva.id}`}>
-              <div className="flex justify-between items-start border-b border-slate-50 pb-3">
-                <div>
-                  <span className="text-[10px] text-slate-400 font-bold uppercase tracking-wider">Gestión de Reserva</span>
-                  <h3 className="text-md font-extrabold text-slate-800">Contrato #{selectedReserva.id.slice(-6)}</h3>
-                </div>
-                <button
-                  onClick={() => setSelectedReserva(null)}
-                  title="Cerrar panel"
-                  className="p-1 hover:bg-slate-100 text-slate-400 rounded-lg"
-                >
-                  <X className="w-4 h-4" />
-                </button>
-              </div>
-
-              {/* Data checklist */}
-              <div className="space-y-3.5 text-xs">
-                {/* Vehicle */}
-                <div className="p-3 bg-slate-50 rounded-xl border border-slate-100 flex gap-2.5 items-center">
-                  <Car className="w-5 h-5 text-blue-600" />
-                  <div>
-                    <span className="text-[9px] text-slate-400 font-bold block uppercase">Vehículo Alquilado</span>
-                    {(() => {
-                      const v = vehiculos.find(veh => veh.id === selectedReserva.vehiculoId);
-                      return v ? (
-                        <span className="font-bold text-slate-800">{v.marca} {v.modelo} ({v.matricula})</span>
-                      ) : (
-                        <span className="text-rose-600 italic">No disponible</span>
-                      );
-                    })()}
-                  </div>
-                </div>
-                {(() => {
-                  const puede = puedeCambiarVehiculo(selectedReserva);
-                  if (!puede.ok) return selectedReserva.estado === 'cancelada' ? null : (
-                    <p data-testid="sin-cambio-vehiculo" className="-mt-1.5 text-[10px] text-slate-400">No se puede cambiar el vehículo. {puede.motivo}</p>
-                  );
-                  if (!cambiandoVehiculo) return (
-                    <>
-                      {avisoVehiculo && <p role="status" data-testid="aviso-vehiculo" className="-mt-1.5 rounded-md border border-emerald-200 bg-emerald-50 px-2 py-1 text-[11px] font-semibold text-emerald-700">{avisoVehiculo}</p>}
-                      <button type="button" data-testid="cambiar-vehiculo" onClick={() => { setAvisoVehiculo(null); setCambiandoVehiculo({ id: '', error: '' }); }}
-                        className="-mt-1.5 w-full cursor-pointer rounded-lg border border-slate-200 bg-white py-1.5 text-[11px] font-bold text-blue-700 transition hover:bg-blue-50">
-                        Cambiar vehículo
-                      </button>
-                    </>
-                  );
-                  const nuevo = vehiculos.find(v => v.id === cambiandoVehiculo.id);
-                  return (
-                    <CambioVehiculo
-                      opciones={vehiculosAlquiler.filter(v => v.id !== selectedReserva.vehiculoId).map(v => ({
-                        value: v.id, label: `${v.marca} ${v.modelo}`,
-                        sublabel: `Matrícula: ${v.matricula}${reservaQueOcupa(reservas, selectedReserva, v.id) ? ' · Ocupado en esas fechas' : ''}`,
-                      }))}
-                      valor={cambiandoVehiculo.id}
-                      avisos={nuevo ? avisosCambioVehiculo(selectedReserva, nuevo) : []}
-                      error={cambiandoVehiculo.error}
-                      firmada={!!firmasVigentes[selectedReserva.id]}
-                      onCambiar={id => setCambiandoVehiculo({ id, error: '' })}
-                      onGuardar={handleCambiarVehiculo}
-                      onCancelar={() => setCambiandoVehiculo(null)}
-                    />
-                  );
-                })()}
-
-                {/* Cliente */}
-                <div className="p-3 bg-slate-50 rounded-xl border border-slate-100 flex gap-2.5 items-center">
-                  <User className="w-5 h-5 text-blue-600" />
-                  <div>
-                    <span className="text-[9px] text-slate-400 font-bold block uppercase">Cliente Signatario</span>
-                    {(() => {
-                      const c = clientes.find(cli => cli.id === selectedReserva.clienteId);
-                      return c ? (
-                        <span className="font-bold text-slate-800">{c.nombre} {c.apellidos} ({c.nifNiePasaporte})</span>
-                      ) : (
-                        <span className="text-rose-600 italic">Desasociado</span>
-                      );
-                    })()}
-                  </div>
-                </div>
-
-                {/* Dates & Times */}
-                <div className="p-3 bg-slate-50 rounded-xl border border-slate-100 space-y-1.5">
-                  <div className="flex justify-between gap-2">
-                    <span className="text-slate-400">Entrega al cliente:</span>
-                    <strong className="font-bold text-slate-700 text-right">
-                      {fechaConHora(selectedReserva.fechaInicio, selectedReserva.horaInicio, formatDate)}
-                      {!selectedReserva.horaInicio && <span className="ml-1.5 text-[10px] font-semibold text-amber-600">sin hora</span>}
-                    </strong>
-                  </div>
-                  <div className="flex justify-between gap-2">
-                    <span className="text-slate-400">Devolución del vehículo:</span>
-                    <strong className="font-bold text-slate-700 text-right">
-                      {fechaConHora(selectedReserva.fechaFin, selectedReserva.horaFin, formatDate)}
-                      {!selectedReserva.horaFin && <span className="ml-1.5 text-[10px] font-semibold text-amber-600">sin hora</span>}
-                    </strong>
-                  </div>
-                  {selectedReserva.estado !== 'cancelada' && (editandoHoras ? (
-                    <div className="border-t border-slate-100/50 pt-2 space-y-2" data-testid="editar-horas">
-                      <div className="grid grid-cols-2 gap-3 items-start">
-                        <div>
-                          <span className="block text-[10px] font-bold text-slate-500 uppercase whitespace-nowrap">Hora de entrega</span>
-                          <Hora24Field etiqueta="Hora de entrega" value={editandoHoras.inicio}
-                            onChange={v => setEditandoHoras({ ...editandoHoras, inicio: v, error: '' })} />
-                        </div>
-                        <div>
-                          <span className="block text-[10px] font-bold text-slate-500 uppercase whitespace-nowrap">Hora de devolución</span>
-                          <Hora24Field etiqueta="Hora de devolución" value={editandoHoras.fin}
-                            onChange={v => setEditandoHoras({ ...editandoHoras, fin: v, error: '' })} />
-                        </div>
-                      </div>
-                      {editandoHoras.error && <p role="alert" className="text-[11px] text-rose-600 font-medium">{editandoHoras.error}</p>}
-                      <div className="flex justify-end gap-2 text-[11px] font-bold">
-                        <button type="button" onClick={() => setEditandoHoras(null)} className="px-3 py-1.5 border border-slate-200 rounded-lg text-slate-500 hover:bg-slate-50 cursor-pointer">Cancelar</button>
-                        <button type="button" onClick={handleGuardarHoras} className="px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded-lg cursor-pointer">Guardar horas</button>
+        {/* Ficha de la reserva: ventana ancha de dos columnas (la reserva a la izquierda, el dinero a la derecha, las acciones abajo) */}
+        <AnimatePresence>
+          {selectedReserva && (
+            <ModalShell
+              id={`res-detail-${selectedReserva.id}`}
+              ancho="max-w-5xl"
+              icono={<FileText className="w-5 h-5 text-blue-600" />}
+              titulo={<span>Gestión de Reserva <span className="text-slate-400 font-bold">· Contrato #{selectedReserva.id.slice(-6)}</span></span>}
+              onClose={() => setSelectedReserva(null)}
+              cerrarConEscape={!hayModalEncima && !hayEdicionAbierta}
+              cerrarAlPulsarFuera={!hayModalEncima && !hayEdicionAbierta}
+            >
+              <div className="p-6 space-y-6 text-slate-700">
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 items-start text-xs">
+                  <div className="space-y-3.5" data-testid="ficha-columna-reserva">
+                    {/* Vehicle */}
+                    <div className="p-3 bg-slate-50 rounded-xl border border-slate-100 flex gap-2.5 items-center">
+                      <Car className="w-5 h-5 text-blue-600" />
+                      <div>
+                        <span className="text-[9px] text-slate-400 font-bold block uppercase">Vehículo Alquilado</span>
+                        {(() => {
+                          const v = vehiculos.find(veh => veh.id === selectedReserva.vehiculoId);
+                          return v ? (
+                            <span className="font-bold text-slate-800">{v.marca} {v.modelo} ({v.matricula})</span>
+                          ) : (
+                            <span className="text-rose-600 italic">No disponible</span>
+                          );
+                        })()}
                       </div>
                     </div>
-                  ) : (
-                    <button type="button" onClick={() => abrirEdicionHoras(selectedReserva)}
-                      className={`w-full mt-1 py-1.5 rounded-lg text-[11px] font-bold transition cursor-pointer ${!selectedReserva.horaInicio || !selectedReserva.horaFin ? 'bg-amber-50 text-amber-700 border border-amber-200 hover:bg-amber-100' : 'bg-white text-slate-500 border border-slate-200 hover:bg-slate-50'}`}>
-                      {!selectedReserva.horaInicio || !selectedReserva.horaFin ? 'Indicar la hora de entrega y de devolución' : 'Cambiar las horas'}
-                    </button>
-                  ))}
-                  {(() => {
-                    const lugares = lugaresReserva(selectedReserva, solicitudes.find(s => s.reservaId === selectedReserva.id));
-                    return (
-                      <div className="border-t border-slate-100/50 pt-1.5 space-y-1.5" data-testid="lugares-ficha">
-                        <div className="flex justify-between gap-2">
-                          <span className="text-slate-400">Lugar de entrega:</span>
-                          <strong className="font-bold text-slate-700 text-right">{lugares.recogida || <span className="text-[10px] font-semibold text-amber-600">sin indicar</span>}</strong>
-                        </div>
-                        <div className="flex justify-between gap-2">
-                          <span className="text-slate-400">Lugar de devolución:</span>
-                          <strong className="font-bold text-slate-700 text-right">{lugares.devolucion || <span className="text-[10px] font-semibold text-amber-600">sin indicar</span>}</strong>
-                        </div>
-                        {selectedReserva.estado !== 'cancelada' && (editandoLugares ? (
-                          <div className="space-y-2" data-testid="editar-lugares">
-                            <input type="text" list="lugares-habituales-ficha" aria-label="Lugar de entrega" placeholder="Lugar de entrega"
-                              className="w-full px-3 h-[34px] border border-slate-200 rounded-lg text-xs bg-white focus:outline-none focus:ring-1 focus:ring-blue-500"
-                              value={editandoLugares.recogida} onChange={e => setEditandoLugares({ ...editandoLugares, recogida: e.target.value })} />
-                            <input type="text" list="lugares-habituales-ficha" aria-label="Lugar de devolución" placeholder="Lugar de devolución"
-                              className="w-full px-3 h-[34px] border border-slate-200 rounded-lg text-xs bg-white focus:outline-none focus:ring-1 focus:ring-blue-500"
-                              value={editandoLugares.devolucion} onChange={e => setEditandoLugares({ ...editandoLugares, devolucion: e.target.value })} />
-                            <datalist id="lugares-habituales-ficha">
-                              {LUGARES_HABITUALES.map(l => <option key={l} value={l} />)}
-                            </datalist>
-                            <div className="flex justify-end gap-2 text-[11px] font-bold">
-                              <button type="button" onClick={() => setEditandoLugares(null)} className="px-3 py-1.5 border border-slate-200 rounded-lg text-slate-500 hover:bg-slate-50 cursor-pointer">Cancelar</button>
-                              <button type="button" onClick={handleGuardarLugares} className="px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded-lg cursor-pointer">Guardar lugares</button>
+                    {(() => {
+                      const puede = puedeCambiarVehiculo(selectedReserva);
+                      if (!puede.ok) return selectedReserva.estado === 'cancelada' ? null : (
+                        <p data-testid="sin-cambio-vehiculo" className="-mt-1.5 text-[10px] text-slate-400">No se puede cambiar el vehículo. {puede.motivo}</p>
+                      );
+                      if (!cambiandoVehiculo) return (
+                        <>
+                          {avisoVehiculo && <p role="status" data-testid="aviso-vehiculo" className="-mt-1.5 rounded-md border border-emerald-200 bg-emerald-50 px-2 py-1 text-[11px] font-semibold text-emerald-700">{avisoVehiculo}</p>}
+                          <button type="button" data-testid="cambiar-vehiculo" onClick={() => { setAvisoVehiculo(null); setCambiandoVehiculo({ id: '', error: '' }); }}
+                            className="-mt-1.5 w-full cursor-pointer rounded-lg border border-slate-200 bg-white py-1.5 text-[11px] font-bold text-blue-700 transition hover:bg-blue-50">
+                            Cambiar vehículo
+                          </button>
+                        </>
+                      );
+                      const nuevo = vehiculos.find(v => v.id === cambiandoVehiculo.id);
+                      return (
+                        <CambioVehiculo
+                          opciones={vehiculosAlquiler.filter(v => v.id !== selectedReserva.vehiculoId).map(v => ({
+                            value: v.id, label: `${v.marca} ${v.modelo}`,
+                            sublabel: `Matrícula: ${v.matricula}${reservaQueOcupa(reservas, selectedReserva, v.id) ? ' · Ocupado en esas fechas' : ''}`,
+                          }))}
+                          valor={cambiandoVehiculo.id}
+                          avisos={nuevo ? avisosCambioVehiculo(selectedReserva, nuevo) : []}
+                          error={cambiandoVehiculo.error}
+                          firmada={!!firmasVigentes[selectedReserva.id]}
+                          onCambiar={id => setCambiandoVehiculo({ id, error: '' })}
+                          onGuardar={handleCambiarVehiculo}
+                          onCancelar={() => setCambiandoVehiculo(null)}
+                        />
+                      );
+                    })()}
+
+                    {/* Cliente */}
+                    <div className="p-3 bg-slate-50 rounded-xl border border-slate-100 flex gap-2.5 items-center">
+                      <User className="w-5 h-5 text-blue-600" />
+                      <div>
+                        <span className="text-[9px] text-slate-400 font-bold block uppercase">Cliente Signatario</span>
+                        {(() => {
+                          const c = clientes.find(cli => cli.id === selectedReserva.clienteId);
+                          return c ? (
+                            <span className="font-bold text-slate-800">{c.nombre} {c.apellidos} ({c.nifNiePasaporte})</span>
+                          ) : (
+                            <span className="text-rose-600 italic">Desasociado</span>
+                          );
+                        })()}
+                      </div>
+                    </div>
+
+                    {/* Dates & Times */}
+                    <div className="p-3 bg-slate-50 rounded-xl border border-slate-100 space-y-1.5">
+                      <div className="flex justify-between gap-2">
+                        <span className="text-slate-400">Entrega al cliente:</span>
+                        <strong className="font-bold text-slate-700 text-right">
+                          {fechaConHora(selectedReserva.fechaInicio, selectedReserva.horaInicio, formatDate)}
+                          {!selectedReserva.horaInicio && <span className="ml-1.5 text-[10px] font-semibold text-amber-600">sin hora</span>}
+                        </strong>
+                      </div>
+                      <div className="flex justify-between gap-2">
+                        <span className="text-slate-400">Devolución del vehículo:</span>
+                        <strong className="font-bold text-slate-700 text-right">
+                          {fechaConHora(selectedReserva.fechaFin, selectedReserva.horaFin, formatDate)}
+                          {!selectedReserva.horaFin && <span className="ml-1.5 text-[10px] font-semibold text-amber-600">sin hora</span>}
+                        </strong>
+                      </div>
+                      {selectedReserva.estado !== 'cancelada' && (editandoHoras ? (
+                        <div className="border-t border-slate-100/50 pt-2 space-y-2" data-testid="editar-horas">
+                          <div className="grid grid-cols-2 gap-3 items-start">
+                            <div>
+                              <span className="block text-[10px] font-bold text-slate-500 uppercase whitespace-nowrap">Hora de entrega</span>
+                              <Hora24Field etiqueta="Hora de entrega" value={editandoHoras.inicio}
+                                onChange={v => setEditandoHoras({ ...editandoHoras, inicio: v, error: '' })} />
+                            </div>
+                            <div>
+                              <span className="block text-[10px] font-bold text-slate-500 uppercase whitespace-nowrap">Hora de devolución</span>
+                              <Hora24Field etiqueta="Hora de devolución" value={editandoHoras.fin}
+                                onChange={v => setEditandoHoras({ ...editandoHoras, fin: v, error: '' })} />
                             </div>
                           </div>
-                        ) : (
-                          <button type="button" onClick={() => setEditandoLugares({ recogida: lugares.recogida, devolucion: lugares.devolucion })}
-                            className={`w-full py-1.5 rounded-lg text-[11px] font-bold transition cursor-pointer ${!lugares.recogida || !lugares.devolucion ? 'bg-amber-50 text-amber-700 border border-amber-200 hover:bg-amber-100' : 'bg-white text-slate-500 border border-slate-200 hover:bg-slate-50'}`}>
-                            {!lugares.recogida || !lugares.devolucion ? 'Indicar el lugar de entrega y de devolución' : 'Cambiar los lugares'}
-                          </button>
-                        ))}
-                      </div>
-                    );
-                  })()}
-                  <FilaDuracion reserva={selectedReserva} />
-                  {avisoDias && <p role="status" data-testid="aviso-dias" className="text-[11px] font-semibold text-emerald-700 bg-emerald-50 border border-emerald-200 rounded-md px-2 py-1">{avisoDias}</p>}
-                </div>
-
-                {/* Desglose económico: cada concepto a su precio, el descuento aparte y la fianza fuera del total */}
-                <div className="p-3 bg-blue-50 text-blue-900 rounded-xl border border-blue-100/30 space-y-2">
-                  <DesgloseFicha reserva={selectedReserva} />
-                  {selectedReserva.estado !== 'cancelada' && selectedReserva.origen !== 'web' && (editandoPrecio ? (() => {
-                    const dias = diasAlquiler(selectedReserva.fechaInicio, selectedReserva.fechaFin, selectedReserva.horaInicio, selectedReserva.horaFin);
-                    const prueba = aplicarPrecio(selectedReserva, editandoPrecio.modo, editandoPrecio.valor, dias);
-                    return (
-                      <EditorPrecio
-                        modo={editandoPrecio.modo} valor={editandoPrecio.valor} dias={dias}
-                        totalNuevo={prueba.ok ? prueba.totalCobrado : null} totalActual={selectedReserva.totalCobrado}
-                        error={editandoPrecio.error} firmada={!!firmasVigentes[selectedReserva.id]}
-                        onModo={modo => setEditandoPrecio({ modo, valor: modo === 'fijo' ? String(importeAlquiler(selectedReserva, dias)) : String(selectedReserva.tarifaDiaria), error: '' })}
-                        onValor={valor => setEditandoPrecio({ ...editandoPrecio, valor, error: '' })}
-                        onGuardar={handleGuardarPrecio}
-                        onCancelar={() => setEditandoPrecio(null)}
-                      />
-                    );
-                  })() : (
-                    <button type="button" data-testid="editar-precio"
-                      onClick={() => {
-                        setAvisoPrecio(null);
-                        setEditandoPrecio(selectedReserva.precioFijo != null
-                          ? { modo: 'fijo', valor: String(selectedReserva.precioFijo), error: '' }
-                          : { modo: 'dia', valor: String(selectedReserva.tarifaDiaria), error: '' });
-                      }}
-                      className="w-full cursor-pointer rounded-lg border border-blue-200 bg-white/70 py-1.5 text-[11px] font-bold text-blue-700 transition hover:bg-white">
-                      Cambiar el precio del alquiler
-                    </button>
-                  ))}
-                  {avisoPrecio && <p role="status" data-testid="aviso-precio" className="rounded-md border border-emerald-200 bg-emerald-50 px-2 py-1 text-[11px] font-semibold text-emerald-700">{avisoPrecio}</p>}
-                  {selectedReserva.estado !== 'cancelada' && (editandoComplementos ? (
-                    <EditorComplementos
-                      reserva={selectedReserva}
-                      filas={editandoComplementos}
-                      dias={diasAlquiler(selectedReserva.fechaInicio, selectedReserva.fechaFin, selectedReserva.horaInicio, selectedReserva.horaFin)}
-                      firmada={!!firmasVigentes[selectedReserva.id]}
-                      onCambiar={(clave, cantidad) => setEditandoComplementos(fs => fs && fs.map(f => f.clave === clave ? { ...f, cantidad } : f))}
-                      onGuardar={handleGuardarComplementos}
-                      onCancelar={() => setEditandoComplementos(null)}
-                    />
-                  ) : (
-                    <button type="button" data-testid="editar-complementos"
-                      onClick={() => { setAvisoComplementos(null); setEditandoComplementos(filasEditorExtras(selectedReserva.extras, complementos)); }}
-                      className="w-full cursor-pointer rounded-lg border border-blue-200 bg-white/70 py-1.5 text-[11px] font-bold text-blue-700 transition hover:bg-white">
-                      Editar complementos
-                    </button>
-                  ))}
-                  {avisoComplementos && <p role="status" data-testid="aviso-complementos" className="rounded-md border border-emerald-200 bg-emerald-50 px-2 py-1 text-[11px] font-semibold text-emerald-700">{avisoComplementos}</p>}
-                  <div className="border-t border-dashed border-blue-200 pt-2 space-y-1.5">
-                    <div className="flex justify-between items-center gap-2 text-xs font-semibold" id="reserva-fianza-ficha">
-                      <span>Fianza (depósito aparte, no incluida en el total):</span>
-                      {editandoFianza ? (
-                        <span className="flex items-center gap-1.5">
-                          <InputPrecio
-                            aria-label="Fianza en euros"
-                            className="w-24 px-2 h-[30px] border border-blue-200 rounded-md text-right text-xs text-slate-800 bg-white focus:outline-none focus:ring-1 focus:ring-blue-500"
-                            value={editandoFianza.valor}
-                            onChange={e => setEditandoFianza({ valor: e.target.value, error: '' })}
-                            autoFocus
-                          />
-                          <span>€</span>
-                          <button type="button" onClick={handleGuardarFianza} className="px-2 py-1 rounded-md bg-blue-600 hover:bg-blue-700 text-white text-[10px] font-bold cursor-pointer">Guardar</button>
-                          <button type="button" onClick={() => setEditandoFianza(null)} className="px-2 py-1 rounded-md border border-blue-200 text-blue-800 text-[10px] font-bold cursor-pointer">Cancelar</button>
-                        </span>
+                          {editandoHoras.error && <p role="alert" className="text-[11px] text-rose-600 font-medium">{editandoHoras.error}</p>}
+                          <div className="flex justify-end gap-2 text-[11px] font-bold">
+                            <button type="button" onClick={() => setEditandoHoras(null)} className="px-3 py-1.5 border border-slate-200 rounded-lg text-slate-500 hover:bg-slate-50 cursor-pointer">Cancelar</button>
+                            <button type="button" onClick={handleGuardarHoras} className="px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded-lg cursor-pointer">Guardar horas</button>
+                          </div>
+                        </div>
                       ) : (
-                        <span className="flex items-center gap-2">
-                          <span>{selectedReserva.fianza != null && selectedReserva.fianza > 0 ? `${fmt2(selectedReserva.fianza)} €` : 'Sin fianza'}</span>
-                          {selectedReserva.estado !== 'cancelada' && (
-                            <button type="button" onClick={() => setEditandoFianza({ valor: String(selectedReserva.fianza ?? 0), error: '' })}
-                              className="text-[10px] font-bold text-blue-800 underline cursor-pointer">Cambiar</button>
-                          )}
-                        </span>
-                      )}
+                        <button type="button" onClick={() => abrirEdicionHoras(selectedReserva)}
+                          className={`w-full mt-1 py-1.5 rounded-lg text-[11px] font-bold transition cursor-pointer ${!selectedReserva.horaInicio || !selectedReserva.horaFin ? 'bg-amber-50 text-amber-700 border border-amber-200 hover:bg-amber-100' : 'bg-white text-slate-500 border border-slate-200 hover:bg-slate-50'}`}>
+                          {!selectedReserva.horaInicio || !selectedReserva.horaFin ? 'Indicar la hora de entrega y de devolución' : 'Cambiar las horas'}
+                        </button>
+                      ))}
+                      {(() => {
+                        const lugares = lugaresReserva(selectedReserva, solicitudes.find(s => s.reservaId === selectedReserva.id));
+                        return (
+                          <div className="border-t border-slate-100/50 pt-1.5 space-y-1.5" data-testid="lugares-ficha">
+                            <div className="flex justify-between gap-2">
+                              <span className="text-slate-400">Lugar de entrega:</span>
+                              <strong className="font-bold text-slate-700 text-right">{lugares.recogida || <span className="text-[10px] font-semibold text-amber-600">sin indicar</span>}</strong>
+                            </div>
+                            <div className="flex justify-between gap-2">
+                              <span className="text-slate-400">Lugar de devolución:</span>
+                              <strong className="font-bold text-slate-700 text-right">{lugares.devolucion || <span className="text-[10px] font-semibold text-amber-600">sin indicar</span>}</strong>
+                            </div>
+                            {selectedReserva.estado !== 'cancelada' && (editandoLugares ? (
+                              <div className="space-y-2" data-testid="editar-lugares">
+                                <input type="text" list="lugares-habituales-ficha" aria-label="Lugar de entrega" placeholder="Lugar de entrega"
+                                  className="w-full px-3 h-[34px] border border-slate-200 rounded-lg text-xs bg-white focus:outline-none focus:ring-1 focus:ring-blue-500"
+                                  value={editandoLugares.recogida} onChange={e => setEditandoLugares({ ...editandoLugares, recogida: e.target.value })} />
+                                <input type="text" list="lugares-habituales-ficha" aria-label="Lugar de devolución" placeholder="Lugar de devolución"
+                                  className="w-full px-3 h-[34px] border border-slate-200 rounded-lg text-xs bg-white focus:outline-none focus:ring-1 focus:ring-blue-500"
+                                  value={editandoLugares.devolucion} onChange={e => setEditandoLugares({ ...editandoLugares, devolucion: e.target.value })} />
+                                <datalist id="lugares-habituales-ficha">
+                                  {LUGARES_HABITUALES.map(l => <option key={l} value={l} />)}
+                                </datalist>
+                                <div className="flex justify-end gap-2 text-[11px] font-bold">
+                                  <button type="button" onClick={() => setEditandoLugares(null)} className="px-3 py-1.5 border border-slate-200 rounded-lg text-slate-500 hover:bg-slate-50 cursor-pointer">Cancelar</button>
+                                  <button type="button" onClick={handleGuardarLugares} className="px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded-lg cursor-pointer">Guardar lugares</button>
+                                </div>
+                              </div>
+                            ) : (
+                              <button type="button" onClick={() => setEditandoLugares({ recogida: lugares.recogida, devolucion: lugares.devolucion })}
+                                className={`w-full py-1.5 rounded-lg text-[11px] font-bold transition cursor-pointer ${!lugares.recogida || !lugares.devolucion ? 'bg-amber-50 text-amber-700 border border-amber-200 hover:bg-amber-100' : 'bg-white text-slate-500 border border-slate-200 hover:bg-slate-50'}`}>
+                                {!lugares.recogida || !lugares.devolucion ? 'Indicar el lugar de entrega y de devolución' : 'Cambiar los lugares'}
+                              </button>
+                            ))}
+                          </div>
+                        );
+                      })()}
+                      <FilaDuracion reserva={selectedReserva} />
+                      {avisoDias && <p role="status" data-testid="aviso-dias" className="text-[11px] font-semibold text-emerald-700 bg-emerald-50 border border-emerald-200 rounded-md px-2 py-1">{avisoDias}</p>}
                     </div>
-                    {editandoFianza?.error && <p role="alert" className="text-[11px] text-rose-600 font-medium">{editandoFianza.error}</p>}
-                    <div className="flex justify-between items-center gap-2 text-xs font-semibold" data-testid="metodo-pago-ficha">
-                      <label htmlFor="metodo-pago-reserva">Método de pago:</label>
-                      <select
-                        id="metodo-pago-reserva"
-                        value={metodoPagoValido(selectedReserva.metodoPago) ?? ''}
-                        disabled={selectedReserva.estado === 'cancelada'}
-                        onChange={e => {
-                          const actualizada = { ...selectedReserva, metodoPago: metodoPagoValido(e.target.value) };
-                          onUpdateReserva(actualizada);
-                          setSelectedReserva(actualizada);
-                        }}
-                        className="h-[30px] rounded-md border border-blue-200 bg-white px-2 text-xs text-slate-800 focus:outline-none focus:ring-1 focus:ring-blue-500 disabled:opacity-60"
-                      >
-                        <option value="">Sin indicar</option>
-                        {METODOS_PAGO.map(m => <option key={m.id} value={m.id}>{m.etiqueta}</option>)}
-                      </select>
+                  </div>
+                  <div className="space-y-3.5" data-testid="ficha-columna-dinero">
+                    {/* Desglose económico: cada concepto a su precio, el descuento aparte y la fianza fuera del total */}
+                    <div className="p-3 bg-blue-50 text-blue-900 rounded-xl border border-blue-100/30 space-y-2">
+                      <DesgloseFicha reserva={selectedReserva} />
+                      {selectedReserva.estado !== 'cancelada' && selectedReserva.origen !== 'web' && (editandoPrecio ? (() => {
+                        const dias = diasAlquiler(selectedReserva.fechaInicio, selectedReserva.fechaFin, selectedReserva.horaInicio, selectedReserva.horaFin);
+                        const prueba = aplicarPrecio(selectedReserva, editandoPrecio.modo, editandoPrecio.valor, dias);
+                        return (
+                          <EditorPrecio
+                            modo={editandoPrecio.modo} valor={editandoPrecio.valor} dias={dias}
+                            totalNuevo={prueba.ok ? prueba.totalCobrado : null} totalActual={selectedReserva.totalCobrado}
+                            error={editandoPrecio.error} firmada={!!firmasVigentes[selectedReserva.id]}
+                            onModo={modo => setEditandoPrecio({ modo, valor: modo === 'fijo' ? String(importeAlquiler(selectedReserva, dias)) : String(selectedReserva.tarifaDiaria), error: '' })}
+                            onValor={valor => setEditandoPrecio({ ...editandoPrecio, valor, error: '' })}
+                            onGuardar={handleGuardarPrecio}
+                            onCancelar={() => setEditandoPrecio(null)}
+                          />
+                        );
+                      })() : (
+                        <button type="button" data-testid="editar-precio"
+                          onClick={() => {
+                            setAvisoPrecio(null);
+                            setEditandoPrecio(selectedReserva.precioFijo != null
+                              ? { modo: 'fijo', valor: String(selectedReserva.precioFijo), error: '' }
+                              : { modo: 'dia', valor: String(selectedReserva.tarifaDiaria), error: '' });
+                          }}
+                          className="w-full cursor-pointer rounded-lg border border-blue-200 bg-white/70 py-1.5 text-[11px] font-bold text-blue-700 transition hover:bg-white">
+                          Cambiar el precio del alquiler
+                        </button>
+                      ))}
+                      {avisoPrecio && <p role="status" data-testid="aviso-precio" className="rounded-md border border-emerald-200 bg-emerald-50 px-2 py-1 text-[11px] font-semibold text-emerald-700">{avisoPrecio}</p>}
+                      {selectedReserva.estado !== 'cancelada' && (editandoComplementos ? (
+                        <EditorComplementos
+                          reserva={selectedReserva}
+                          filas={editandoComplementos}
+                          dias={diasAlquiler(selectedReserva.fechaInicio, selectedReserva.fechaFin, selectedReserva.horaInicio, selectedReserva.horaFin)}
+                          firmada={!!firmasVigentes[selectedReserva.id]}
+                          onCambiar={(clave, cantidad) => setEditandoComplementos(fs => fs && fs.map(f => f.clave === clave ? { ...f, cantidad } : f))}
+                          onGuardar={handleGuardarComplementos}
+                          onCancelar={() => setEditandoComplementos(null)}
+                        />
+                      ) : (
+                        <button type="button" data-testid="editar-complementos"
+                          onClick={() => { setAvisoComplementos(null); setEditandoComplementos(filasEditorExtras(selectedReserva.extras, complementos)); }}
+                          className="w-full cursor-pointer rounded-lg border border-blue-200 bg-white/70 py-1.5 text-[11px] font-bold text-blue-700 transition hover:bg-white">
+                          Editar complementos
+                        </button>
+                      ))}
+                      {avisoComplementos && <p role="status" data-testid="aviso-complementos" className="rounded-md border border-emerald-200 bg-emerald-50 px-2 py-1 text-[11px] font-semibold text-emerald-700">{avisoComplementos}</p>}
+                      <div className="border-t border-dashed border-blue-200 pt-2 space-y-1.5">
+                        <div className="flex justify-between items-center gap-2 text-xs font-semibold" id="reserva-fianza-ficha">
+                          <span>Fianza (depósito aparte, no incluida en el total):</span>
+                          {editandoFianza ? (
+                            <span className="flex items-center gap-1.5">
+                              <InputPrecio
+                                aria-label="Fianza en euros"
+                                className="w-24 px-2 h-[30px] border border-blue-200 rounded-md text-right text-xs text-slate-800 bg-white focus:outline-none focus:ring-1 focus:ring-blue-500"
+                                value={editandoFianza.valor}
+                                onChange={e => setEditandoFianza({ valor: e.target.value, error: '' })}
+                                autoFocus
+                              />
+                              <span>€</span>
+                              <button type="button" onClick={handleGuardarFianza} className="px-2 py-1 rounded-md bg-blue-600 hover:bg-blue-700 text-white text-[10px] font-bold cursor-pointer">Guardar</button>
+                              <button type="button" onClick={() => setEditandoFianza(null)} className="px-2 py-1 rounded-md border border-blue-200 text-blue-800 text-[10px] font-bold cursor-pointer">Cancelar</button>
+                            </span>
+                          ) : (
+                            <span className="flex items-center gap-2">
+                              <span>{selectedReserva.fianza != null && selectedReserva.fianza > 0 ? `${fmt2(selectedReserva.fianza)} €` : 'Sin fianza'}</span>
+                              {selectedReserva.estado !== 'cancelada' && (
+                                <button type="button" onClick={() => setEditandoFianza({ valor: String(selectedReserva.fianza ?? 0), error: '' })}
+                                  className="text-[10px] font-bold text-blue-800 underline cursor-pointer">Cambiar</button>
+                              )}
+                            </span>
+                          )}
+                        </div>
+                        {editandoFianza?.error && <p role="alert" className="text-[11px] text-rose-600 font-medium">{editandoFianza.error}</p>}
+                        <div className="flex justify-between items-center gap-2 text-xs font-semibold" data-testid="metodo-pago-ficha">
+                          <label htmlFor="metodo-pago-reserva">Método de pago:</label>
+                          <select
+                            id="metodo-pago-reserva"
+                            value={metodoPagoValido(selectedReserva.metodoPago) ?? ''}
+                            disabled={selectedReserva.estado === 'cancelada'}
+                            onChange={e => {
+                              const actualizada = { ...selectedReserva, metodoPago: metodoPagoValido(e.target.value) };
+                              onUpdateReserva(actualizada);
+                              setSelectedReserva(actualizada);
+                            }}
+                            className="h-[30px] rounded-md border border-blue-200 bg-white px-2 text-xs text-slate-800 focus:outline-none focus:ring-1 focus:ring-blue-500 disabled:opacity-60"
+                          >
+                            <option value="">Sin indicar</option>
+                            {METODOS_PAGO.map(m => <option key={m.id} value={m.id}>{m.etiqueta}</option>)}
+                          </select>
+                        </div>
+                      </div>
                     </div>
                   </div>
                 </div>
-              </div>
 
-              {/* Entrega y devolución del vehículo */}
-              {(selectedReserva.estado !== 'cancelada' || selectedReserva.entrega || selectedReserva.devolucion) && (
-                <div className="space-y-2 border-t border-slate-50 pt-3">
-                  <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest block">Entrega y devolución</span>
-                  <TarjetaMovimiento
-                    titulo="Entrega al cliente"
-                    mov={selectedReserva.entrega}
-                    bloqueada={selectedReserva.estado === 'cancelada' ? 'La reserva está anulada.' : undefined}
-                    onRegistrar={() => setMovimientoModal({ tipo: 'entrega', reserva: selectedReserva })}
-                    onEditar={() => setMovimientoModal({ tipo: 'entrega', reserva: selectedReserva })}
-                  />
-                  <TarjetaMovimiento
-                    titulo="Devolución del vehículo"
-                    mov={selectedReserva.devolucion}
-                    bloqueada={!selectedReserva.entrega ? 'Registra primero la entrega.' : selectedReserva.estado === 'cancelada' ? 'La reserva está anulada.' : undefined}
-                    onRegistrar={() => setMovimientoModal({ tipo: 'devolucion', reserva: selectedReserva })}
-                    onEditar={() => setMovimientoModal({ tipo: 'devolucion', reserva: selectedReserva })}
-                  />
-                  {kmRecorridos(selectedReserva.entrega, selectedReserva.devolucion) != null && (
-                    <p className="text-[11px] font-semibold text-blue-700 bg-blue-50 border border-blue-100 rounded-lg px-3 py-2">
-                      Kilómetros recorridos: {kmRecorridos(selectedReserva.entrega, selectedReserva.devolucion)!.toLocaleString('es-ES')} km
-                    </p>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6 border-t border-slate-100 pt-5 items-start text-xs" data-testid="ficha-acciones">
+                  {/* Entrega y devolución del vehículo */}
+                  {(selectedReserva.estado !== 'cancelada' || selectedReserva.entrega || selectedReserva.devolucion) && (
+                    <div className="space-y-2">
+                      <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest block">Entrega y devolución</span>
+                      <TarjetaMovimiento
+                        titulo="Entrega al cliente"
+                        mov={selectedReserva.entrega}
+                        bloqueada={selectedReserva.estado === 'cancelada' ? 'La reserva está anulada.' : undefined}
+                        onRegistrar={() => setMovimientoModal({ tipo: 'entrega', reserva: selectedReserva })}
+                        onEditar={() => setMovimientoModal({ tipo: 'entrega', reserva: selectedReserva })}
+                      />
+                      <TarjetaMovimiento
+                        titulo="Devolución del vehículo"
+                        mov={selectedReserva.devolucion}
+                        bloqueada={!selectedReserva.entrega ? 'Registra primero la entrega.' : selectedReserva.estado === 'cancelada' ? 'La reserva está anulada.' : undefined}
+                        onRegistrar={() => setMovimientoModal({ tipo: 'devolucion', reserva: selectedReserva })}
+                        onEditar={() => setMovimientoModal({ tipo: 'devolucion', reserva: selectedReserva })}
+                      />
+                      {kmRecorridos(selectedReserva.entrega, selectedReserva.devolucion) != null && (
+                        <p className="text-[11px] font-semibold text-blue-700 bg-blue-50 border border-blue-100 rounded-lg px-3 py-2">
+                          Kilómetros recorridos: {kmRecorridos(selectedReserva.entrega, selectedReserva.devolucion)!.toLocaleString('es-ES')} km
+                        </p>
+                      )}
+                    </div>
                   )}
-                </div>
-              )}
+                  <div className="space-y-3 md:col-start-2">
+                  {/* State Management actions */}
+                  <div className="space-y-2">
+                    <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest block">Estado del contrato</span>
+                    <div className="flex items-center justify-between gap-2">
+                      {(() => {
+                        const e = estadoReserva(selectedReserva);
+                        return <span className={`px-2.5 py-1.5 rounded-lg text-xs font-bold inline-flex ${e.cls}`}>{e.label}</span>;
+                      })()}
+                      {selectedReserva.estado === 'cancelada' ? (
+                        <button
+                          onClick={() => handleStatusChange(selectedReserva.id, 'confirmada')}
+                          className="py-1.5 px-3 rounded-lg text-xs font-bold transition cursor-pointer bg-slate-100 text-slate-600 hover:bg-slate-200 flex items-center gap-1"
+                        >
+                          <Check className="w-3.5 h-3.5" /> Reactivar
+                        </button>
+                      ) : (
+                        <button
+                          onClick={() => setConfirmAnular({ isOpen: true, resId: selectedReserva.id })}
+                          className="py-1.5 px-3 rounded-lg text-xs font-bold transition cursor-pointer bg-rose-50 text-rose-600 hover:bg-rose-100 flex items-center gap-1"
+                        >
+                          <X className="w-3.5 h-3.5" /> Anular reserva
+                        </button>
+                      )}
+                    </div>
+                  </div>
 
-              {/* State Management actions */}
-              <div className="space-y-2 border-t border-slate-50 pt-3">
-                <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest block">Estado del contrato</span>
-                <div className="flex items-center justify-between gap-2">
-                  {(() => {
-                    const e = estadoReserva(selectedReserva);
-                    return <span className={`px-2.5 py-1.5 rounded-lg text-xs font-bold inline-flex ${e.cls}`}>{e.label}</span>;
-                  })()}
-                  {selectedReserva.estado === 'cancelada' ? (
+                  <div className="pt-2">
                     <button
-                      onClick={() => handleStatusChange(selectedReserva.id, 'confirmada')}
-                      className="py-1.5 px-3 rounded-lg text-xs font-bold transition cursor-pointer bg-slate-100 text-slate-600 hover:bg-slate-200 flex items-center gap-1"
+                      onClick={() => setViewingContract(selectedReserva)}
+                      className="w-full py-2.5 bg-blue-600 hover:bg-blue-700 text-white text-xs font-extrabold rounded-xl transition flex items-center justify-center gap-1.5 cursor-pointer shadow-sm"
                     >
-                      <Check className="w-3.5 h-3.5" /> Reactivar
+                      <FileText className="w-4 h-4" /> Generar e Imprimir Contrato
                     </button>
-                  ) : (
-                    <button
-                      onClick={() => setConfirmAnular({ isOpen: true, resId: selectedReserva.id })}
-                      className="py-1.5 px-3 rounded-lg text-xs font-bold transition cursor-pointer bg-rose-50 text-rose-600 hover:bg-rose-100 flex items-center gap-1"
-                    >
-                      <X className="w-3.5 h-3.5" /> Anular reserva
-                    </button>
-                  )}
+                    {firmasVigentes[selectedReserva.id] && (
+                      <p className="mt-1.5 text-center text-[11px] font-bold text-emerald-700 flex items-center justify-center gap-1">
+                        <Check className="w-3.5 h-3.5" /> Firmado por el cliente el {formatDate(firmasVigentes[selectedReserva.id].slice(0, 10))}
+                      </p>
+                    )}
+                  </div>
+                  </div>
                 </div>
               </div>
-
-              <div className="pt-2">
-                <button
-                  onClick={() => setViewingContract(selectedReserva)}
-                  className="w-full py-2.5 bg-blue-600 hover:bg-blue-700 text-white text-xs font-extrabold rounded-xl transition flex items-center justify-center gap-1.5 cursor-pointer shadow-sm"
-                >
-                  <FileText className="w-4 h-4" /> Generar e Imprimir Contrato
-                </button>
-                {firmasVigentes[selectedReserva.id] && (
-                  <p className="mt-1.5 text-center text-[11px] font-bold text-emerald-700 flex items-center justify-center gap-1">
-                    <Check className="w-3.5 h-3.5" /> Firmado por el cliente el {formatDate(firmasVigentes[selectedReserva.id].slice(0, 10))}
-                  </p>
-                )}
-              </div>
-            </div>
-          ) : (
-            <div className="bg-white p-10 rounded-2xl border border-slate-100 shadow-sm text-center flex flex-col items-center justify-center space-y-3 text-slate-400 h-full min-h-[400px]">
-              <div className="p-4 bg-slate-50 rounded-full border border-slate-100">
-                <FileText className="w-9 h-9 text-slate-300" />
-              </div>
-              <h4 className="text-sm font-bold text-slate-700">Gestor Operativo de Contratos</h4>
-              <p className="text-xs max-w-xs leading-relaxed">
-                Haga clic sobre cualquier reserva de la planilla o del calendario ocupacional para administrar su estado, liquidar el seguro todo riesgo o generar la copia física legal firmada para el cliente.
-              </p>
-            </div>
+            </ModalShell>
           )}
-        </div>
+        </AnimatePresence>
       </div>
 
       {/* MODAL: ENTREGA / DEVOLUCIÓN */}
