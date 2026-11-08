@@ -106,6 +106,9 @@ export interface InteraccionCliente {
   notas: string;
 }
 
+/** Forma de pago de una reserva. */
+export type MetodoPago = 'efectivo' | 'tarjeta' | 'transferencia';
+
 /** Segundo conductor de un cliente de alquiler: nombre, documento y número del permiso de conducir. */
 export interface SegundoConductor {
   nombre: string;
@@ -170,6 +173,8 @@ export interface Reserva {
   seguroDia?: number;
   /** De dónde viene: creada a mano o asignada desde una solicitud de la web. */
   origen?: 'manual' | 'web';
+  /** Cómo paga el cliente el alquiler. Vacío = sin indicar. */
+  metodoPago?: MetodoPago | null;
   /** Precio total pactado del ALQUILER (no días × tarifa). El seguro y los complementos se suman aparte. Vacío = por días × tarifa. */
   precioFijo?: number | null;
   /** Registro de la entrega del coche al cliente. */

@@ -5,7 +5,7 @@ import ModalShell from './ModalShell';
 import { usePaginacion } from '../utils/usePaginacion';
 import { ofreceSeguro, totalAlquiler, etiquetaTransmision, parseFianza, fianzaSugerida, totalTrasCambioDeHoras, tarifaDeReferencia } from '../utils/condicionesAlquiler';
 import { useSeleccion } from '../utils/useSeleccion';
-import { Reserva, Vehiculo, Cliente, SolicitudReserva, MovimientoVehiculo, Complemento } from '../types';
+import { Reserva, Vehiculo, Cliente, SolicitudReserva, MovimientoVehiculo, Complemento, MetodoPago } from '../types';
 import SearchableSelect from './SearchableSelect';
 import {
   Calendar, Plus, User, Car, FileText, Check, X, Download, ChevronLeft, ChevronRight, Search, Globe, AlertTriangle
@@ -28,6 +28,8 @@ import { EditorComplementos } from './EditorComplementos';
 import { InputPrecio } from './InputPrecio';
 import { CambioVehiculo } from './CambioVehiculo';
 import { EditorPrecio } from './EditorPrecio';
+import MetodoPagoCampo from './MetodoPagoCampo';
+import { METODOS_PAGO, etiquetaMetodoPago, metodoPagoValido } from '../utils/metodoPago';
 import { aplicarPrecio, importePositivo, importeAlquiler, type ModoPrecio } from '../utils/precioAlquiler';
 import { VistaSemanaDia } from './VistaSemanaDia';
 import { rangoVisible, moverAncla, anclaAlCambiarVista, etiquetaRango, diasSemana, type VistaCalendario } from '../utils/calendarioVistas';
@@ -102,6 +104,8 @@ export default function RentalsTab({
   const [formLugarDevolucion, setFormLugarDevolucion] = useState('');
   // Fianza de la reserva: parte del importe habitual del vehículo, pero el taller la puede cambiar.
   const [formFianza, setFormFianza] = useState('');
+  // Cómo paga el cliente (opcional).
+  const [formMetodoPago, setFormMetodoPago] = useState<MetodoPago | ''>('');
   // Cambio de la fianza de una reserva ya creada (desde la ficha de gestión).
   const [editandoFianza, setEditandoFianza] = useState<{ valor: string; error: string } | null>(null);
   // Edición de las horas de una reserva ya creada (desde la ficha de gestión).
@@ -174,6 +178,7 @@ export default function RentalsTab({
     setFormExtras({});
     setFormTemporada('media');
     setFormPrecioFijo('');
+    setFormMetodoPago('');
     setFormTarifa(vehiculos[0]?.tarifasAlquiler?.temporadaMedia ?? 45);
     setFormSeguro(ofreceSeguro(vehiculos[0]));
     setIsAddingOpen(true);
@@ -197,6 +202,7 @@ export default function RentalsTab({
         totalCobrado: solicitudActiva.total,
         estado: 'confirmada',
         fianza: parseFianza(formFianza) ?? undefined,
+        metodoPago: formMetodoPago || undefined,
         origen: 'web',
         // Cada línea a su precio de lista y el descuento del pedido aparte; el total es el que cobró la web.
         ...datosReservaWeb(solicitudActiva, duration),
@@ -222,6 +228,7 @@ export default function RentalsTab({
       estado: 'confirmada',
       incluyeSeguroTodoRiesgo: formSeguro && seguroDiaElegido != null,
       fianza: parseFianza(formFianza) ?? undefined,
+      metodoPago: formMetodoPago || undefined,
       seguroDia: formSeguro && seguroDiaElegido != null ? seguroDiaElegido : undefined,
       extras,
     };
@@ -339,6 +346,7 @@ export default function RentalsTab({
     setFormLugarDevolucion(sol.lugarDevolucion ?? '');
     setFormTemporada('media');
     setFormPrecioFijo('');
+    setFormMetodoPago('');
     setFormSeguro(incluyeCobertura(sol.extras));
     setFormError('');
     setIsAddingOpen(true);
@@ -454,7 +462,7 @@ export default function RentalsTab({
   };
 
   const handleExportCsv = () => {
-    const headers = ['ID', 'Vehículo', 'Matrícula', 'Cliente', 'Fecha Inicio', 'Hora entrega', 'Fecha Fin', 'Hora devolución', 'Días', 'Tarifa/día (€)', 'Seguro', 'Total (€)', 'Estado', 'Complementos'];
+    const headers = ['ID', 'Vehículo', 'Matrícula', 'Cliente', 'Fecha Inicio', 'Hora entrega', 'Fecha Fin', 'Hora devolución', 'Días', 'Tarifa/día (€)', 'Seguro', 'Total (€)', 'Estado', 'Método de pago', 'Complementos'];
     const rows = reservas.map(res => {
       const veh = vehiculos.find(v => v.id === res.vehiculoId);
       const cli = clientes.find(c => c.id === res.clienteId);
@@ -473,6 +481,7 @@ export default function RentalsTab({
         res.incluyeSeguroTodoRiesgo ? 'Sí' : 'No',
         String(res.totalCobrado),
         res.estado,
+        etiquetaMetodoPago(res.metodoPago),
         resumenExtras(res.extras)
       ];
     });
@@ -1057,7 +1066,7 @@ export default function RentalsTab({
                           </td>
                           <td className="py-3 px-2 text-right">
                             <span className="font-mono font-extrabold text-slate-800 block text-xs">{fmt2(res.totalCobrado)} €</span>
-                            <span className="text-[9px] text-slate-400">{res.precioFijo != null ? 'precio cerrado' : `${fmt2(res.tarifaDiaria)}€/día`} {res.incluyeSeguroTodoRiesgo && '+ todo riesgo'}</span>
+                            <span className="text-[9px] text-slate-400">{res.precioFijo != null ? 'precio cerrado' : `${fmt2(res.tarifaDiaria)}€/día`} {res.incluyeSeguroTodoRiesgo && '+ todo riesgo'}{etiquetaMetodoPago(res.metodoPago) && ` · ${etiquetaMetodoPago(res.metodoPago)}`}</span>
                           </td>
                           <td className="py-3 px-2 text-right space-x-1" onClick={e => e.stopPropagation()}>
                             {(() => {
@@ -1330,6 +1339,23 @@ export default function RentalsTab({
                       )}
                     </div>
                     {editandoFianza?.error && <p role="alert" className="text-[11px] text-rose-600 font-medium">{editandoFianza.error}</p>}
+                    <div className="flex justify-between items-center gap-2 text-xs font-semibold" data-testid="metodo-pago-ficha">
+                      <label htmlFor="metodo-pago-reserva">Método de pago:</label>
+                      <select
+                        id="metodo-pago-reserva"
+                        value={metodoPagoValido(selectedReserva.metodoPago) ?? ''}
+                        disabled={selectedReserva.estado === 'cancelada'}
+                        onChange={e => {
+                          const actualizada = { ...selectedReserva, metodoPago: metodoPagoValido(e.target.value) };
+                          onUpdateReserva(actualizada);
+                          setSelectedReserva(actualizada);
+                        }}
+                        className="h-[30px] rounded-md border border-blue-200 bg-white px-2 text-xs text-slate-800 focus:outline-none focus:ring-1 focus:ring-blue-500 disabled:opacity-60"
+                      >
+                        <option value="">Sin indicar</option>
+                        {METODOS_PAGO.map(m => <option key={m.id} value={m.id}>{m.etiqueta}</option>)}
+                      </select>
+                    </div>
                   </div>
                 </div>
               </div>
@@ -1738,6 +1764,8 @@ export default function RentalsTab({
                       {vehiculoElegido?.transmision ? ` · Cambio ${etiquetaTransmision(vehiculoElegido.transmision).toLowerCase()}` : ''}
                     </p>
                   </div>
+
+                  <MetodoPagoCampo value={formMetodoPago} onChange={setFormMetodoPago} />
 
                   {(() => {
                     const cli = clientes.find(c => c.id === formClienteId);
