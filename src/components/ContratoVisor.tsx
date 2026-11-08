@@ -67,7 +67,7 @@ export function ContratoVisorVista({
     empresa: empresa.nombre,
   });
   const tel = cliente?.telefono?.replace(/\D/g, '') ?? '';
-  const cambios = firmado ? cambiosTrasFirma(firmado.contrato, reserva, solicitud) : [];
+  const cambios = firmado ? cambiosTrasFirma(firmado.contrato, reserva, solicitud, cliente) : [];
   const puedeFirmar = estado.fase === 'listo' && !firmado && reserva.estado !== 'cancelada';
   const snapshotActual = () => crearSnapshot(reserva, cliente, vehiculo, solicitud, empresa);
 

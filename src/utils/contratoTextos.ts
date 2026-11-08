@@ -43,6 +43,8 @@ export interface TextosContrato {
   domicilio: string;
   fichaNoDisponible: string;
   carnetPalabras: { expedido: string; vence: string };
+  /** Título del bloque del segundo conductor (si el cliente lo tiene). */
+  segundoConductor: string;
   // 3. Vehículo
   s3: string;
   marcaModelo: string;
@@ -125,6 +127,7 @@ const ES: TextosContrato = {
   domicilio: 'Domicilio',
   fichaNoDisponible: 'Ficha del cliente no disponible en el CRM.',
   carnetPalabras: { expedido: 'expedido', vence: 'vence' },
+  segundoConductor: 'Segundo conductor',
   s3: '3. DESCRIPCIÓN DEL VEHÍCULO DE FLOTA',
   marcaModelo: 'Marca y Modelo',
   matricula: 'Matrícula Nacional',
@@ -197,6 +200,7 @@ const EN: TextosContrato = {
   domicilio: 'Address',
   fichaNoDisponible: 'Customer record not available in the CRM.',
   carnetPalabras: { expedido: 'issued', vence: 'expires' },
+  segundoConductor: 'Additional driver',
   s3: '3. FLEET VEHICLE DESCRIPTION',
   marcaModelo: 'Make and model',
   matricula: 'Registration plate',

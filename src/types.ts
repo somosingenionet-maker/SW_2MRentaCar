@@ -425,7 +425,7 @@ export interface SnapshotContrato {
     /** Días de alquiler tal como se contaron al firmar. Los contratos sin firmar lo calculan al vuelo. */
     dias?: number;
   };
-  cliente: Pick<Cliente, 'nombre' | 'apellidos' | 'nifNiePasaporte' | 'correo' | 'telefono' | 'direccion' | 'ciudad' | 'pais' | 'carnetNumero' | 'carnetExpedicion' | 'carnetVencimiento'> | null;
+  cliente: Pick<Cliente, 'nombre' | 'apellidos' | 'nifNiePasaporte' | 'correo' | 'telefono' | 'direccion' | 'ciudad' | 'pais' | 'carnetNumero' | 'carnetExpedicion' | 'carnetVencimiento' | 'segundoConductor'> | null;
   vehiculo: Pick<Vehiculo, 'marca' | 'modelo' | 'matricula' | 'bastidor' | 'transmision' | 'aseguradora' | 'kilometraje'> | null;
   empresa: EmpresaContrato;
   /** Pedido de la web del que viene la reserva, si lo hay. */

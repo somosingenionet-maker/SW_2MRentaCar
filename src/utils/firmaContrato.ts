@@ -30,6 +30,7 @@ export function crearSnapshot(
       nombre: cliente.nombre, apellidos: cliente.apellidos, nifNiePasaporte: cliente.nifNiePasaporte, correo: cliente.correo,
       telefono: cliente.telefono, direccion: cliente.direccion, ciudad: cliente.ciudad, pais: cliente.pais,
       carnetNumero: cliente.carnetNumero, carnetExpedicion: cliente.carnetExpedicion, carnetVencimiento: cliente.carnetVencimiento,
+      segundoConductor: cliente.segundoConductor ?? undefined,
     } : null,
     vehiculo: vehiculo ? {
       marca: vehiculo.marca, modelo: vehiculo.modelo, matricula: vehiculo.matricula, bastidor: vehiculo.bastidor,
@@ -73,6 +74,7 @@ export function fechaHoraFirma(iso: string, idioma: 'es' | 'en'): string {
 /** Qué ha cambiado en la reserva desde que se firmó el contrato (vacío = nada que afecte a lo firmado). */
 export function cambiosTrasFirma(
   firmado: SnapshotContrato, reserva: Reserva, solicitud?: Pick<SolicitudReserva, 'lugarRecogida' | 'lugarDevolucion'>,
+  cliente?: Pick<Cliente, 'segundoConductor'> | null,
 ): string[] {
   const antes = firmado.reserva;
   const lugares = lugaresReserva(reserva, solicitud);
@@ -84,6 +86,8 @@ export function cambiosTrasFirma(
   if ((antes.lugarRecogida ?? '') !== lugares.recogida || (antes.lugarDevolucion ?? '') !== lugares.devolucion) cambios.push('los lugares');
   if (antes.totalCobrado !== reserva.totalCobrado || antes.tarifaDiaria !== reserva.tarifaDiaria || (antes.precioFijo ?? null) !== (reserva.precioFijo ?? null)) cambios.push('el importe');
   if ((antes.fianza ?? 0) !== (reserva.fianza ?? 0)) cambios.push('la fianza');
+  // El segundo conductor figura en el contrato: añadirlo o cambiarlo después de firmar obliga a firmar de nuevo.
+  if (cliente && jsonCanonico(firmado.cliente?.segundoConductor ?? null) !== jsonCanonico(cliente.segundoConductor ?? null)) cambios.push('el segundo conductor');
   return cambios;
 }
 

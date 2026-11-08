@@ -3,7 +3,7 @@ import { renderToString } from 'react-dom/server';
 import ContratoAlquiler from './components/ContratoAlquiler';
 import { ContratoVisorVista, type EstadoFirma } from './components/ContratoVisor';
 import FirmaPantalla from './components/FirmaPantalla';
-import { crearSnapshot, calcularHuella } from './utils/firmaContrato';
+import { crearSnapshot, calcularHuella, cambiosTrasFirma } from './utils/firmaContrato';
 import { TEXTOS_CONTRATO, DECLARACION_ES, DECLARACION_EN, IDIOMAS_CONTRATO, type IdiomaContrato } from './utils/contratoTextos';
 import { DEFAULT_EMPRESA_CONFIG } from './data/empresaConfig';
 import type { Cliente, ContratoFirmado, Reserva, SolicitudReserva, Vehiculo } from './types';
@@ -204,7 +204,7 @@ describe('número de reserva web, lugares y entrega/devolución', () => {
     expect(t).toContain('Lugar de devolución: Aeropuerto');
     const e = texto('en', { reserva: { lugarRecogida: 'Hotel Sol, Palma', lugarDevolucion: 'Aeropuerto' } });
     expect(e).toContain('Pick-up location: Hotel Sol, Palma');
-    expect(e).toContain('Return location: Aeropuerto');
+    expect(e).toContain('Return location: Airport');
   });
 
   it('si la reserva no guarda el lugar, usa el del pedido de la web', () => {
@@ -421,8 +421,8 @@ describe('complementos en el contrato', () => {
 
   it('en inglés traduce el tipo de precio', () => {
     const t = conExtras('en');
-    expect(t).toContain('Sillita infantil × 2 (8.00 € / day): 64.00 €');
-    expect(t).toContain('Baca coche (50.00 €, fixed price): 50.00 €');
+    expect(t).toContain('Child seat × 2 (8.00 € / day): 64.00 €');
+    expect(t).toContain('Roof rack (50.00 €, fixed price): 50.00 €');
   });
 
   it('la línea va dentro del cuadro económico, antes del importe neto', () => {
@@ -523,5 +523,116 @@ describe('contrato con alquiler a precio cerrado', () => {
     const t = texto('en', { reserva: cerrado });
     expect(t).toContain('Rental (3 days, agreed price): 100.00 €');
     expect(t).toContain('NET INVOICED AMOUNT: 145.00 €');
+  });
+});
+
+describe('contrato en inglés: todo en inglés', () => {
+  // Datos como los de 2M: cliente británico, país en español, complementos de la web con su nombre español,
+  // lugares y aseguradora tal como están guardados.
+  const britanico = {
+    ...cliente, nombre: 'John', apellidos: 'Smith', pais: 'Reino Unido', ciudad: 'London', direccion: '10 Downing Street',
+    segundoConductor: { nombre: 'Mary Smith', dni: 'AB123456C', permiso: 'SMITH701234M99XY' },
+  } as Cliente;
+  const vehiculoMutua = { ...vehiculo, aseguradora: 'Mutua (actualmente de baja)' } as Vehiculo;
+  const completa: Partial<Reserva> = {
+    lugarRecogida: 'Aeropuerto, Palma de Mallorca', lugarDevolucion: 'Cami de son Gotleu, 8 bajos, 07008',
+    tarifaDiaria: 40, fechaInicio: '2026-10-29', fechaFin: '2026-11-01', horaInicio: '04:00', horaFin: '04:00',
+    totalCobrado: 308, incluyeSeguroTodoRiesgo: true, seguroDia: 15, descuento: 10, cupon: '10mallorca',
+    extras: [
+      { nombre: 'Sillita infantil', cantidad: 2, precio: 8, porDia: true, total: 48 },
+      { nombre: 'Baca coche', cantidad: 1, precio: 50, porDia: false, total: 50 },
+      { nombre: 'Portabicicletas', cantidad: 1, total: 40 },
+      { nombre: 'Asiento elevador de respaldo alto - 8€/día', cantidad: 1, total: 24 },
+      { nombre: 'Maxi-Cosi', cantidad: 1, total: 24 },
+    ],
+  };
+  const en = texto('en', { cliente: britanico, vehiculo: vehiculoMutua, reserva: completa, solicitud: { referenciaExterna: '2178', lugarRecogida: '', lugarDevolucion: '' } as SolicitudReserva });
+
+  // Palabras que solo existen en español (se evitan las que también son inglés: no, a, me…).
+  // Los nombres propios («Palma de Mallorca», «Camí de Son Gotleu») se quitan antes de mirar.
+  const ESPANOL = /\b(contrato|alquiler|veh[ií]culo|firma|fianza|seguro|conductor|cliente|tel[eé]fono|domicilio|aeropuerto|bajos|espa[ñn]a|reino unido|p[oó]liza|sillita|baca|portabicicletas|asiento|elevador|informado|n[uú]mero|fecha|lugar|entrega|devoluci[oó]n|retorno|importe|descuento|cup[oó]n|ajustes|redondeo|permiso|carnet|matr[ií]cula|bastidor|transmisi[oó]n|aseguradora|kilometraje|d[ií]as?|jornadas|naturales|dep[oó]sito|reembolsable|arrendador|arrendatario|sede|fiscal|actualmente|baja|completo|t[eé]cnico|terceros|b[aá]sica|incluid[oa]|declaro|le[ií]do|condiciones|pagos?|tarjeta|efectivo|mediante|desde|hasta|reserva|pedido)\b/i;
+  const sinPropios = (t: string) => t.replace(/Palma de Mallorca|Cam[ií] de Son Gotleu|Cami de son Gotleu|Two M Rent a Car SL|Illes Balears/gi, ' ');
+
+  it('no queda ninguna palabra en español en todo el contrato', () => {
+    const encontradas = (sinPropios(en).match(new RegExp(ESPANOL.source, 'gi')) ?? []);
+    expect(encontradas).toEqual([]);
+  });
+
+  it('el país, los complementos, los lugares y la aseguradora salen traducidos', () => {
+    expect(en).toContain('London · United Kingdom');
+    expect(en).toContain('Palma (Illes Balears) · Spain');
+    expect(en).toContain('Child seat × 2 (8.00 € / day): 48.00 €');
+    expect(en).toContain('Roof rack (50.00 €, fixed price): 50.00 €');
+    expect(en).toContain('Bike rack: 40.00 €');
+    expect(en).toContain('High-back booster seat: 24.00 €');
+    expect(en).toContain('Maxi-Cosi: 24.00 €');
+    expect(en).toContain('Pick-up location: Airport, Palma de Mallorca');
+    expect(en).toContain('Return location: Cami de son Gotleu, 8 (ground floor), 07008');
+    expect(en).toContain('Registered office: Camí de Son Gotleu, 8 (ground floor)');
+    expect(en).toContain('Insurer Mutua (currently inactive)');
+  });
+
+  it('el contrato en español no cambia: país, complementos y lugares como están guardados', () => {
+    const es = texto('es', { cliente: britanico, vehiculo: vehiculoMutua, reserva: completa });
+    expect(es).toContain('London · Reino Unido');
+    expect(es).toContain('Sillita infantil × 2');
+    expect(es).toContain('Baca coche');
+    expect(es).toContain('Lugar de entrega: Aeropuerto, Palma de Mallorca');
+    expect(es).toContain('8 bajos');
+    expect(es).toContain('Mutua (actualmente de baja)');
+  });
+});
+
+describe('segundo conductor en el contrato', () => {
+  const conSegundo = { ...cliente, segundoConductor: { nombre: 'Luis Gil', dni: '87654321X', permiso: 'B-1234567' } } as Cliente;
+
+  it('en español: nombre, documento y permiso del segundo conductor', () => {
+    const t = texto('es', { cliente: conSegundo });
+    expect(t).toContain('Segundo conductor: Luis Gil');
+    expect(t).toContain('DNI/NIF/NIE: 87654321X');
+    expect(t).toContain('Carnet de conducir: B-1234567');
+  });
+
+  it('en inglés: Additional driver, ID y driving licence', () => {
+    const t = texto('en', { cliente: conSegundo });
+    expect(t).toContain('Additional driver: Luis Gil');
+    expect(t).toContain('ID / NIF / NIE / Passport: 87654321X');
+    expect(t).toContain('Driving licence: B-1234567');
+  });
+
+  it('sin segundo conductor (o con null) no aparece nada', () => {
+    expect(texto('es')).not.toContain('Segundo conductor');
+    expect(texto('en', { cliente: { ...cliente, segundoConductor: null } as Cliente })).not.toContain('Additional driver');
+  });
+
+  it('la copia firmada lo guarda, y añadirlo o cambiarlo después de firmar se detecta', () => {
+    const firmado = crearSnapshot(reserva, conSegundo, vehiculo, undefined, empresa);
+    expect(firmado.cliente?.segundoConductor).toEqual({ nombre: 'Luis Gil', dni: '87654321X', permiso: 'B-1234567' });
+    expect(cambiosTrasFirma(firmado, reserva, undefined, conSegundo)).toEqual([]);
+    expect(cambiosTrasFirma(firmado, reserva, undefined, { segundoConductor: { nombre: 'Otro', dni: '1', permiso: '2' } })).toContain('el segundo conductor');
+    expect(cambiosTrasFirma(firmado, reserva, undefined, { segundoConductor: null })).toContain('el segundo conductor');
+    // un contrato firmado sin segundo conductor y un cliente que sigue sin él: sin cambios; con uno nuevo, sí
+    const sin = crearSnapshot(reserva, cliente, vehiculo, undefined, empresa);
+    expect('segundoConductor' in (sin.cliente ?? {}) && sin.cliente?.segundoConductor !== undefined).toBe(false);
+    expect(cambiosTrasFirma(sin, reserva, undefined, { segundoConductor: null })).toEqual([]);
+    expect(cambiosTrasFirma(sin, reserva, undefined, conSegundo)).toContain('el segundo conductor');
+    // sin pasar el cliente no se compara (comportamiento anterior)
+    expect(cambiosTrasFirma(sin, reserva)).toEqual([]);
+  });
+});
+
+describe('pantalla de firma y mensaje en inglés', () => {
+  const ESPANOL = /\b(contrato|firma|firme|dedo|borrar|guardar|guardando|cancelar|conexi[oó]n|int[eé]ntelo|revise|marque|casilla|recuadro|acepto|condiciones|le[ií]do|hola|saludo|enviamos|alquiler|veh[ií]culo|desde|hasta|d[ií]as)\b/i;
+
+  it('el cliente que firma en inglés ve la pantalla de firma entera en inglés', () => {
+    const h = renderToString(<FirmaPantalla contrato={crearSnapshot(reserva, cliente, vehiculo, undefined, empresa)} idiomaInicial="en" onConfirmar={async () => undefined} onCancelar={() => undefined} />).replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ');
+    expect(h).toContain('Contract signature');
+    expect(h.match(new RegExp(ESPANOL.source, 'gi')) ?? []).toEqual([]);
+  });
+
+  it('el mensaje que acompaña al contrato en inglés está en inglés', () => {
+    const m = TEXTOS_CONTRATO.en.mensaje({ nombre: 'John', vehiculo: 'Seat Ibiza', matricula: '1234ABC', desde: '1 Nov 2026', hasta: '5 Nov 2026', dias: 4, total: '180.00', empresa: '2M Rent a Car' });
+    expect(m.match(new RegExp(ESPANOL.source, 'gi')) ?? []).toEqual([]);
+    expect(m).toContain('Hello John');
   });
 });

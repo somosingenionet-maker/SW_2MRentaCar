@@ -9,6 +9,7 @@ import { desgloseReserva, type LineaDesglose } from '../utils/desgloseReserva';
 import { fechaHoraFirma, referenciaCorta } from '../utils/firmaContrato';
 import { TEXTOS_CONTRATO, etiquetaTransmisionContrato, type IdiomaContrato } from '../utils/contratoTextos';
 import { fmt2 } from '../utils/moneda';
+import { traducirPais, traducirLugar, traducirComplemento, traducirAseguradora } from '../utils/contratoTraducciones';
 
 /** Firma del cliente ya registrada: se dibuja dentro de su caja. */
 interface FirmaVisible {
@@ -51,7 +52,7 @@ export default function ContratoAlquiler({ reserva, cliente, vehiculo, empresa, 
       case 'terceros': return { etiqueta: tx.polizaTerceros, importe: tx.incluida };
       case 'extra': {
         const cuenta = l.precio != null && l.porDia != null ? ` (${f2(l.precio)} ${l.porDia ? tx.porDia : `€, ${tx.precioFijo}`})` : '';
-        return { etiqueta: `${nombreComplemento(l.nombre)}${l.cantidad > 1 ? ` × ${l.cantidad}` : ''}${cuenta}`, importe: euros(l.importe) };
+        return { etiqueta: `${traducirComplemento(nombreComplemento(l.nombre), idioma)}${l.cantidad > 1 ? ` × ${l.cantidad}` : ''}${cuenta}`, importe: euros(l.importe) };
       }
       case 'descuento': return { etiqueta: `${tx.descuento}${l.cupon ? ` (${tx.cupon} ${l.cupon})` : ''}`, importe: euros(l.importe), descuento: true };
       case 'ajuste': return { etiqueta: Math.abs(l.importe) > 0.05 ? tx.otrosAjustes : tx.redondeo, importe: euros(l.importe) };
@@ -86,9 +87,9 @@ export default function ContratoAlquiler({ reserva, cliente, vehiculo, empresa, 
           <h5 className="font-bold text-slate-900 uppercase border-b border-slate-200 pb-1 text-[10px]">{tx.s1}</h5>
           <p className="font-bold">{empresa.razonSocial}</p>
           <p className="text-slate-500">{tx.nif(empresa.nif)}</p>
-          <p className="text-slate-500">{tx.sedeFiscal}: {empresa.direccionFiscal}</p>
+          <p className="text-slate-500">{tx.sedeFiscal}: {traducirLugar(empresa.direccionFiscal, idioma)}</p>
           {(empresa.ciudad || empresa.pais) && (
-            <p className="text-slate-500">{[empresa.ciudad, empresa.pais].filter(Boolean).join(' · ')}</p>
+            <p className="text-slate-500">{[empresa.ciudad, traducirPais(empresa.pais, idioma)].filter(Boolean).join(' · ')}</p>
           )}
           <p className="text-slate-500">{tx.telefonoCentral}: {empresa.telefono}</p>
         </div>
@@ -104,7 +105,14 @@ export default function ContratoAlquiler({ reserva, cliente, vehiculo, empresa, 
               <p className="text-slate-500">{tx.email}: {c.correo || tx.noInformado}</p>
               <p className="text-slate-500">{tx.telefono}: {c.telefono}</p>
               <p className="text-slate-500">{tx.domicilio}: {c.direccion || tx.noInformado}</p>
-              {(c.ciudad || c.pais) && <p className="text-slate-500">{[c.ciudad, c.pais].filter(Boolean).join(' · ')}</p>}
+              {(c.ciudad || c.pais) && <p className="text-slate-500">{[c.ciudad, traducirPais(c.pais, idioma)].filter(Boolean).join(' · ')}</p>}
+              {c.segundoConductor && (
+                <div data-testid="segundo-conductor-contrato" className="pt-1.5 space-y-1.5">
+                  <p className="font-bold text-slate-900">{tx.segundoConductor}: {c.segundoConductor.nombre}</p>
+                  <p className="text-slate-500 font-mono">{tx.documento}: {c.segundoConductor.dni}</p>
+                  <p className="text-slate-500">{tx.carnet}: {c.segundoConductor.permiso}</p>
+                </div>
+              )}
             </>
           ) : (
             <p className="text-rose-600 italic font-semibold">{tx.fichaNoDisponible}</p>
@@ -136,7 +144,7 @@ export default function ContratoAlquiler({ reserva, cliente, vehiculo, empresa, 
             {v.aseguradora && (
               <div>
                 <span className="text-slate-400 block text-[9px] uppercase font-semibold">{tx.aseguradora}</span>
-                <strong className="font-bold text-slate-800">{v.aseguradora}</strong>
+                <strong className="font-bold text-slate-800">{traducirAseguradora(v.aseguradora, idioma)}</strong>
               </div>
             )}
             <div>
@@ -154,9 +162,9 @@ export default function ContratoAlquiler({ reserva, cliente, vehiculo, empresa, 
         <div className="space-y-1.5">
           <h5 className="font-bold text-slate-900 uppercase text-[10px] pb-1 border-b border-slate-200">{tx.s4}</h5>
           <p><strong>{tx.fechaHoraEntrega}:</strong> {fechaConHora(reserva.fechaInicio, reserva.horaInicio, fecha)}</p>
-          <p><strong>{tx.lugarEntrega}:</strong> {lugares.recogida || tx.noInformado}</p>
+          <p><strong>{tx.lugarEntrega}:</strong> {traducirLugar(lugares.recogida, idioma) || tx.noInformado}</p>
           <p><strong>{tx.fechaHoraRetorno}:</strong> {fechaConHora(reserva.fechaFin, reserva.horaFin, fecha)}</p>
-          <p><strong>{tx.lugarDevolucion}:</strong> {lugares.devolucion || tx.noInformado}</p>
+          <p><strong>{tx.lugarDevolucion}:</strong> {traducirLugar(lugares.devolucion, idioma) || tx.noInformado}</p>
           <p><strong>{tx.jornadas}:</strong> {tx.diasNaturales(dias)}</p>
           <p className="text-slate-500 italic text-[10px]">{tx.retraso}</p>
         </div>
