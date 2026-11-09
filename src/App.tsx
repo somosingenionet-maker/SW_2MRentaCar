@@ -306,6 +306,16 @@ export default function App() {
         notas: `Cambio de vehículo en la reserva${antes ? ` de ${antes.marca} ${antes.modelo} (${antes.matricula})` : ''}${veh ? ` a ${veh.marca} ${veh.modelo} (${veh.matricula})` : ''}. Rango: ${editada.fechaInicio} al ${editada.fechaFin}.`,
       });
     }
+    // Ampliación o cambio de fechas de un alquiler: queda apunte en el historial del cliente.
+    if (anterior && (anterior.fechaInicio !== editada.fechaInicio || anterior.fechaFin !== editada.fechaFin)) {
+      const rango = (r: Reserva) => `${r.fechaInicio}${r.horaInicio ? ` ${r.horaInicio}` : ''} al ${r.fechaFin}${r.horaFin ? ` ${r.horaFin}` : ''}`;
+      apuntes.push({
+        id: genId('int-cli-fec'),
+        fecha: new Date().toISOString().split('T')[0],
+        tipo: 'registro_contrato',
+        notas: `Cambio de fechas de la reserva${veh ? ` (${veh.marca} ${veh.modelo}, ${veh.matricula})` : ''}: antes ${rango(anterior)}; ahora ${rango(editada)}. Total: ${fmt2(editada.totalCobrado)} €.`,
+      });
+    }
     const cli = clientes.find(c => c.id === editada.clienteId);
     if (cli && apuntes.length > 0) handleUpdateCliente({ ...cli, interacciones: [...apuntes, ...cli.interacciones] });
   }, [fallo, reservas, vehiculos, clientes, sincronizarKilometraje, handleUpdateCliente]);

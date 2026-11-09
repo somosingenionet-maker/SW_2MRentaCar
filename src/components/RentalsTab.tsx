@@ -3,7 +3,7 @@ import RegistroMovimientoModal, { TarjetaMovimiento } from './RegistroMovimiento
 import { estadoReserva as estadoDeReserva, esHistorica as esHistoricaReserva, finEfectivo, kmRecorridos, ESTADO_META } from '../utils/entregaDevolucion';
 import ModalShell from './ModalShell';
 import { usePaginacion } from '../utils/usePaginacion';
-import { ofreceSeguro, totalAlquiler, etiquetaTransmision, parseFianza, fianzaSugerida, totalTrasCambioDeHoras, tarifaDeReferencia } from '../utils/condicionesAlquiler';
+import { ofreceSeguro, totalAlquiler, etiquetaTransmision, parseFianza, fianzaSugerida, tarifaDeReferencia } from '../utils/condicionesAlquiler';
 import { useSeleccion } from '../utils/useSeleccion';
 import { Reserva, Vehiculo, Cliente, SolicitudReserva, MovimientoVehiculo, Complemento, MetodoPago } from '../types';
 import SearchableSelect from './SearchableSelect';
@@ -28,6 +28,8 @@ import { EditorComplementos } from './EditorComplementos';
 import { InputPrecio } from './InputPrecio';
 import { CambioVehiculo } from './CambioVehiculo';
 import { EditorPrecio } from './EditorPrecio';
+import { EditorFechas } from './EditorFechas';
+import { puedeCambiarFechas, aplicarCambioFechas, type BorradorFechas } from '../utils/cambioFechas';
 import MetodoPagoCampo from './MetodoPagoCampo';
 import { METODOS_PAGO, ESTILO_METODO_PAGO, etiquetaMetodoPago, metodoPagoValido } from '../utils/metodoPago';
 import { aplicarPrecio, importePositivo, importeAlquiler, type ModoPrecio } from '../utils/precioAlquiler';
@@ -109,7 +111,7 @@ export default function RentalsTab({
   // Cambio de la fianza de una reserva ya creada (desde la ficha de gestión).
   const [editandoFianza, setEditandoFianza] = useState<{ valor: string; error: string } | null>(null);
   // Edición de las horas de una reserva ya creada (desde la ficha de gestión).
-  const [editandoHoras, setEditandoHoras] = useState<{ inicio: string; fin: string; error: string } | null>(null);
+  const [editandoFechas, setEditandoFechas] = useState<(BorradorFechas & { error: string }) | null>(null);
   const [editandoLugares, setEditandoLugares] = useState<{ recogida: string; devolucion: string } | null>(null);
   // Aviso tras cambiar las horas de una reserva cuando eso cambia los días (y quizá el total).
   const [avisoDias, setAvisoDias] = useState<string | null>(null);
@@ -153,7 +155,7 @@ export default function RentalsTab({
   const calculateDays = diasAlquiler;
   // La ficha de la reserva (ventana) no se cierra con Escape ni al pulsar fuera si hay otra ventana encima o algo a medio editar.
   const hayModalEncima = !!(movimientoModal || viewingContract || confirmAnular.isOpen);
-  const hayEdicionAbierta = !!(editandoHoras || editandoFianza || editandoLugares || editandoComplementos || cambiandoVehiculo || editandoPrecio);
+  const hayEdicionAbierta = !!(editandoFechas || editandoFianza || editandoLugares || editandoComplementos || cambiandoVehiculo || editandoPrecio);
 
   const currentDuration = calculateDays(formFechaInicio, formFechaFin, formHoraInicio, formHoraFin);
   // Condiciones del vehículo elegido: el seguro y la fianza son suyos, no valores fijos.
@@ -375,7 +377,7 @@ export default function RentalsTab({
   };
 
   // Al elegir otra reserva se descarta una edición de horas a medias.
-  useEffect(() => { setEditandoHoras(null); setEditandoFianza(null); setEditandoLugares(null); setAvisoDias(null); setEditandoComplementos(null); setAvisoComplementos(null); setCambiandoVehiculo(null); setAvisoVehiculo(null); setEditandoPrecio(null); setAvisoPrecio(null); }, [selectedReserva?.id]);
+  useEffect(() => { setEditandoFechas(null); setEditandoFianza(null); setEditandoLugares(null); setAvisoDias(null); setEditandoComplementos(null); setAvisoComplementos(null); setCambiandoVehiculo(null); setAvisoVehiculo(null); setEditandoPrecio(null); setAvisoPrecio(null); }, [selectedReserva?.id]);
 
   const handleGuardarFianza = () => {
     if (!selectedReserva || !editandoFianza) return;
@@ -387,26 +389,27 @@ export default function RentalsTab({
     setEditandoFianza(null);
   };
 
-  const abrirEdicionHoras = (res: Reserva) => setEditandoHoras({ inicio: res.horaInicio ?? '', fin: res.horaFin ?? '', error: '' });
+  const abrirEdicionFechas = (res: Reserva) =>
+    setEditandoFechas({ fechaInicio: res.fechaInicio, fechaFin: res.fechaFin, horaInicio: res.horaInicio ?? '', horaFin: res.horaFin ?? '', valor: null, error: '' });
 
-  const handleGuardarHoras = () => {
-    if (!selectedReserva || !editandoHoras) return;
-    const err = validarHorasReserva({
-      fechaInicio: selectedReserva.fechaInicio, fechaFin: selectedReserva.fechaFin,
-      horaInicio: editandoHoras.inicio, horaFin: editandoHoras.fin,
-    });
-    if (err) { setEditandoHoras({ ...editandoHoras, error: err }); return; }
-    // Las horas deciden cuántos días se cobran: si cambian, el total de una reserva manual se recalcula.
-    const t = totalTrasCambioDeHoras(selectedReserva, editandoHoras.inicio, editandoHoras.fin);
-    const actualizada = { ...selectedReserva, horaInicio: editandoHoras.inicio, horaFin: editandoHoras.fin, totalCobrado: t.total, extras: t.extras };
+  // Ampliar, acortar o mover un alquiler: fechas y horas nuevas, con el total recalculado (o el que se confirme). El contrato se genera
+  // siempre con los datos de la reserva, así que se actualiza solo; si ya estaba firmado, hay que volver a firmarlo.
+  const handleGuardarFechas = () => {
+    if (!selectedReserva || !editandoFechas) return;
+    const permiso = puedeCambiarFechas(selectedReserva);
+    if (!permiso.ok) { setEditandoFechas({ ...editandoFechas, error: permiso.motivo }); return; }
+    const r = aplicarCambioFechas(selectedReserva, reservas, editandoFechas, permiso.inicioBloqueado);
+    if (!r.ok) { setEditandoFechas({ ...editandoFechas, error: r.error }); return; }
+    if (r.sinCambios && (r.cambios.totalCobrado === selectedReserva.totalCobrado) && (r.cambios.precioFijo ?? null) === (selectedReserva.precioFijo ?? null)) { setEditandoFechas(null); return; }
+    const actualizada = { ...selectedReserva, ...r.cambios };
     onUpdateReserva(actualizada);
     setSelectedReserva(actualizada);
-    setEditandoHoras(null);
-    if (t.diasAntes === t.diasDespues) setAvisoDias(null);
-    else if (t.recalculado && selectedReserva.precioFijo != null) setAvisoDias(`Con las nuevas horas el alquiler pasa de ${t.diasAntes} a ${t.diasDespues} días. El precio cerrado del alquiler (${fmt2(selectedReserva.precioFijo)} €) no cambia; el total pasa a ${fmt2(t.total)} € por el seguro y los complementos por día.`);
-    else if (t.recalculado) setAvisoDias(`Con las nuevas horas el alquiler pasa de ${t.diasAntes} a ${t.diasDespues} días y el total se ha recalculado: ${fmt2(t.total)} €.`);
-    else if (selectedReserva.origen === 'web') setAvisoDias(`Con las nuevas horas el alquiler pasa de ${t.diasAntes} a ${t.diasDespues} días. El total (${fmt2(t.total)} €) lo fija la web y no se ha cambiado.`);
-    else setAvisoDias(`Con las nuevas horas el alquiler pasa de ${t.diasAntes} a ${t.diasDespues} días. El total no se ha cambiado porque no coincidía con días × tarifa: revísalo.`);
+    setEditandoFechas(null);
+    const accion = r.diasDespues > r.diasAntes ? 'ampliado' : r.diasDespues < r.diasAntes ? 'acortado' : 'modificado';
+    const firmada = firmasVigentes[selectedReserva.id]
+      ? ' El contrato ya estaba firmado: ábrelo («Generar e Imprimir Contrato»), anula la firma y vuelve a firmar con las fechas nuevas.'
+      : ' El contrato ya recoge las fechas nuevas.';
+    setAvisoDias(`Alquiler ${accion}: del ${formatDate(actualizada.fechaInicio)} al ${formatDate(actualizada.fechaFin)} (${r.diasDespues} ${r.diasDespues === 1 ? 'día' : 'días'}, antes ${r.diasAntes}). Total: ${fmt2(actualizada.totalCobrado)} €.${firmada}`);
   };
 
   const handleGuardarComplementos = () => {
@@ -1202,32 +1205,27 @@ export default function RentalsTab({
                           {!selectedReserva.horaFin && <span className="ml-1.5 text-[10px] font-semibold text-amber-600">sin hora</span>}
                         </strong>
                       </div>
-                      {selectedReserva.estado !== 'cancelada' && (editandoHoras ? (
-                        <div className="border-t border-slate-100/50 pt-2 space-y-2" data-testid="editar-horas">
-                          <div className="grid grid-cols-2 gap-3 items-start">
-                            <div>
-                              <span className="block text-[10px] font-bold text-slate-500 uppercase whitespace-nowrap">Hora de entrega</span>
-                              <Hora24Field etiqueta="Hora de entrega" value={editandoHoras.inicio}
-                                onChange={v => setEditandoHoras({ ...editandoHoras, inicio: v, error: '' })} />
-                            </div>
-                            <div>
-                              <span className="block text-[10px] font-bold text-slate-500 uppercase whitespace-nowrap">Hora de devolución</span>
-                              <Hora24Field etiqueta="Hora de devolución" value={editandoHoras.fin}
-                                onChange={v => setEditandoHoras({ ...editandoHoras, fin: v, error: '' })} />
-                            </div>
-                          </div>
-                          {editandoHoras.error && <p role="alert" className="text-[11px] text-rose-600 font-medium">{editandoHoras.error}</p>}
-                          <div className="flex justify-end gap-2 text-[11px] font-bold">
-                            <button type="button" onClick={() => setEditandoHoras(null)} className="px-3 py-1.5 border border-slate-200 rounded-lg text-slate-500 hover:bg-slate-50 cursor-pointer">Cancelar</button>
-                            <button type="button" onClick={handleGuardarHoras} className="px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded-lg cursor-pointer">Guardar horas</button>
-                          </div>
-                        </div>
-                      ) : (
-                        <button type="button" onClick={() => abrirEdicionHoras(selectedReserva)}
-                          className={`w-full mt-1 py-1.5 rounded-lg text-[11px] font-bold transition cursor-pointer ${!selectedReserva.horaInicio || !selectedReserva.horaFin ? 'bg-amber-50 text-amber-700 border border-amber-200 hover:bg-amber-100' : 'bg-white text-slate-500 border border-slate-200 hover:bg-slate-50'}`}>
-                          {!selectedReserva.horaInicio || !selectedReserva.horaFin ? 'Indicar la hora de entrega y de devolución' : 'Cambiar las horas'}
-                        </button>
-                      ))}
+                      {(() => {
+                        const permiso = puedeCambiarFechas(selectedReserva);
+                        if (!permiso.ok) return selectedReserva.estado === 'cancelada' ? null : (
+                          <p data-testid="sin-cambio-fechas" className="mt-1 text-[10px] text-slate-400">No se pueden cambiar las fechas. {permiso.motivo}</p>
+                        );
+                        if (editandoFechas) return (
+                          <EditorFechas
+                            reserva={selectedReserva} borrador={editandoFechas} inicioBloqueado={permiso.inicioBloqueado}
+                            firmada={!!firmasVigentes[selectedReserva.id]} error={editandoFechas.error}
+                            onCambiar={c => setEditandoFechas({ ...editandoFechas, ...c, error: '' })}
+                            onGuardar={handleGuardarFechas} onCancelar={() => setEditandoFechas(null)}
+                          />
+                        );
+                        const sinHoras = !selectedReserva.horaInicio || !selectedReserva.horaFin;
+                        return (
+                          <button type="button" data-testid="cambiar-fechas" onClick={() => { setAvisoDias(null); abrirEdicionFechas(selectedReserva); }}
+                            className={`w-full mt-1 py-1.5 rounded-lg text-[11px] font-bold transition cursor-pointer ${sinHoras ? 'bg-amber-50 text-amber-700 border border-amber-200 hover:bg-amber-100' : 'bg-white text-blue-700 border border-slate-200 hover:bg-blue-50'}`}>
+                            {sinHoras ? 'Indicar la hora de entrega y de devolución' : selectedReserva.entrega ? 'Ampliar o acortar el alquiler (cambiar fechas y horas)' : 'Cambiar las fechas y las horas'}
+                          </button>
+                        );
+                      })()}
                       {(() => {
                         const lugares = lugaresReserva(selectedReserva, solicitudes.find(s => s.reservaId === selectedReserva.id));
                         return (
