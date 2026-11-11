@@ -603,6 +603,11 @@ export default function CrmTab({
                     <span className="font-semibold text-slate-700">{selectedCliente.telefono}</span>
                   </div>
                 </div>
+                {selectedCliente.noAvisar && (
+                  <div data-testid="ficha-no-avisar" className="flex items-center gap-2 text-xs bg-slate-100 border border-slate-200 rounded-lg px-3 py-2">
+                    <span className="font-semibold text-slate-600">No quiere recibir avisos (recordatorios de aceite)</span>
+                  </div>
+                )}
 
                 {selectedCliente.direccion && (
                   <div className="flex items-center gap-3 text-xs">
@@ -998,6 +1003,11 @@ export default function CrmTab({
                   />
                 </div>
 
+                <label className="flex items-start gap-2 text-xs text-slate-600 cursor-pointer">
+                  <input type="checkbox" data-testid="nuevo-no-avisar" checked={!!formData.noAvisar} onChange={e => setFormData({ ...formData, noAvisar: e.target.checked })} className="w-4 h-4 mt-0.5 cursor-pointer" />
+                  <span><strong className="text-slate-700">No avisar a este cliente</strong> (recordatorios de cambio de aceite por WhatsApp o correo)</span>
+                </label>
+
                 <div>
                   <label className="block text-xs font-bold text-slate-500 uppercase">Domicilio Fiscal</label>
                   <input
@@ -1212,6 +1222,11 @@ export default function CrmTab({
                     onChange={e => setEditFormData({ ...editFormData, correo: e.target.value })}
                   />
                 </div>
+
+                <label className="flex items-start gap-2 text-xs text-slate-600 cursor-pointer">
+                  <input type="checkbox" data-testid="editar-no-avisar" checked={!!editFormData.noAvisar} onChange={e => setEditFormData({ ...editFormData, noAvisar: e.target.checked })} className="w-4 h-4 mt-0.5 cursor-pointer" />
+                  <span><strong className="text-slate-700">No avisar a este cliente</strong> (recordatorios de cambio de aceite por WhatsApp o correo)</span>
+                </label>
 
                 <div>
                   <label className="block text-xs font-bold text-slate-500 uppercase">Domicilio Fiscal</label>

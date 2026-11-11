@@ -14,6 +14,8 @@ import { fetchFirmasVigentes } from './data/contratosFirmadosDb';
 import { fetchTecnicos, guardarTecnico, fetchTareasTaller, renombrarTecnicoEnOrdenes } from './data/tecnicosDb';
 import { fetchFiltros, guardarFiltro } from './data/filtrosDb';
 import { aceiteTrasEntrega } from './utils/cambioAceite';
+import { alertasUrgentes } from './utils/alertasEstado';
+import { hoyISO } from './utils/fechas';
 import type { EstadoFiltros, FiltroId } from './utils/filtrosAceite';
 import { fetchInvitaciones, crearInvitacion, updateEstadoInvitacion } from './data/invitacionesDb';
 import LoginScreen from './components/LoginScreen';
@@ -419,20 +421,13 @@ export default function App() {
     }
   }, [clientes, handleUpdateCliente]);
 
-  const handleResolveAlerta = useCallback((id: string) => {
-    const changed = alertas.find(a => a.id === id);
-    if (!changed) return;
-    const actualizada = { ...changed, estado: 'atendida' as const };
-    setAlertas(prev => prev.map(a => a.id === id ? actualizada : a));
-    upsertOne('alertas', actualizada).catch(fallo('actualizar la alerta'));
-  }, [alertas, fallo]);
-
   const handleAddNotificacion = useCallback((notif: NotificacionCliente) => {
     setNotificaciones(prev => [...prev, notif]);
     upsertOne('notificaciones', notif).catch(fallo('guardar la notificación'));
 
     const targetCli = clientes.find(c => c.id === notif.clienteId);
-    if (targetCli) {
+    // Un aviso descartado no es una comunicación con el cliente: no deja apunte en su historial.
+    if (targetCli && notif.tipoEnvio !== 'omitido') {
       const nuevaInteraccion: InteraccionCliente = {
         id: genId('int-cli-not'),
         fecha: new Date().toISOString().split('T')[0],
@@ -449,40 +444,25 @@ export default function App() {
     deleteOne('notificaciones', id).catch(fallo('eliminar la notificación'));
   }, [fallo]);
 
-  const handleTriggerAutoRenew = useCallback((vehId: string, tipo: AlertaTipo, nuevaFechaOrKm: string) => {
+  const handleTriggerAutoRenew = useCallback((vehId: string, tipo: AlertaTipo, nuevaFecha: string) => {
     const veh = vehiculos.find(v => v.id === vehId);
     if (!veh) return;
-    let updatedVeh = { ...veh };
-    if (tipo === 'itv') updatedVeh.itvVencimiento = nuevaFechaOrKm;
-    else if (tipo === 'seguro') updatedVeh.seguroVencimiento = nuevaFechaOrKm;
-    else if (tipo === 'impuesto') updatedVeh.impuestoVencimiento = nuevaFechaOrKm;
-    else if (tipo === 'mantenimiento') {
-      updatedVeh.kilometraje = Math.max(veh.kilometraje, Number(nuevaFechaOrKm) - 15000);
-      // El mantenimiento por km no lo gestiona ningún trigger: se abre aquí
-      // la siguiente alerta a +15.000 km para que el ciclo continúe.
-      const proximoKm = Number(nuevaFechaOrKm) + 15000;
-      const siguiente: Alerta = {
-        id: genId('al-mnt'),
-        vehiculoId: vehId,
-        tipo: 'mantenimiento',
-        descripcion: `Revisión de mantenimiento preventivo recomendada a los ${proximoKm.toLocaleString()} km.`,
-        estado: 'activa',
-        kilometrajeLimite: proximoKm,
-      };
-      setAlertas(prev => [...prev, siguiente]);
-      upsertOne('alertas', siguiente).catch(fallo('guardar la alerta'));
+    const updatedVeh = { ...veh };
+    if (tipo === 'itv') updatedVeh.itvVencimiento = nuevaFecha;
+    else if (tipo === 'seguro') updatedVeh.seguroVencimiento = nuevaFecha;
+    else if (tipo === 'impuesto') updatedVeh.impuestoVencimiento = nuevaFecha;
+    else if (tipo === 'aceite') {
+      // Cambio de aceite hecho: queda como último cambio de hoy y se fija el próximo.
+      updatedVeh.aceiteFecha = hoyISO();
+      updatedVeh.aceiteProximaFecha = nuevaFecha;
     }
 
-    const actualizado = handleUpdateVehiculo(updatedVeh);
-    if (tipo !== 'mantenimiento') {
-      // itv/seguro/impuesto: un trigger en Supabase reabre/actualiza la
-      // alerta al guardar la nueva fecha del vehículo; se recarga para
-      // reflejar ese cambio hecho en el servidor.
-      actualizado
-        .then(() => fetchAll<Alerta>('alertas').then(setAlertas))
-        .catch(err => console.error('Error recargando alertas', err));
-    }
-  }, [vehiculos, handleUpdateVehiculo, fallo]);
+    // Un trigger en Supabase reabre/actualiza la alerta al guardar la nueva fecha del vehículo;
+    // se recarga para reflejar ese cambio hecho en el servidor.
+    handleUpdateVehiculo(updatedVeh)
+      .then(() => fetchAll<Alerta>('alertas').then(setAlertas))
+      .catch(err => console.error('Error recargando alertas', err));
+  }, [vehiculos, handleUpdateVehiculo]);
 
   // Factura handlers
   const handleAddFactura = useCallback((f: Factura) => {
@@ -604,7 +584,8 @@ export default function App() {
     deleteOne('citas', id).catch(fallo('eliminar la cita'));
   }, [fallo]);
 
-  const activeAlertsCount = useMemo(() => alertas.filter(a => a.estado === 'activa').length, [alertas]);
+  // El globito de la pestaña cuenta solo lo que pide atención ya: vencidas y las que vencen en 14 días.
+  const activeAlertsCount = useMemo(() => alertasUrgentes(alertas, hoyISO()), [alertas]);
   // Solicitudes de la web esperando que alguien asigne el coche.
   const datosRecibidos = useMemo(() => invitaciones.filter(i => i.estado === 'completada').length, [invitaciones]);
   const solicitudesPendientes = useMemo(() => solicitudes.filter(x => x.estadoGestion === 'pendiente').length, [solicitudes]);
@@ -1002,8 +983,9 @@ export default function App() {
             notificaciones={notificaciones}
             clientes={clientes}
             vehiculos={vehiculos}
+            ordenesTrabajo={ordenesTrabajo}
+            filtrosOT={filtrosOT}
             onAddNotificacion={handleAddNotificacion}
-            onResolveAlerta={handleResolveAlerta}
             onDeleteNotificacion={handleDeleteNotificacion}
             onTriggerAutoRenew={handleTriggerAutoRenew}
           />

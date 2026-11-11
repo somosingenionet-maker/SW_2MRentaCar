@@ -89,7 +89,7 @@ const facturas: Factura[] = [
 ];
 const alertas: Alerta[] = [
   { id: 'a1', vehiculoId: 'v2', tipo: 'itv', descripcion: 'ITV vencida', estado: 'activa', fechaLimite: '2025-08-29' },
-  { id: 'a2', vehiculoId: 'v1', tipo: 'mantenimiento', descripcion: 'Revisión a 135000 km', estado: 'activa', kilometrajeLimite: 135000 },
+  { id: 'a2', vehiculoId: 'v1', tipo: 'aceite', descripcion: 'Cambio de aceite previsto', estado: 'activa', fechaLimite: '2027-01-01' },
 ] as Alerta[];
 const tecnicos: Tecnico[] = [{ id: 't1', nombre: 'Carlos', especialidad: 'Motor', activo: true }];
 // Una cita de hoy, que es el día que enseña la Agenda al abrirse: así se prueba que se dibuja.
@@ -106,7 +106,7 @@ const pestanas: [string, ComponentType<never>, Record<string, unknown>][] = [
   ['Taller (órdenes)', OrdenesTrabajoTab, { ordenes, vehiculos, clientes, tecnicos, onAdd: nop, onUpdate: nop, onDelete: nop }],
   ['Agenda', AgendaTab, { citas, vehiculos, clientes, tecnicos, ordenes, capacidadTaller: 10, onAddCita: nop, onUpdateCita: nop, onDeleteCita: nop, onCreateOT: nop }],
   ['Facturas', FacturasTab, { facturas, clientes, vehiculos, ordenesTrabajo: ordenes, puedeGestionarFacturas: true, onAddFactura: nop, onUpdateFactura: nop, onDeleteFactura: nop, onUpdateOT: nop }],
-  ['Alertas', AlertsNotificationsTab, { alertas, notificaciones: [], clientes, vehiculos, onAddNotificacion: nop, onResolveAlerta: nop, onDeleteNotificacion: nop, onTriggerAutoRenew: nop }],
+  ['Alertas', AlertsNotificationsTab, { alertas, notificaciones: [], clientes, vehiculos, onAddNotificacion: nop, onDeleteNotificacion: nop, onTriggerAutoRenew: nop }],
   ['Rentabilidad', AnalyticsTab, { ordenesTrabajo: ordenes, clientes, reservas, vehiculos }],
 ];
 const colecciones = new Set(['vehiculos', 'clientes', 'reservas', 'solicitudes', 'ordenes', 'ordenesTrabajo', 'facturas', 'alertas', 'notificaciones', 'citas', 'tecnicos', 'invitaciones']);

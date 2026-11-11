@@ -150,8 +150,17 @@ export function mensajeEnlaceMecanico(d: { nombre: string; empresa: string; enla
   return `Hola ${d.nombre}, este es tu enlace personal del taller de ${d.empresa}: ${d.enlace}\n\nÁbrelo desde el móvil y guárdalo (puedes añadirlo a la pantalla de inicio). Ahí verás los coches que te asignemos y podrás marcar las tareas. No lo compartas.`;
 }
 
+/**
+ * Teléfono listo para wa.me: solo dígitos y con prefijo de país. Un móvil o fijo español de 9 dígitos sin prefijo
+ * («644 09 50 97») recibe el 34; un «00» internacional se quita. Cualquier otro número se deja como está.
+ */
+function telefonoWhatsApp(telefono: string | undefined): string {
+  const digitos = (telefono ?? '').replace(/\D/g, '');
+  if (digitos.startsWith('00')) return digitos.slice(2);
+  return /^[6-9]\d{8}$/.test(digitos) ? `34${digitos}` : digitos;
+}
+
 /** Enlace de WhatsApp con el texto escrito; si hay teléfono abre el chat directamente, si no deja elegir contacto. */
 export function enlaceWhatsApp(telefono: string | undefined, texto: string): string {
-  const digitos = (telefono ?? '').replace(/\D/g, '');
-  return `https://wa.me/${digitos}?text=${encodeURIComponent(texto)}`;
+  return `https://wa.me/${telefonoWhatsApp(telefono)}?text=${encodeURIComponent(texto)}`;
 }

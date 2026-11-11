@@ -1,201 +1,252 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { usePaginacion } from '../utils/usePaginacion';
 import Pagination from './Pagination';
-import { Alerta, NotificacionCliente, Cliente, Vehiculo, AlertaTipo } from '../types';
+import { Alerta, NotificacionCliente, Cliente, Vehiculo, AlertaTipo, OrdenTrabajo } from '../types';
 import {
-  Bell, Check, MessageSquare, AlertTriangle, Send, Mail, Phone, Calendar, Sparkles, Clock
+  Bell, Check, MessageSquare, AlertTriangle, Mail, Calendar, Droplets, Send, Clock, BellOff
 } from 'lucide-react';
-import ConfirmDialog from './ConfirmDialog';
 import RenovarVencimientoModal from './RenovarVencimientoModal';
 import { formatDate } from '../utils/dateFormat';
 import { getEmpresaConfig } from '../data/empresaConfig';
 import { genId } from '../utils/id';
+import { hoyISO } from '../utils/fechas';
+import { alertasVisibles, estadoAlerta, ordenarAlertas, resumenAlertas, textoPlazo, DIAS_VENCE_PRONTO } from '../utils/alertasEstado';
+import { avisosPendientes, clienteDelVehiculo, tipoEventoAceite, DIAS_ANTES_RECORDATORIO, type AvisoPendiente, type EtapaAviso } from '../utils/avisosAceite';
+import { enlaceWhatsApp } from '../utils/tallerMecanico';
+import type { EstadoFiltros } from '../utils/filtrosAceite';
 
 interface AlertsNotificationsTabProps {
   alertas: Alerta[];
   notificaciones: NotificacionCliente[];
   clientes: Cliente[];
   vehiculos: Vehiculo[];
+  /** Órdenes del taller: dicen quién es el cliente de cada coche y qué cambios de aceite se han entregado. */
+  ordenesTrabajo?: OrdenTrabajo[];
+  /** Check list de filtros de cada orden, para el resumen que se manda al cliente. */
+  filtrosOT?: Record<string, EstadoFiltros>;
   onAddNotificacion: (notif: NotificacionCliente) => void;
-  onResolveAlerta: (alertaId: string) => void;
   onDeleteNotificacion: (id: string) => void;
   onTriggerAutoRenew: (vehiculoId: string, tipo: AlertaTipo, nuevaFecha: string) => void;
 }
 
-// Ventana informativa de "próxima a vencer" (días / km) — solo para el
-// resumen de la pantalla; el envío automático real todavía no existe en 2M.
-const DIAS_AVISO_VENCIMIENTO = 14;
-const KM_AVISO_MANTENIMIENTO = 500;
+const NOMBRE_TIPO: Record<AlertaTipo, string> = { itv: 'ITV', seguro: 'Seguro', impuesto: 'Impuesto', aceite: 'Cambio de aceite' };
+const ETIQUETA_ETAPA: Record<EtapaAviso, string> = { entrega: 'Resumen de entrega', recordatorio: 'Recordatorio', vencido: 'Cambio pasado de fecha' };
+const COLOR_ETAPA: Record<EtapaAviso, string> = { entrega: 'bg-emerald-100 text-emerald-800', recordatorio: 'bg-blue-100 text-blue-800', vencido: 'bg-rose-100 text-rose-800' };
+const ETIQUETA_EVENTO: Record<NotificacionCliente['tipoEvento'], string> = {
+  mantenimiento_preventivo: 'Mantenimiento', itv_proxima: 'ITV próxima', reserva_confirmada: 'Reserva confirmada', vencimiento_seguro: 'Seguro',
+  reparacion_lista: 'Reparación lista', aceite_entrega: 'Resumen de entrega (aceite)', aceite_recordatorio: 'Recordatorio de aceite', aceite_vencido: 'Aceite pasado de fecha',
+};
+const COLOR_PLAZO = {
+  vencida: 'bg-rose-100 text-rose-800', pronto: 'bg-amber-100 text-amber-800', programada: 'bg-slate-100 text-slate-600', atendida: 'bg-emerald-50 text-emerald-700',
+} as const;
 
-function estaProximaAVencer(alerta: Alerta, vehiculo?: Vehiculo): boolean {
-  if (alerta.tipo === 'mantenimiento') {
-    if (alerta.kilometrajeLimite == null || !vehiculo) return false;
-    return alerta.kilometrajeLimite - vehiculo.kilometraje <= KM_AVISO_MANTENIMIENTO;
-  }
-  if (!alerta.fechaLimite) return false;
-  const limite = new Date();
-  limite.setDate(limite.getDate() + DIAS_AVISO_VENCIMIENTO);
-  return new Date(alerta.fechaLimite) <= limite;
-}
+const abrir = (url: string) => { window.open(url, '_blank', 'noopener,noreferrer'); };
+const enlaceCorreo = (correo: string, asunto: string, mensaje: string) => `mailto:${correo}?subject=${encodeURIComponent(asunto)}&body=${encodeURIComponent(mensaje)}`;
+const ahoraTexto = () => {
+  const d = new Date(), dos = (n: number) => String(n).padStart(2, '0');
+  return `${hoyISO()} ${dos(d.getHours())}:${dos(d.getMinutes())}`;
+};
 
 export default function AlertsNotificationsTab({
   alertas,
   notificaciones,
   clientes,
   vehiculos,
+  ordenesTrabajo = [],
+  filtrosOT = {},
   onAddNotificacion,
-  onResolveAlerta,
   onDeleteNotificacion,
   onTriggerAutoRenew
 }: AlertsNotificationsTabProps) {
 
   const empresa = getEmpresaConfig();
+  const hoy = hoyISO();
   const [selectedTipoFilter, setSelectedTipoFilter] = useState<string>('all');
   const [selectedAlertaId, setSelectedAlertaId] = useState<string | null>(null);
-  const [confirmAlerta, setConfirmAlerta] = useState<{
-    isOpen: boolean;
-    title: string;
-    message: string;
-    onConfirm: () => void;
-  }>({ isOpen: false, title: '', message: '', onConfirm: () => {} });
-
-  // Alerta de ITV/seguro/impuesto que se está cerrando (elige la fecha en un cuadro propio).
+  // Alerta que se está cerrando (elige cuándo se hizo y el nuevo vencimiento en un cuadro propio).
   const [renovando, setRenovando] = useState<{ alerta: Alerta; titulo: string; etiqueta: string } | null>(null);
+  // Texto de cada aviso pendiente si el taller lo ha editado antes de enviarlo.
+  const [textos, setTextos] = useState<Record<string, string>>({});
 
-  // Notification Form states
-  const [targetClienteId, setTargetClienteId] = useState('');
-  const [targetVehiculoId, setTargetVehiculoId] = useState('');
-  const [selectedTemplate, setSelectedTemplate] = useState<NotificacionCliente['tipoEvento']>('mantenimiento_preventivo');
-  const [dispatchChannel, setDispatchChannel] = useState<'email' | 'sms' | 'whatsapp'>('email');
+  // Aviso manual
+  const [targetClienteId, setTargetClienteId] = useState(() => clientes[0]?.id ?? '');
+  const [targetVehiculoId, setTargetVehiculoId] = useState(() => vehiculos[0]?.id ?? '');
+  const [selectedTemplate, setSelectedTemplate] = useState<NotificacionCliente['tipoEvento']>('aceite_recordatorio');
   const [customSubject, setCustomSubject] = useState('');
   const [customBody, setCustomBody] = useState('');
-  const [sendingDone, setSendingDone] = useState(false);
+  const [registrado, setRegistrado] = useState(false);
 
-  // Initialize fields
   useEffect(() => {
-    if (clientes.length > 0 && !targetClienteId) {
-      setTargetClienteId(clientes[0].id);
-    }
-    if (vehiculos.length > 0 && !targetVehiculoId) {
-      setTargetVehiculoId(vehiculos[0].id);
-    }
+    if (clientes.length > 0 && !targetClienteId) setTargetClienteId(clientes[0].id);
+    if (vehiculos.length > 0 && !targetVehiculoId) setTargetVehiculoId(vehiculos[0].id);
   }, [clientes, vehiculos]);
 
-  // Live variable template text calculation
+  // Texto de la plantilla elegida con los datos del cliente y del coche.
   useEffect(() => {
     const cli = clientes.find(c => c.id === targetClienteId);
     const veh = vehiculos.find(v => v.id === targetVehiculoId);
-
     if (!cli || !veh) return;
-
-    if (selectedTemplate === 'mantenimiento_preventivo') {
-      setCustomSubject(`🔧 Mantenimiento Preventivo Pendiente: ${veh.marca} ${veh.matricula}`);
-      setCustomBody(`Estimado/a ${cli.nombre} ${cli.apellidos},\n\nLe informamos que de acuerdo con el kilometraje de su vehículo (${veh.marca} ${veh.modelo} con matrícula ${veh.matricula}), se recomienda agendar cita previa para el cambio de filtros y aceite de motor.\n\nAtentamente, Servicio Técnico ${empresa.nombre}.`);
+    const coche = `${veh.marca} ${veh.modelo} (${veh.matricula})`;
+    if (selectedTemplate === 'aceite_recordatorio' || selectedTemplate === 'aceite_vencido' || selectedTemplate === 'aceite_entrega' || selectedTemplate === 'mantenimiento_preventivo') {
+      setCustomSubject(`Cambio de aceite de su ${veh.marca} ${veh.matricula}`);
+      setCustomBody(`Hola ${cli.nombre},\n\nLe recordamos que el próximo cambio de aceite de su ${coche}${veh.aceiteProximaFecha ? ` está previsto para el ${formatDate(veh.aceiteProximaFecha)}` : ' se acerca'}. Para pedir cita, llámenos o escríbanos${empresa.telefono ? ` al ${empresa.telefono}` : ''}.\n\n${empresa.nombre}`);
     } else if (selectedTemplate === 'itv_proxima') {
-      setCustomSubject(`⚠️ Recordatorio de ITV Próxima: ${veh.marca} ${veh.matricula}`);
-      setCustomBody(`Hola ${cli.nombre},\n\nLe recordamos que la Inspección Técnica de Vehículo (ITV) de su coche asignado (${veh.marca} ${veh.modelo} matrícula ${veh.matricula}) caduca el ${veh.itvVencimiento}.\n\nPor favor, pase por nuestras instalaciones para preparar el coche. Taller Central ${empresa.nombre}.`);
+      setCustomSubject(`Recordatorio de ITV: ${veh.marca} ${veh.matricula}`);
+      setCustomBody(`Hola ${cli.nombre},\n\nLe recordamos que la ITV de su ${coche} caduca el ${formatDate(veh.itvVencimiento)}.\n\n${empresa.nombre}`);
     } else if (selectedTemplate === 'reserva_confirmada') {
-      setCustomSubject(`📅 Confirmación de Reserva de Vehículo: ${veh.marca}`);
-      setCustomBody(`Hola ${cli.nombre} ${cli.apellidos},\n\nConfirmamos su reserva activa del coche ${veh.marca} ${veh.modelo} con matrícula ${veh.matricula}. El mismo cuenta con seguro completo y estará listo para su entrega en la fecha indicada. ¡Gracias!`);
+      setCustomSubject(`Confirmación de su reserva: ${veh.marca}`);
+      setCustomBody(`Hola ${cli.nombre},\n\nConfirmamos su reserva del ${coche}. ¡Gracias!\n\n${empresa.nombre}`);
     } else if (selectedTemplate === 'vencimiento_seguro') {
-      setCustomSubject(`🛡️ Póliza de Seguro Próxima a Vencer: ${veh.marca}`);
-      setCustomBody(`Servicio de Gestión de Flotas: Estimado/a ${cli.nombre}, la póliza de seguro del vehículo ${veh.marca} ${veh.modelo} matrícula ${veh.matricula} vencerá el próximo ${veh.seguroVencimiento}. Estamos tramitando la renovación obligatoria automática.`);
-    } else if (selectedTemplate === 'reparacion_lista') {
-      setCustomSubject(`✅ Vehículo Reparado Listo para Entrega: ${veh.marca}`);
-      setCustomBody(`⚙️ ${empresa.nombre} Taller: Estimado ${cli.nombre}, tenemos el placer de comunicarle que la reparación de su vehículo ${veh.marca} ${veh.modelo} (${veh.matricula}) ha concluido exitosamente y ha sido verificado en carretera. Puede pasar a retirarlo.`);
+      setCustomSubject(`Seguro próximo a vencer: ${veh.marca}`);
+      setCustomBody(`Hola ${cli.nombre},\n\nLa póliza de seguro del ${coche} vence el ${formatDate(veh.seguroVencimiento)}.\n\n${empresa.nombre}`);
+    } else {
+      setCustomSubject(`Su vehículo está listo: ${veh.marca} ${veh.matricula}`);
+      setCustomBody(`Hola ${cli.nombre},\n\nLa reparación de su ${coche} ha terminado. Puede pasar a recogerlo.\n\n${empresa.nombre}`);
     }
   }, [targetClienteId, targetVehiculoId, selectedTemplate]);
 
-  const handleDispatchSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!targetClienteId || !customBody) return;
+  const pendientes = useMemo(
+    () => avisosPendientes({ vehiculos, ordenes: ordenesTrabajo, clientes, notificaciones, filtrosOT, empresa: { nombre: empresa.nombre, telefono: empresa.telefono }, hoy }),
+    [vehiculos, ordenesTrabajo, clientes, notificaciones, filtrosOT, empresa.nombre, empresa.telefono, hoy],
+  );
 
-    // Hoy el aviso solo se REGISTRA (queda en el historial del cliente y en la
-    // bandeja de abajo); todavía no hay envío automático por email/SMS/WhatsApp.
-    const nueva: NotificacionCliente = {
-      id: genId('not'),
-      clienteId: targetClienteId,
-      vehiculoId: targetVehiculoId || undefined,
-      tipoEnvio: dispatchChannel,
-      asunto: dispatchChannel === 'email' ? customSubject : undefined,
-      mensaje: customBody,
-      fechaEnvio: new Date().toISOString().replace('T', ' ').slice(0, 16),
-      leido: false,
-      tipoEvento: selectedTemplate
-    };
+  const registrar = (n: Omit<NotificacionCliente, 'id' | 'fechaEnvio' | 'leido'>) =>
+    onAddNotificacion({ ...n, id: genId('not'), fechaEnvio: ahoraTexto(), leido: false });
 
-    onAddNotificacion(nueva);
-    setSendingDone(true);
-    setTimeout(() => setSendingDone(false), 3000);
+  // Abre el chat o el correo con el texto escrito y lo anota como avisado: así deja de aparecer en «Toca avisar».
+  const enviarPendiente = (a: AvisoPendiente, canal: 'whatsapp' | 'email') => {
+    const mensaje = textos[a.clave] ?? a.mensaje;
+    abrir(canal === 'whatsapp' ? enlaceWhatsApp(a.telefono, mensaje) : enlaceCorreo(a.correo, a.asunto, mensaje));
+    registrar({ clienteId: a.cliente.id, vehiculoId: a.vehiculo.id, tipoEnvio: canal, asunto: canal === 'email' ? a.asunto : undefined, mensaje, tipoEvento: tipoEventoAceite(a.etapa), referencia: a.referencia });
+  };
+  const descartarPendiente = (a: AvisoPendiente) =>
+    registrar({ clienteId: a.cliente.id, vehiculoId: a.vehiculo.id, tipoEnvio: 'omitido', mensaje: 'Aviso descartado por el taller.', tipoEvento: tipoEventoAceite(a.etapa), referencia: a.referencia });
+
+  const enviarManual = (canal: 'whatsapp' | 'email') => {
+    const cli = clientes.find(c => c.id === targetClienteId);
+    if (!cli || !customBody) return;
+    abrir(canal === 'whatsapp' ? enlaceWhatsApp(cli.telefono, customBody) : enlaceCorreo(cli.correo, customSubject, customBody));
+    registrar({ clienteId: cli.id, vehiculoId: targetVehiculoId || undefined, tipoEnvio: canal, asunto: canal === 'email' ? customSubject : undefined, mensaje: customBody, tipoEvento: selectedTemplate });
+    setRegistrado(true);
+    setTimeout(() => setRegistrado(false), 3000);
   };
 
   const handleSelectAlerta = (alerta: Alerta) => {
     setSelectedAlertaId(alerta.id);
     setTargetVehiculoId(alerta.vehiculoId);
-    const clienteAsociado = clientes.find(c => c.vehiculosAsociados?.includes(alerta.vehiculoId));
-    if (clienteAsociado) setTargetClienteId(clienteAsociado.id);
-    const templateMap: Record<AlertaTipo, NotificacionCliente['tipoEvento']> = {
-      itv: 'itv_proxima',
-      seguro: 'vencimiento_seguro',
-      mantenimiento: 'mantenimiento_preventivo',
-      impuesto: 'mantenimiento_preventivo',
-    };
-    setSelectedTemplate(templateMap[alerta.tipo]);
+    const cliente = clienteDelVehiculo(alerta.vehiculoId, ordenesTrabajo, clientes) ?? clientes.find(c => c.vehiculosAsociados?.includes(alerta.vehiculoId));
+    if (cliente) setTargetClienteId(cliente.id);
+    const plantilla: Record<AlertaTipo, NotificacionCliente['tipoEvento']> = { itv: 'itv_proxima', seguro: 'vencimiento_seguro', impuesto: 'itv_proxima', aceite: 'aceite_recordatorio' };
+    setSelectedTemplate(plantilla[alerta.tipo]);
   };
 
+  // Atender una alerta cambia la fecha del vehículo; un trigger de la base de datos reabre/actualiza esta misma alerta con el nuevo vencimiento.
   const handleResolveAlertClick = (alerta: Alerta) => {
-    // Para itv/seguro/impuesto NO se llama a onResolveAlerta: al cambiar la
-    // fecha del vehículo, un trigger en la base de datos reabre/actualiza
-    // esta misma alerta con el nuevo vencimiento automáticamente (ver
-    // supabase/schema.sql). Resolverla también desde aquí competiría con esa
-    // actualización del servidor.
-    if (alerta.tipo === 'itv') {
-      setRenovando({ alerta, titulo: 'ITV realizada', etiqueta: 'la ITV' });
-    } else if (alerta.tipo === 'seguro') {
-      setRenovando({ alerta, titulo: 'Renovación de seguro', etiqueta: 'renovación' });
-    } else if (alerta.tipo === 'impuesto') {
-      setRenovando({ alerta, titulo: 'Pago del impuesto de circulación', etiqueta: 'pago' });
-    } else if (alerta.tipo === 'mantenimiento') {
-      const targetVeh = vehiculos.find(v => v.id === alerta.vehiculoId);
-      const nextMaintKm = (targetVeh ? targetVeh.kilometraje : 0) + 15000;
-      setConfirmAlerta({
-        isOpen: true,
-        title: 'Confirmar mantenimiento realizado',
-        message: `La alerta de kilometraje se pospondrá 15.000 km (próxima revisión recomendada: ${nextMaintKm.toLocaleString()} km).`,
-        onConfirm: () => { onTriggerAutoRenew(alerta.vehiculoId, 'mantenimiento', nextMaintKm.toString()); onResolveAlerta(alerta.id); },
-      });
-    }
+    const modal: Record<AlertaTipo, { titulo: string; etiqueta: string }> = {
+      itv: { titulo: 'ITV realizada', etiqueta: 'la ITV' },
+      seguro: { titulo: 'Renovación de seguro', etiqueta: 'renovación' },
+      impuesto: { titulo: 'Pago del impuesto de circulación', etiqueta: 'pago' },
+      aceite: { titulo: 'Cambio de aceite realizado', etiqueta: 'el cambio de aceite' },
+    };
+    setRenovando({ alerta, titulo: modal[alerta.tipo].titulo, etiqueta: modal[alerta.tipo].etiqueta });
   };
 
-  const filteredAlertas = alertas.filter(al => {
-    if (selectedTipoFilter === 'all') return true;
-    return al.tipo === selectedTipoFilter;
-  });
+  const visibles = useMemo(() => alertasVisibles(alertas), [alertas]);
+  const filteredAlertas = useMemo(
+    () => ordenarAlertas(visibles.filter(al => selectedTipoFilter === 'all' || al.tipo === selectedTipoFilter), hoy),
+    [visibles, selectedTipoFilter, hoy],
+  );
+  const resumen = resumenAlertas(alertas, hoy);
 
   const pagAlertas = usePaginacion(filteredAlertas, 'alertas', selectedTipoFilter);
   const avisosOrdenados = [...notificaciones].reverse();
   const pagAvisos = usePaginacion(avisosOrdenados, 'avisos');
-  const activas = alertas.filter(al => al.estado !== 'atendida');
-  const proximasAVencer = activas.filter(al => estaProximaAVencer(al, vehiculos.find(v => v.id === al.vehiculoId))).length;
-  const atendidas = alertas.length - activas.length;
+
+  /** Último aviso de aceite registrado para un coche, para enseñarlo en su alerta. */
+  const ultimoAvisoAceite = (vehiculoId: string) =>
+    [...notificaciones].reverse().find(n => n.vehiculoId === vehiculoId && n.tipoEnvio !== 'omitido' && n.tipoEvento.startsWith('aceite_'));
+
+  const clienteManual = clientes.find(c => c.id === targetClienteId);
 
   return (
     <div className="space-y-6 text-slate-700" id="alerts-notifications-tab-root">
 
       {/* Resumen del monitor */}
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-        <div className="bg-white border border-slate-200 rounded-2xl p-5">
-          <p className="text-xs font-bold text-slate-400 uppercase tracking-wider">Alertas activas</p>
-          <p className="text-2xl font-bold text-slate-800 mt-1">{activas.length}</p>
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+        <div className="bg-white border border-slate-200 rounded-2xl p-5" data-testid="resumen-vencidas">
+          <p className="text-xs font-bold text-slate-400 uppercase tracking-wider">Vencidas</p>
+          <p className={`text-2xl font-bold mt-1 ${resumen.vencidas > 0 ? 'text-rose-600' : 'text-slate-800'}`}>{resumen.vencidas}</p>
         </div>
-        <div className="bg-white border border-slate-200 rounded-2xl p-5">
-          <p className="text-xs font-bold text-slate-400 uppercase tracking-wider">Próximas a vencer</p>
-          <p className={`text-2xl font-bold mt-1 ${proximasAVencer > 0 ? 'text-amber-600' : 'text-slate-800'}`}>{proximasAVencer}</p>
+        <div className="bg-white border border-slate-200 rounded-2xl p-5" data-testid="resumen-pronto">
+          <p className="text-xs font-bold text-slate-400 uppercase tracking-wider">Vencen en {DIAS_VENCE_PRONTO} días</p>
+          <p className={`text-2xl font-bold mt-1 ${resumen.pronto > 0 ? 'text-amber-600' : 'text-slate-800'}`}>{resumen.pronto}</p>
+        </div>
+        <div className="bg-white border border-slate-200 rounded-2xl p-5" data-testid="resumen-programadas">
+          <p className="text-xs font-bold text-slate-400 uppercase tracking-wider">Programadas</p>
+          <p className="text-2xl font-bold text-slate-800 mt-1">{resumen.programadas}</p>
         </div>
         <div className="bg-white border border-slate-200 rounded-2xl p-5">
           <p className="text-xs font-bold text-slate-400 uppercase tracking-wider">Atendidas</p>
-          <p className="text-2xl font-bold text-emerald-600 mt-1">{atendidas}</p>
+          <p className="text-2xl font-bold text-emerald-600 mt-1">{resumen.atendidas}</p>
         </div>
+      </div>
+
+      {/* Toca avisar a clientes */}
+      <div className="bg-white p-6 rounded-2xl border border-slate-100 shadow-sm space-y-4" data-testid="toca-avisar">
+        <div>
+          <h2 className="text-lg font-bold text-slate-800 flex items-center gap-2">
+            <Droplets className="w-5 h-5 text-amber-500" />
+            Toca avisar a clientes
+            {pendientes.length > 0 && <span className="text-xs font-bold bg-amber-100 text-amber-800 rounded-full px-2 py-0.5">{pendientes.length}</span>}
+          </h2>
+          <p className="text-xs text-slate-400">
+            Cambio de aceite de los coches de clientes del taller. Solo salen tres avisos por cambio (resumen al entregar, recordatorio {DIAS_ANTES_RECORDATORIO} días antes y, si pasa una semana, un último aviso) y cada uno una sola vez.
+            Al pulsar WhatsApp o Correo se abre con el texto escrito y queda anotado como avisado.
+          </p>
+        </div>
+        {pendientes.length === 0 ? (
+          <div className="text-center py-6 bg-slate-50 border border-slate-100 rounded-xl text-slate-400 text-xs">
+            <Check className="w-5 h-5 text-emerald-500 mx-auto mb-1" /> No hay avisos pendientes hoy.
+          </div>
+        ) : (
+          <ul className="space-y-3">
+            {pendientes.map(a => (
+              <li key={a.clave} data-testid="aviso-pendiente" className="p-4 border border-slate-200 rounded-xl space-y-2.5 bg-slate-50/40">
+                <div className="flex flex-wrap items-center gap-2">
+                  <span className={`px-2 py-0.5 rounded text-[10px] font-extrabold uppercase ${COLOR_ETAPA[a.etapa]}`}>{ETIQUETA_ETAPA[a.etapa]}</span>
+                  <strong className="text-sm text-slate-800">{a.cliente.nombre} {a.cliente.apellidos}</strong>
+                  <span className="text-xs text-slate-500">· {a.vehiculo.marca} {a.vehiculo.modelo} ({a.vehiculo.matricula})</span>
+                  <span className="text-[11px] font-semibold text-slate-400 sm:ml-auto">{a.motivo}</span>
+                </div>
+                {a.sinProximoCambio && (
+                  <p data-testid="aviso-sin-proximo" className="text-[11px] font-semibold text-amber-700 bg-amber-50 border border-amber-200 rounded-lg px-2 py-1">
+                    Falta anotar el próximo cambio en la ficha del vehículo: este mensaje saldría sin fecha.
+                  </p>
+                )}
+                <textarea
+                  aria-label={`Mensaje para ${a.cliente.nombre}`} rows={a.etapa === 'entrega' ? 7 : 4}
+                  value={textos[a.clave] ?? a.mensaje}
+                  onChange={e => setTextos(prev => ({ ...prev, [a.clave]: e.target.value }))}
+                  className="w-full p-2.5 border border-slate-200 bg-white text-slate-600 rounded-lg text-xs leading-relaxed focus:outline-none focus:ring-1 focus:ring-blue-500"
+                />
+                <div className="flex flex-wrap items-center gap-2 text-xs font-bold">
+                  <button type="button" disabled={!a.telefono} onClick={() => enviarPendiente(a, 'whatsapp')}
+                    className="px-3 py-1.5 rounded-lg bg-green-600 hover:bg-green-500 text-white inline-flex items-center gap-1 cursor-pointer disabled:bg-slate-200 disabled:text-slate-400 disabled:cursor-not-allowed">
+                    <MessageSquare className="w-3.5 h-3.5" /> {a.telefono ? 'WhatsApp' : 'Sin teléfono'}
+                  </button>
+                  <button type="button" disabled={!a.correo} onClick={() => enviarPendiente(a, 'email')}
+                    className="px-3 py-1.5 rounded-lg bg-blue-600 hover:bg-blue-500 text-white inline-flex items-center gap-1 cursor-pointer disabled:bg-slate-200 disabled:text-slate-400 disabled:cursor-not-allowed">
+                    <Mail className="w-3.5 h-3.5" /> {a.correo ? 'Correo' : 'Sin correo'}
+                  </button>
+                  <button type="button" onClick={() => descartarPendiente(a)} title="Queda anotado y no vuelve a salir"
+                    className="px-3 py-1.5 rounded-lg border border-slate-200 text-slate-500 hover:bg-slate-100 inline-flex items-center gap-1 cursor-pointer ml-auto">
+                    <BellOff className="w-3.5 h-3.5" /> No avisar
+                  </button>
+                </div>
+              </li>
+            ))}
+          </ul>
+        )}
       </div>
 
       {/* Monitor de alertas */}
@@ -203,21 +254,21 @@ export default function AlertsNotificationsTab({
         <div>
           <h2 className="text-lg font-bold text-slate-800 flex items-center gap-2">
             <AlertTriangle className="w-5 h-5 text-amber-500" />
-            Alertas Preventivas del Sistema de Flotas
+            Vencimientos de la flota
           </h2>
-          <p className="text-xs text-slate-400">ITV, seguro, impuesto y mantenimiento se crean y renuevan solas al registrar los vencimientos del vehículo</p>
+          <p className="text-xs text-slate-400">ITV, seguro, impuesto y cambio de aceite se crean y renuevan solos con las fechas de la ficha del vehículo. Lo más urgente va arriba.</p>
         </div>
 
-        <div className="flex gap-2 p-1 border-slate-100 border text-xs bg-slate-50/40 rounded-lg w-full sm:w-fit">
-          {['all', 'itv', 'seguro', 'impuesto', 'mantenimiento'].map(tipo => (
+        <div className="flex flex-wrap gap-2 p-1 border-slate-100 border text-xs bg-slate-50/40 rounded-lg w-full sm:w-fit">
+          {['all', 'itv', 'seguro', 'impuesto', 'aceite'].map(tipo => (
             <button
               key={tipo}
               onClick={() => setSelectedTipoFilter(tipo)}
-              className={`flex-1 py-1 px-2.5 font-bold capitalize text-[10px] rounded transition-all cursor-pointer ${
+              className={`flex-1 py-1 px-2.5 font-bold text-[10px] rounded transition-all cursor-pointer ${
                 selectedTipoFilter === tipo ? 'bg-white text-slate-800 shadow-3xs' : 'text-slate-500 hover:text-slate-700'
               }`}
             >
-              {tipo === 'all' ? 'Ver Todas' : tipo}
+              {tipo === 'all' ? 'Ver todas' : NOMBRE_TIPO[tipo as AlertaTipo]}
             </button>
           ))}
         </div>
@@ -226,12 +277,14 @@ export default function AlertsNotificationsTab({
           {filteredAlertas.length === 0 ? (
             <div className="text-center py-10 bg-slate-50 border border-slate-100 rounded-xl text-slate-400 text-xs">
               <Check className="w-6 h-6 text-blue-500 mx-auto mb-2" />
-              No se registran alertas preventivas activas en este momento.
+              No hay vencimientos en este momento.
             </div>
           ) : (
             pagAlertas.items.map(al => {
               const veh = vehiculos.find(v => v.id === al.vehiculoId);
-              const proxima = al.estado !== 'atendida' && estaProximaAVencer(al, veh);
+              const e = estadoAlerta(al, hoy);
+              const cliente = al.tipo === 'aceite' ? clienteDelVehiculo(al.vehiculoId, ordenesTrabajo, clientes) : undefined;
+              const ultimo = al.tipo === 'aceite' ? ultimoAvisoAceite(al.vehiculoId) : undefined;
               return (
                 <div
                   key={al.id}
@@ -240,37 +293,37 @@ export default function AlertsNotificationsTab({
                   className={`p-4 rounded-xl border transition-colors cursor-pointer ${
                     selectedAlertaId === al.id
                       ? 'border-2 border-blue-400 bg-blue-50/50 shadow-sm shadow-blue-100'
-                      : al.estado === 'activa'
-                      ? 'border-rose-200 bg-rose-50/40 hover:border-rose-300'
-                      : al.estado === 'pendiente'
-                      ? 'border-amber-200 bg-amber-50/30 hover:border-amber-300'
+                      : e === 'vencida' ? 'border-rose-200 bg-rose-50/40 hover:border-rose-300'
+                      : e === 'pronto' ? 'border-amber-200 bg-amber-50/30 hover:border-amber-300'
                       : 'border-slate-200 bg-slate-50 hover:border-slate-300'
                   }`}
                 >
                   <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3">
                     <div className="space-y-1">
-                      <div className="flex items-center gap-1.5">
-                        <span className={`px-2 py-0.5 rounded text-[9px] font-extrabold uppercase ${
-                          al.tipo === 'itv' ? 'bg-amber-100 text-amber-800' :
-                          al.tipo === 'seguro' ? 'bg-red-100 text-red-800' : 'bg-blue-100 text-blue-800'
-                        }`}>
-                          {al.tipo}
-                        </span>
-                        {veh && (
-                          <strong className="text-xs text-slate-800 font-bold">{veh.marca} ({veh.matricula})</strong>
-                        )}
+                      <div className="flex flex-wrap items-center gap-1.5">
+                        <span className="px-2 py-0.5 rounded text-[9px] font-extrabold uppercase bg-slate-200 text-slate-700">{NOMBRE_TIPO[al.tipo]}</span>
+                        <span data-testid="plazo-alerta" className={`px-2 py-0.5 rounded text-[10px] font-bold ${COLOR_PLAZO[e]}`}>{textoPlazo(al, hoy)}</span>
+                        {veh && <strong className="text-xs text-slate-800 font-bold">{veh.marca} ({veh.matricula})</strong>}
                       </div>
                       <p className="text-xs text-slate-600 font-medium leading-relaxed">{al.descripcion}</p>
                       {al.fechaLimite && (
                         <div className="text-[10px] text-slate-400 font-semibold flex items-center gap-1">
-                          <Calendar className="w-3 h-3 text-slate-400" /> Vencimiento: {formatDate(al.fechaLimite)}
+                          <Calendar className="w-3 h-3 text-slate-400" /> {al.tipo === 'aceite' ? 'Próximo cambio' : 'Vencimiento'}: {formatDate(al.fechaLimite)}
+                        </div>
+                      )}
+                      {al.tipo === 'aceite' && (
+                        <div className="text-[10px] font-semibold text-slate-500 flex items-center gap-1" data-testid="aceite-cliente">
+                          <Clock className="w-3 h-3 text-slate-400" />
+                          {cliente
+                            ? <>Cliente: {cliente.nombre} {cliente.apellidos}{cliente.noAvisar ? ' (no quiere avisos)' : ultimo ? ` · último aviso: ${ETIQUETA_EVENTO[ultimo.tipoEvento]} por ${ultimo.tipoEnvio === 'whatsapp' ? 'WhatsApp' : ultimo.tipoEnvio === 'email' ? 'correo' : ultimo.tipoEnvio} el ${formatDate(ultimo.fechaEnvio.slice(0, 10))}` : ' · sin avisos todavía'}</>
+                            : 'Flota propia: control interno, no se avisa a ningún cliente'}
                         </div>
                       )}
                     </div>
 
                     {al.estado !== 'atendida' ? (
                       <button
-                        onClick={e => { e.stopPropagation(); handleResolveAlertClick(al); }}
+                        onClick={ev => { ev.stopPropagation(); handleResolveAlertClick(al); }}
                         id={`btn-resolve-alert-${al.id}`}
                         className="w-full sm:w-auto px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded text-[10px] font-bold transition duration-150 self-end sm:self-center cursor-pointer flex items-center gap-1 shrink-0 font-sans"
                       >
@@ -280,12 +333,6 @@ export default function AlertsNotificationsTab({
                       <span className="text-[10px] text-slate-400 font-bold uppercase shrink-0">✓ Atendida</span>
                     )}
                   </div>
-
-                  {proxima && (
-                    <div className="flex items-center gap-1 mt-3 pt-3 border-t border-slate-200/60 text-[10px] font-bold text-amber-700 bg-amber-50 px-2 py-1 rounded-full w-fit">
-                      <Clock className="w-3 h-3" /> Próxima a vencer — conviene avisar al cliente
-                    </div>
-                  )}
                 </div>
               );
             })
@@ -294,14 +341,14 @@ export default function AlertsNotificationsTab({
         <Pagination {...pagAlertas.props} />
       </div>
 
-      {/* Notificación manual al cliente */}
+      {/* Aviso manual */}
       <div className="bg-white p-6 rounded-2xl border border-slate-100 shadow-sm space-y-4">
         <div>
-          <h2 className="text-lg font-bold text-slate-800 flex items-center gap-2 font-display">
-            <Sparkles className="w-5 h-5 text-blue-600" />
-            Notificación Manual al Cliente
+          <h2 className="text-lg font-bold text-slate-800 flex items-center gap-2">
+            <Send className="w-5 h-5 text-blue-600" />
+            Aviso manual a un cliente
           </h2>
-          <p className="text-xs text-slate-400">Redacta y registra un aviso por email, SMS o WhatsApp (envío automático aún no activado)</p>
+          <p className="text-xs text-slate-400">Para cualquier otro aviso. Se abre WhatsApp o tu correo con el texto escrito y queda anotado en el historial del cliente.</p>
         </div>
         {selectedAlertaId && (
           <div className="flex items-center gap-2 px-3 py-2 bg-blue-50 border border-blue-200 rounded-lg text-xs text-blue-700 font-semibold">
@@ -313,119 +360,73 @@ export default function AlertsNotificationsTab({
 
         {clientes.length === 0 || vehiculos.length === 0 ? (
           <div className="text-center py-10 bg-slate-50 border border-slate-200 rounded-xl text-xs text-slate-400">
-            Registre algún cliente y vehículo para poder enviar notificaciones.
+            Registre algún cliente y vehículo para poder enviar avisos.
           </div>
         ) : (
-          <form onSubmit={handleDispatchSubmit} className="p-4.5 bg-slate-50/40 border border-slate-100 rounded-xl space-y-3.5 grid grid-cols-1 sm:grid-cols-2 gap-x-4 sm:gap-y-0 gap-y-3.5" id="notif-dispatch-form">
+          <form onSubmit={ev => ev.preventDefault()} className="p-4.5 bg-slate-50/40 border border-slate-100 rounded-xl space-y-3.5 grid grid-cols-1 sm:grid-cols-2 gap-x-4 sm:gap-y-0 gap-y-3.5" id="notif-dispatch-form">
             <div className="space-y-1">
               <label className="block text-[10px] font-bold text-slate-500 uppercase">Destinatario (Cliente)</label>
-              <select
-                value={targetClienteId}
-                onChange={e => setTargetClienteId(e.target.value)}
-                className="w-full px-2.5 py-1.5 border border-slate-200 bg-white rounded-lg text-xs font-semibold text-slate-700 focus:outline-none"
-              >
-                {clientes.map(c => (
-                  <option key={c.id} value={c.id}>{c.nombre} {c.apellidos}</option>
-                ))}
+              <select value={targetClienteId} onChange={ev => setTargetClienteId(ev.target.value)}
+                className="w-full px-2.5 py-1.5 border border-slate-200 bg-white rounded-lg text-xs font-semibold text-slate-700 focus:outline-none">
+                {clientes.map(c => <option key={c.id} value={c.id}>{c.nombre} {c.apellidos}</option>)}
               </select>
             </div>
 
             <div className="space-y-1">
               <label className="block text-[10px] font-bold text-slate-500 uppercase">Vehículo</label>
-              <select
-                value={targetVehiculoId}
-                onChange={e => setTargetVehiculoId(e.target.value)}
-                className="w-full px-2.5 py-1.5 border border-slate-200 bg-white rounded-lg text-xs font-semibold text-slate-700 focus:outline-none"
-              >
-                {vehiculos.map(v => (
-                  <option key={v.id} value={v.id}>{v.marca} ({v.matricula})</option>
-                ))}
+              <select value={targetVehiculoId} onChange={ev => setTargetVehiculoId(ev.target.value)}
+                className="w-full px-2.5 py-1.5 border border-slate-200 bg-white rounded-lg text-xs font-semibold text-slate-700 focus:outline-none">
+                {vehiculos.map(v => <option key={v.id} value={v.id}>{v.marca} ({v.matricula})</option>)}
               </select>
             </div>
 
             <div className="space-y-1 sm:col-span-2">
               <label className="block text-[10px] font-bold text-slate-500 uppercase">Motivo / Plantilla</label>
-              <select
-                value={selectedTemplate}
-                onChange={e => setSelectedTemplate(e.target.value as NotificacionCliente['tipoEvento'])}
-                className="w-full px-2.5 py-1.5 border border-slate-200 bg-white rounded-lg text-xs font-semibold text-slate-700 focus:outline-none"
-              >
-                <option value="mantenimiento_preventivo">⚙️ Mantenimiento Técnico Programado</option>
-                <option value="itv_proxima">⚠️ Vencimiento de ITV Próximo</option>
-                <option value="reserva_confirmada">📅 Confirmación de Reserva Alquiler</option>
-                <option value="vencimiento_seguro">🛡️ Alerta Renovación Póliza Seguro</option>
-                <option value="reparacion_lista">🔧 Vehículo reparado listo para entrega</option>
+              <select value={selectedTemplate} onChange={ev => setSelectedTemplate(ev.target.value as NotificacionCliente['tipoEvento'])}
+                className="w-full px-2.5 py-1.5 border border-slate-200 bg-white rounded-lg text-xs font-semibold text-slate-700 focus:outline-none">
+                <option value="aceite_recordatorio">Cambio de aceite</option>
+                <option value="itv_proxima">Vencimiento de ITV</option>
+                <option value="vencimiento_seguro">Renovación del seguro</option>
+                <option value="reserva_confirmada">Confirmación de reserva</option>
+                <option value="reparacion_lista">Vehículo reparado, listo para entrega</option>
               </select>
             </div>
 
             <div className="space-y-1 sm:col-span-2">
-              <label className="block text-[10px] font-bold text-slate-500 uppercase">Canal de Envío</label>
-              <div className="grid grid-cols-3 gap-2">
-                {(['email', 'sms', 'whatsapp'] as const).map(ch => (
-                  <button
-                    key={ch}
-                    type="button"
-                    onClick={() => setDispatchChannel(ch)}
-                    className={`py-1 rounded-lg border text-xs font-bold transition capitalize flex items-center justify-center gap-1 cursor-pointer font-sans ${
-                      dispatchChannel === ch
-                        ? 'bg-blue-600 text-white border-blue-600'
-                        : 'bg-white text-slate-600 border-slate-200'
-                    }`}
-                  >
-                    {ch === 'email' ? <Mail className="w-3 h-3" /> : ch === 'whatsapp' ? <MessageSquare className="w-3 h-3" /> : <Phone className="w-3 h-3" />}
-                    {ch}
-                  </button>
-                ))}
-              </div>
+              <label className="block text-[10px] font-bold text-slate-500 uppercase">Asunto (solo para el correo)</label>
+              <input type="text" value={customSubject} onChange={ev => setCustomSubject(ev.target.value)}
+                className="w-full px-3 py-1 border border-slate-200 bg-white rounded-lg text-xs focus:outline-none" />
             </div>
-
-            {dispatchChannel === 'email' && (
-              <div className="space-y-1 sm:col-span-2">
-                <label className="block text-[10px] font-bold text-slate-500 uppercase">Asunto del Correo</label>
-                <input
-                  type="text"
-                  value={customSubject}
-                  onChange={e => setCustomSubject(e.target.value)}
-                  className="w-full px-3 py-1 border border-slate-200 bg-white rounded-lg text-xs focus:outline-none"
-                />
-              </div>
-            )}
 
             <div className="space-y-1 sm:col-span-2">
               <label className="block text-[10px] font-bold text-slate-500 uppercase">Mensaje</label>
-              <textarea
-                rows={4}
-                value={customBody}
-                onChange={e => setCustomBody(e.target.value)}
-                className="w-full p-2.5 border border-slate-200 bg-white font-semibold text-slate-600 rounded-lg text-xs leading-relaxed focus:outline-none focus:ring-1 focus:ring-blue-500"
-              />
+              <textarea rows={4} value={customBody} onChange={ev => setCustomBody(ev.target.value)}
+                className="w-full p-2.5 border border-slate-200 bg-white font-semibold text-slate-600 rounded-lg text-xs leading-relaxed focus:outline-none focus:ring-1 focus:ring-blue-500" />
             </div>
 
-            <div className="flex justify-end gap-2 text-xs sm:col-span-2">
-              {sendingDone && (
-                <span className="text-blue-600 font-bold flex items-center gap-1 animate-bounce">
-                  ✓ ¡Notificación registrada!
-                </span>
-              )}
-              <button
-                type="submit"
-                className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-bold transition flex items-center gap-1 cursor-pointer font-sans"
-              >
-                <Send className="w-3.5 h-3.5" /> Registrar notificación
+            <div className="flex flex-wrap justify-end items-center gap-2 text-xs sm:col-span-2">
+              {registrado && <span className="text-blue-600 font-bold">✓ Anotado en el historial</span>}
+              <button type="button" disabled={!clienteManual?.telefono} onClick={() => enviarManual('whatsapp')}
+                className="px-4 py-2 bg-green-600 hover:bg-green-500 text-white rounded-xl font-bold inline-flex items-center gap-1 cursor-pointer disabled:bg-slate-200 disabled:text-slate-400 disabled:cursor-not-allowed">
+                <MessageSquare className="w-3.5 h-3.5" /> {clienteManual?.telefono ? 'Abrir WhatsApp' : 'Sin teléfono'}
+              </button>
+              <button type="button" disabled={!clienteManual?.correo} onClick={() => enviarManual('email')}
+                className="px-4 py-2 bg-blue-600 hover:bg-blue-500 text-white rounded-xl font-bold inline-flex items-center gap-1 cursor-pointer disabled:bg-slate-200 disabled:text-slate-400 disabled:cursor-not-allowed">
+                <Mail className="w-3.5 h-3.5" /> {clienteManual?.correo ? 'Abrir correo' : 'Sin correo'}
               </button>
             </div>
           </form>
         )}
       </div>
 
-      {/* Dispatched history logs */}
+      {/* Historial de avisos */}
       <div className="bg-white p-6 rounded-2xl border border-slate-100 shadow-sm space-y-4">
         <div>
           <h3 className="text-sm font-bold text-slate-800 uppercase tracking-wider flex items-center gap-1.5 font-display">
             <MessageSquare className="w-4 h-4 text-blue-600" />
-            Registro de Comunicaciones con Clientes
+            Registro de avisos a clientes
           </h3>
-          <p className="text-[11px] text-slate-400">Avisos registrados para recordatorios de ITV, seguro y mantenimiento. No se envían automáticamente: envíalos tú por email o WhatsApp.</p>
+          <p className="text-[11px] text-slate-400">Lo que se ha avisado (o descartado). Si eliminas un registro, ese aviso vuelve a salir en «Toca avisar» cuando corresponda.</p>
         </div>
 
         <div className="space-y-2">
@@ -434,25 +435,25 @@ export default function AlertsNotificationsTab({
           ) : (
             pagAvisos.items.map(not => {
               const cli = clientes.find(c => c.id === not.clienteId);
+              const veh = vehiculos.find(v => v.id === not.vehiculoId);
+              const omitido = not.tipoEnvio === 'omitido';
               return (
                 <div key={not.id} className="p-3 bg-slate-50 border border-slate-100 rounded-xl space-y-1.5 hover:bg-slate-100/50 transition">
                   <div className="flex justify-between items-center text-[10px] font-bold text-slate-400">
                     <span className="flex items-center gap-1">
-                      {not.tipoEnvio === 'email' ? <Mail className="w-3 h-3 text-blue-500" /> : not.tipoEnvio === 'whatsapp' ? <MessageSquare className="w-3 h-3 text-emerald-500" /> : <Phone className="w-3 h-3 text-amber-500" />}
-                      {cli ? `${cli.nombre} ${cli.apellidos}` : 'Cliente desconocido'} ({not.tipoEnvio.toUpperCase()})
+                      {not.tipoEnvio === 'email' ? <Mail className="w-3 h-3 text-blue-500" /> : omitido ? <BellOff className="w-3 h-3 text-slate-400" /> : <MessageSquare className="w-3 h-3 text-emerald-500" />}
+                      {cli ? `${cli.nombre} ${cli.apellidos}` : 'Cliente desconocido'} ({omitido ? 'DESCARTADO' : not.tipoEnvio === 'whatsapp' ? 'WHATSAPP' : not.tipoEnvio === 'email' ? 'CORREO' : not.tipoEnvio.toUpperCase()})
+                      {veh && <span className="font-mono text-slate-400"> · {veh.matricula}</span>}
                     </span>
-                    <span>{formatDate(not.fechaEnvio)}</span>
+                    <span>{formatDate(not.fechaEnvio.slice(0, 10))}</span>
                   </div>
                   {not.asunto && <strong className="text-slate-800 text-xs block font-bold">{not.asunto}</strong>}
-                  <p className="text-xs text-slate-600 leading-relaxed font-semibold whitespace-pre-line">{not.mensaje}</p>
+                  {!omitido && <p className="text-xs text-slate-600 leading-relaxed font-semibold whitespace-pre-line">{not.mensaje}</p>}
 
                   <div className="flex justify-between items-center text-[9px] text-slate-400 pt-1">
-                    <span>Filtro evento: {not.tipoEvento.replace('_', ' ')}</span>
-                    <button
-                      onClick={() => onDeleteNotificacion(not.id)}
-                      className="text-slate-400 hover:text-rose-600 text-[10px] shrink-0 cursor-pointer"
-                    >
-                      Eliminar Registro
+                    <span>{ETIQUETA_EVENTO[not.tipoEvento] ?? not.tipoEvento}</span>
+                    <button onClick={() => onDeleteNotificacion(not.id)} className="text-slate-400 hover:text-rose-600 text-[10px] shrink-0 cursor-pointer">
+                      Eliminar registro
                     </button>
                   </div>
                 </div>
@@ -462,20 +463,12 @@ export default function AlertsNotificationsTab({
         </div>
         <Pagination {...pagAvisos.props} />
       </div>
-      <ConfirmDialog
-        isOpen={confirmAlerta.isOpen}
-        title={confirmAlerta.title}
-        message={confirmAlerta.message}
-        confirmLabel="Sí, confirmar"
-        variant="info"
-        onConfirm={() => { confirmAlerta.onConfirm(); setConfirmAlerta(prev => ({ ...prev, isOpen: false })); }}
-        onCancel={() => setConfirmAlerta(prev => ({ ...prev, isOpen: false }))}
-      />
       {renovando && (
         <RenovarVencimientoModal
           titulo={renovando.titulo}
           etiquetaRealizado={renovando.etiqueta}
           vencimientoAnterior={renovando.alerta.fechaLimite}
+          {...(renovando.alerta.tipo === 'aceite' ? { etiquetaFecha: 'Fecha del cambio', etiquetaAnterior: 'Próximo cambio previsto', etiquetaNuevo: 'Próximo cambio' } : {})}
           onConfirm={nuevaFecha => { onTriggerAutoRenew(renovando.alerta.vehiculoId, renovando.alerta.tipo, nuevaFecha); setRenovando(null); }}
           onCancel={() => setRenovando(null)}
         />

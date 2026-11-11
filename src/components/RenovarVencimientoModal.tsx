@@ -10,6 +10,10 @@ interface Props {
   etiquetaRealizado: string;
   /** Vencimiento que tenía hasta ahora, solo informativo. */
   vencimientoAnterior?: string;
+  /** Textos que cambian según lo que se cierre (por defecto, los de un vencimiento). */
+  etiquetaFecha?: string;
+  etiquetaAnterior?: string;
+  etiquetaNuevo?: string;
   onConfirm: (nuevoVencimiento: string) => void;
   onCancel: () => void;
 }
@@ -19,7 +23,7 @@ interface Props {
  * haber sido ayer) y el nuevo vencimiento se calcula con +1 año, pero se puede
  * ajustar a mano (p. ej. un seguro semestral).
  */
-export default function RenovarVencimientoModal({ titulo, etiquetaRealizado, vencimientoAnterior, onConfirm, onCancel }: Props) {
+export default function RenovarVencimientoModal({ titulo, etiquetaRealizado, vencimientoAnterior, etiquetaFecha, etiquetaAnterior = 'Vencimiento anterior', etiquetaNuevo = 'Nuevo vencimiento', onConfirm, onCancel }: Props) {
   const [realizado, setRealizado] = useState(hoyISO());
   const [vencimiento, setVencimiento] = useState(sumarAnios(hoyISO(), 1));
   const [vencimientoAjustado, setVencimientoAjustado] = useState(false);
@@ -51,10 +55,10 @@ export default function RenovarVencimientoModal({ titulo, etiquetaRealizado, ven
 
         <div className="px-6 py-4 space-y-4">
           {vencimientoAnterior && (
-            <p className="text-xs text-slate-500">Vencimiento anterior: <strong className="text-slate-700">{formatDate(vencimientoAnterior)}</strong></p>
+            <p className="text-xs text-slate-500">{etiquetaAnterior}: <strong className="text-slate-700">{formatDate(vencimientoAnterior)}</strong></p>
           )}
           <div>
-            <label className="block text-xs font-bold text-slate-500 uppercase">Fecha de {etiquetaRealizado}</label>
+            <label className="block text-xs font-bold text-slate-500 uppercase">{etiquetaFecha ?? `Fecha de ${etiquetaRealizado}`}</label>
             <input
               type="date"
               value={realizado}
@@ -64,7 +68,7 @@ export default function RenovarVencimientoModal({ titulo, etiquetaRealizado, ven
             />
           </div>
           <div>
-            <label className="block text-xs font-bold text-slate-500 uppercase">Nuevo vencimiento</label>
+            <label className="block text-xs font-bold text-slate-500 uppercase">{etiquetaNuevo}</label>
             <input
               type="date"
               value={vencimiento}

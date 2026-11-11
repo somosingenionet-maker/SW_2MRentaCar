@@ -146,6 +146,8 @@ export interface Cliente {
    * un vehículo de flota propio (el selector de vehículo se oculta en el CRM).
    */
   esClienteAlquiler?: boolean;
+  /** El cliente pidió no recibir avisos (recordatorios de aceite, etc.). */
+  noAvisar?: boolean;
   interacciones: InteraccionCliente[];
   fechaRegistro: string;
   /** IDs de los vehículos de flota (taller) asociados a este cliente. */
@@ -287,7 +289,7 @@ export interface SolicitudReserva {
   reservaId?: string;
 }
 
-export type AlertaTipo = 'itv' | 'mantenimiento' | 'seguro' | 'impuesto';
+export type AlertaTipo = 'itv' | 'seguro' | 'impuesto' | 'aceite';
 
 export interface Alerta {
   id: string;
@@ -305,12 +307,15 @@ export interface NotificacionCliente {
   id: string;
   clienteId: string;
   vehiculoId?: string;
-  tipoEnvio: 'email' | 'sms' | 'whatsapp';
+  /** «omitido» = el taller decidió no avisar (queda anotado para que el aviso no vuelva a salir). */
+  tipoEnvio: 'email' | 'sms' | 'whatsapp' | 'omitido';
   asunto?: string;
   mensaje: string;
   fechaEnvio: string;
   leido: boolean;
-  tipoEvento: 'mantenimiento_preventivo' | 'itv_proxima' | 'reserva_confirmada' | 'vencimiento_seguro' | 'reparacion_lista';
+  tipoEvento: 'mantenimiento_preventivo' | 'itv_proxima' | 'reserva_confirmada' | 'vencimiento_seguro' | 'reparacion_lista' | 'aceite_entrega' | 'aceite_recordatorio' | 'aceite_vencido';
+  /** Qué dato motivó el aviso (fecha del próximo cambio u orden de trabajo): evita repetir el mismo aviso. */
+  referencia?: string;
 }
 
 export interface Tecnico {

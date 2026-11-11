@@ -156,6 +156,13 @@ describe('mensajes de WhatsApp al mecánico', () => {
     expect(enlaceWhatsApp('+34 623 59 64 15', 'Hola & adiós')).toBe('https://wa.me/34623596415?text=Hola%20%26%20adi%C3%B3s');
     expect(enlaceWhatsApp(undefined, 'x')).toBe('https://wa.me/?text=x');
   });
+  it('un móvil español sin prefijo recibe el 34 para que wa.me abra el chat; un 00 internacional se quita', () => {
+    expect(enlaceWhatsApp(' 644 09 50 97 ', 'x')).toBe('https://wa.me/34644095097?text=x');
+    expect(enlaceWhatsApp('971 12 34 56', 'x')).toBe('https://wa.me/34971123456?text=x');
+    expect(enlaceWhatsApp('0049 170 1234567', 'x')).toBe('https://wa.me/491701234567?text=x');
+    expect(enlaceWhatsApp('+18505300291', 'x')).toBe('https://wa.me/18505300291?text=x');
+    expect(enlaceWhatsApp('34644095097', 'x')).toBe('https://wa.me/34644095097?text=x');
+  });
 });
 
 describe('datos vacíos de órdenes antiguas (la base de datos los permite)', () => {
