@@ -1,4 +1,5 @@
 import type { OrdenTrabajo, OTEstado } from '../types';
+import { formatDate } from './dateFormat';
 
 /** Estados en los que el coche está físicamente en el taller y el mecánico lo trabaja. */
 export type EstadoTaller = Extract<OTEstado, 'recibido' | 'en_reparacion' | 'listo'>;
@@ -15,8 +16,10 @@ export interface OrdenMecanico {
   id: string;
   numero: string;
   estado: EstadoTaller;
-  /** Puede venir vacía en órdenes antiguas. */
+  /** Puede venir vacía en órdenes antiguas. Es solo un día y a veces una fecha prevista. */
   recepcion?: string | null;
+  /** Cuándo entró de verdad el coche al taller (fecha y hora, del historial de la orden). Si no consta, la fecha de recepción. */
+  ingreso?: string | null;
   fechaEstimadaEntrega?: string | null;
   kilometraje?: number | null;
   problema?: string | null;
@@ -40,10 +43,34 @@ export function progresoMecanico(o: Pick<OrdenMecanico, 'tareas'>): { hechas: nu
   return { hechas: o.tareas.filter(t => t.hecha).length, total: o.tareas.length };
 }
 
-/** Primero lo que se está trabajando, luego lo pendiente de empezar y al final lo ya listo. */
+/** Instante de ingreso de una orden en milisegundos; sin dato válido, al final de la lista. */
+const msIngreso = (o: Pick<OrdenMecanico, 'ingreso' | 'recepcion'>): number => {
+  const t = Date.parse(o.ingreso || o.recepcion || '');
+  return Number.isNaN(t) ? Number.POSITIVE_INFINITY : t;
+};
+
+/**
+ * Lista del mecánico: primero lo que está trabajando, luego lo pendiente de empezar y al final lo ya listo. Dentro de
+ * cada grupo, el coche que entró antes (fecha y hora) va primero y los nuevos se quedan abajo: se van sacando en orden.
+ */
 const PRIORIDAD: Record<EstadoTaller, number> = { en_reparacion: 0, recibido: 1, listo: 2 };
 export function ordenarParaMecanico(ordenes: OrdenMecanico[]): OrdenMecanico[] {
-  return [...ordenes].sort((a, b) => PRIORIDAD[a.estado] - PRIORIDAD[b.estado] || (b.recepcion ?? '').localeCompare(a.recepcion ?? '') || (b.numero ?? '').localeCompare(a.numero ?? ''));
+  return [...ordenes].sort((a, b) => {
+    const ia = msIngreso(a), ib = msIngreso(b);
+    return PRIORIDAD[a.estado] - PRIORIDAD[b.estado]
+      || (ia === ib ? 0 : ia < ib ? -1 : 1)
+      || (a.numero ?? '').localeCompare(b.numero ?? '', undefined, { numeric: true });
+  });
+}
+
+/** «10 nov. 2026 · 12:27» (hora local del aparato); si solo hay el día, solo el día; sin dato, «—». */
+export function formatoIngreso(valor: string | null | undefined): string {
+  if (!valor) return '—';
+  if (!valor.includes('T')) return formatDate(valor);
+  const d = new Date(valor);
+  if (Number.isNaN(d.getTime())) return '—';
+  const dos = (n: number) => String(n).padStart(2, '0');
+  return `${formatDate(`${d.getFullYear()}-${dos(d.getMonth() + 1)}-${dos(d.getDate())}`)} · ${dos(d.getHours())}:${dos(d.getMinutes())}`;
 }
 
 /** Órdenes que no estaban en la lista anterior: las que acaban de asignarle. Sin lista anterior (primera carga) no hay nuevas. */

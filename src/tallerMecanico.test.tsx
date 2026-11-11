@@ -29,6 +29,17 @@ describe('tarjeta del mecánico', () => {
     expect(t).not.toContain('Pastillas gastadas');
   });
 
+  it('enseña la fecha y la hora de ingreso del coche, también con la tarjeta cerrada', () => {
+    const ingreso = new Date(2026, 9, 29, 8, 5).toISOString();
+    expect(texto(pinta({ ingreso }, { abierta: false }))).toContain('Ingreso: 29 oct. 2026 · 08:05');
+    expect(texto(pinta({ ingreso }))).toContain('Ingreso al taller 29 oct. 2026 · 08:05');
+  });
+
+  it('sin hora de ingreso (órdenes antiguas) enseña la fecha de recepción', () => {
+    expect(texto(pinta({ ingreso: null }, { abierta: false }))).toContain('Ingreso: 30 oct. 2026');
+    expect(texto(pinta({ ingreso: undefined, recepcion: null }, { abierta: false }))).toContain('Ingreso: —');
+  });
+
   it('abierta enseña los datos de trabajo, las tareas con su estado y las piezas', () => {
     const t = texto(pinta());
     for (const x of ['OT-2026-001', '120.500 km', 'Frena mal', 'Pastillas gastadas', 'Ojo con el tornillo', 'Cambiar pastillas', 'Purgar frenos', 'Pastillas Brembo', 'Pedro']) expect(t).toContain(x);

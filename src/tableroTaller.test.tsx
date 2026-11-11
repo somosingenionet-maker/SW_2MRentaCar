@@ -24,6 +24,16 @@ describe('tablero del taller', () => {
     for (const x of ['0069LJX', 'Peugeot 3008', 'OT-1', 'En reparación', 'Mecánico: Pedro', '1 de 2 tareas', 'Actualizado hace 5 min']) expect(t).toContain(x);
   });
 
+  it('enseña cuándo ingresó cada coche: el momento del historial, o la fecha de recepción si no consta', () => {
+    const fecha = new Date(2026, 9, 28, 16, 40).toISOString();
+    const t = texto(pinta([
+      ot('1', 'v1', 'recibido', { fechaRecepcion: '2026-10-29', historial: [{ fecha, descripcion: 'Presupuesto aprobado — vehículo recibido en taller' }] as OrdenTrabajo['historial'] }),
+      ot('2', 'v2', 'recibido', { fechaRecepcion: '2026-10-25', historial: [] }),
+    ]));
+    expect(t).toContain('Ingreso: 28 oct. 2026 · 16:40');
+    expect(t).toContain('Ingreso: 25 oct. 2026');
+  });
+
   it('solo los coches que están en el taller, lo que se trabaja primero', () => {
     const h = pinta([ot('p', 'v1', 'presupuesto'), ot('r', 'v1', 'recibido'), ot('e', 'v2', 'en_reparacion'), ot('x', 'v1', 'entregado')]);
     expect((h.match(/data-testid="ficha-taller"/g) ?? []).length).toBe(2);

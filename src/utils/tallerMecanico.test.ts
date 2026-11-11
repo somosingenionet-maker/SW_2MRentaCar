@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import {
-  progresoMecanico, ordenarParaMecanico, ordenesNuevas, haceCuanto, descripcionVehiculo, progresoOT, fichasTaller, agruparTareasHechas, mensajeAvisoMecanico, mensajeEnlaceMecanico, enlaceWhatsApp,
+  progresoMecanico, ordenarParaMecanico, formatoIngreso, ordenesNuevas, haceCuanto, descripcionVehiculo, progresoOT, fichasTaller, agruparTareasHechas, mensajeAvisoMecanico, mensajeEnlaceMecanico, enlaceWhatsApp,
   type OrdenMecanico,
 } from './tallerMecanico';
 import type { OrdenTrabajo } from '../types';
@@ -18,14 +18,55 @@ describe('progresoMecanico', () => {
 });
 
 describe('ordenarParaMecanico', () => {
-  it('primero en reparación, luego por empezar, al final listo; dentro, lo más reciente primero', () => {
-    const r = ordenarParaMecanico([om('1', 'listo'), om('2', 'recibido', { recepcion: '2026-10-01' }), om('3', 'en_reparacion'), om('4', 'recibido', { recepcion: '2026-10-29' })]);
+  it('primero en reparación, luego por empezar, al final listo; dentro de cada grupo el que entró antes va primero', () => {
+    const r = ordenarParaMecanico([
+      om('1', 'listo'), om('2', 'recibido', { ingreso: '2026-10-29T10:00:00.000Z' }), om('3', 'en_reparacion'), om('4', 'recibido', { ingreso: '2026-10-01T10:00:00.000Z' }),
+    ]);
     expect(r.map(o => o.id)).toEqual(['3', '4', '2', '1']);
   });
+
+  it('el mismo día manda la hora: el que entró por la mañana antes que el de la tarde; los nuevos quedan abajo', () => {
+    const r = ordenarParaMecanico([
+      om('tarde', 'recibido', { ingreso: '2026-11-10T16:30:00.000Z' }),
+      om('nuevo', 'recibido', { ingreso: '2026-11-11T07:00:00.000Z' }),
+      om('manana', 'recibido', { ingreso: '2026-11-10T08:15:00.000Z' }),
+    ]);
+    expect(r.map(o => o.id)).toEqual(['manana', 'tarde', 'nuevo']);
+  });
+
+  it('manda el momento real de ingreso, no la fecha de recepción (que puede ser una fecha prevista, incluso futura)', () => {
+    const r = ordenarParaMecanico([
+      om('a', 'recibido', { recepcion: '2026-11-17', ingreso: '2026-11-10T22:54:00.000Z' }),
+      om('b', 'recibido', { recepcion: '2026-11-12', ingreso: '2026-11-11T06:33:00.000Z' }),
+      om('c', 'recibido', { recepcion: '2026-11-16', ingreso: '2026-11-11T09:41:00.000Z' }),
+    ]);
+    expect(r.map(o => o.id)).toEqual(['a', 'b', 'c']);
+  });
+
+  it('sin ingreso (órdenes antiguas) usa la fecha de recepción; con empate, el número de orden menor primero', () => {
+    const r = ordenarParaMecanico([
+      om('2', 'recibido', { ingreso: null, recepcion: '2026-10-05', numero: 'OT-2026-010' }),
+      om('1', 'recibido', { ingreso: null, recepcion: '2026-10-05', numero: 'OT-2026-009' }),
+      om('0', 'recibido', { ingreso: null, recepcion: '2026-10-01', numero: 'OT-2026-020' }),
+    ]);
+    expect(r.map(o => o.id)).toEqual(['0', '1', '2']);
+  });
+
   it('no modifica la lista original', () => {
     const l = [om('1', 'listo'), om('2', 'en_reparacion')];
     ordenarParaMecanico(l);
     expect(l.map(o => o.id)).toEqual(['1', '2']);
+  });
+});
+
+describe('formatoIngreso', () => {
+  it('con fecha y hora enseña las dos (hora local); con solo el día, el día; sin dato, un guion', () => {
+    const local = new Date(2026, 10, 10, 12, 27).toISOString();
+    expect(formatoIngreso(local)).toBe('10 nov. 2026 · 12:27');
+    expect(formatoIngreso('2026-11-10')).toBe('10 nov. 2026');
+    expect(formatoIngreso(null)).toBe('—');
+    expect(formatoIngreso(undefined)).toBe('—');
+    expect(formatoIngreso('2026-13-45T99:99')).toBe('—');
   });
 });
 
@@ -120,7 +161,7 @@ describe('mensajes de WhatsApp al mecánico', () => {
 describe('datos vacíos de órdenes antiguas (la base de datos los permite)', () => {
   it('ordenar para el mecánico no falla si falta la fecha de recepción', () => {
     const r = ordenarParaMecanico([om('1', 'recibido', { recepcion: null }), om('2', 'recibido', { recepcion: '2026-10-01' }), om('3', 'recibido', { recepcion: undefined })]);
-    expect(r.map(o => o.id)).toEqual(['2', '3', '1']); // con fecha primero; sin fecha, por número de orden de mayor a menor
+    expect(r.map(o => o.id)).toEqual(['2', '1', '3']); // con fecha primero; sin fecha, al final y por número de orden
   });
 
   it('el tablero del personal no falla si falta la fecha de actualización', () => {

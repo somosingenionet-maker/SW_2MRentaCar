@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { Bell, BellOff, Check, ChevronDown, ChevronUp, Gauge, RefreshCw, Wrench, Package, StickyNote, WifiOff } from 'lucide-react';
 import {
-  ETIQUETA_ESTADO_TALLER, descripcionVehiculo, haceCuanto, ordenarParaMecanico, ordenesNuevas, progresoMecanico,
+  ETIQUETA_ESTADO_TALLER, descripcionVehiculo, formatoIngreso, haceCuanto, ordenarParaMecanico, ordenesNuevas, progresoMecanico,
   type OrdenMecanico, type PaginaMecanico,
 } from '../utils/tallerMecanico';
 import { formatDate } from '../utils/dateFormat';
@@ -265,6 +265,7 @@ export function Tarjeta({ orden: o, color, ahora, abierta, nueva, ocupado, nota,
             {nueva && <span className="text-[11px] font-bold px-2 py-0.5 rounded-full text-white" style={{ backgroundColor: color }}>Nuevo</span>}
           </div>
           <p className="text-sm font-semibold text-slate-700 mt-0.5">{descripcionVehiculo(o.vehiculo)}</p>
+          <p data-testid="ingreso-orden" className="text-[11px] font-semibold text-slate-500 mt-0.5">Ingreso: {formatoIngreso(o.ingreso ?? o.recepcion)}</p>
           {o.problema && !abierta && <p className="text-xs text-slate-500 mt-1 line-clamp-2 whitespace-pre-line">{o.problema}</p>}
           {total > 0 && (
             <div className="mt-2" aria-label={`${hechas} de ${total} tareas hechas`}>
@@ -280,7 +281,7 @@ export function Tarjeta({ orden: o, color, ahora, abierta, nueva, ocupado, nota,
         <div className="px-4 pb-4 space-y-4 border-t border-slate-100 pt-3">
           <dl className="grid grid-cols-2 gap-2 text-xs">
             <div><dt className="text-slate-400 font-semibold">Orden</dt><dd className="font-bold text-slate-700">{o.numero}</dd></div>
-            <div><dt className="text-slate-400 font-semibold">Entrada</dt><dd className="font-bold text-slate-700">{o.recepcion ? formatDate(o.recepcion) : '—'}</dd></div>
+            <div><dt className="text-slate-400 font-semibold">Ingreso al taller</dt><dd className="font-bold text-slate-700">{formatoIngreso(o.ingreso ?? o.recepcion)}</dd></div>
             {o.kilometraje != null && <div><dt className="text-slate-400 font-semibold flex items-center gap-1"><Gauge className="w-3 h-3" /> Kilometraje</dt><dd className="font-bold text-slate-700">{o.kilometraje.toLocaleString('es-ES')} km</dd></div>}
             {o.fechaEstimadaEntrega && <div><dt className="text-slate-400 font-semibold">Entrega prevista</dt><dd className="font-bold text-slate-700">{formatDate(o.fechaEstimadaEntrega)}</dd></div>}
             {o.actualizada && <div className="col-span-2"><dt className="text-slate-400 font-semibold">Última novedad</dt><dd className="font-bold text-slate-700">{haceCuanto(o.actualizada, ahora)}</dd></div>}

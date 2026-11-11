@@ -1,6 +1,7 @@
 import { Wrench, UserX } from 'lucide-react';
 import type { OrdenTrabajo, Vehiculo } from '../types';
-import { fichasTaller, haceCuanto, type EstadoTaller } from '../utils/tallerMecanico';
+import { fichasTaller, formatoIngreso, haceCuanto, type EstadoTaller } from '../utils/tallerMecanico';
+import { ingresoDeOT } from '../utils/tallerOcupacion';
 
 const ESTADO: Record<EstadoTaller, { etiqueta: string; cls: string }> = {
   recibido: { etiqueta: 'Recibido', cls: 'bg-slate-100 text-slate-700' },
@@ -65,6 +66,7 @@ export default function TableroTaller({ ordenes, vehiculos, tareasHechas, onSele
               ) : (
                 <p className="text-[11px] text-slate-400">Sin tareas detalladas</p>
               )}
+              <p data-testid="ingreso-ficha" className="text-[11px] text-slate-500">Ingreso: <strong className="text-slate-700">{formatoIngreso(ingresoDeOT(ot)?.fechaHora ?? ot.fechaRecepcion)}</strong></p>
               <p className="text-[10px] text-slate-400">Actualizado {haceCuanto(ot.fechaActualizacion, ahora) || '—'}</p>
             </Tag>
           );
