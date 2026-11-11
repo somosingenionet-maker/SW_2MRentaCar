@@ -1,5 +1,6 @@
 import type { OrdenTrabajo, OTEstado } from '../types';
 import { formatDate } from './dateFormat';
+import type { EstadoFiltros } from './filtrosAceite';
 
 /** Estados en los que el coche está físicamente en el taller y el mecánico lo trabaja. */
 export type EstadoTaller = Extract<OTEstado, 'recibido' | 'en_reparacion' | 'listo'>;
@@ -30,6 +31,10 @@ export interface OrdenMecanico {
   vehiculo: { matricula?: string | null; marca?: string | null; modelo?: string | null; anio?: number | null; color?: string | null };
   tareas: { id: string; descripcion: string; hecha: boolean; hechaPor?: string | null; hechaEn?: string | null; /** Minutos que le llevó, si lo indicó. */ duracionMin?: number | null }[];
   piezas: { descripcion: string; cantidad: number }[];
+  /** La orden es un cambio de aceite: se muestra el check list de filtros. */
+  cambioAceite?: boolean;
+  /** Filtros ya marcados: true = cambiado, false = no se cambió; los que faltan están sin revisar. */
+  filtros?: EstadoFiltros;
 }
 
 export interface PaginaMecanico {

@@ -21,10 +21,14 @@ import { genId } from '../utils/id';
 import { fmt2 } from '../utils/moneda';
 import CambioAceiteFields from './CambioAceiteFields';
 import { errorCambioAceite, estadoProximoCambio, normalizarAceite } from '../utils/cambioAceite';
+import { ResumenFiltros } from './ChecklistFiltros';
+import type { EstadoFiltros } from '../utils/filtrosAceite';
 
 interface VehiclesTabProps {
   vehiculos: Vehiculo[];
   ordenesTrabajo?: OrdenTrabajo[];
+  /** Check list del cambio de aceite de cada orden: { otId: { aire: true, diesel: false } }. */
+  filtrosOT?: Record<string, EstadoFiltros>;
   hasAlquileres?: boolean;
   onAddVehiculo: (vehiculo: Vehiculo) => void;
   onUpdateVehiculo: (vehiculo: Vehiculo) => void;
@@ -52,6 +56,7 @@ const OT_ESTADO_COLOR: Record<OTEstado, string> = {
 export default function VehiclesTab({
   vehiculos,
   ordenesTrabajo = [],
+  filtrosOT = {},
   hasAlquileres = false,
   onAddVehiculo,
   onUpdateVehiculo,
@@ -540,6 +545,13 @@ export default function VehiclesTab({
                                   <span className="font-semibold text-slate-600">{fmt2(ot.total)} €</span>
                                 </div>
                               </button>
+
+                              {/* Check list del cambio de aceite: siempre a la vista en la visita */}
+                              {ot.esCambioAceite && (
+                                <div className="px-3 pb-3 -mt-1">
+                                  <ResumenFiltros estado={filtrosOT[ot.id]} />
+                                </div>
+                              )}
 
                               {/* Historial expandido */}
                               {isOpen && (

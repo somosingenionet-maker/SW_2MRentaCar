@@ -10,13 +10,16 @@ import { AnimatePresence, motion } from 'motion/react';
 import {
   ClipboardList, Plus, Search, ChevronRight, X, Check, Trash2,
   Car, User, Calendar, Gauge, Wrench, Package, AlertCircle, FileText,
-  Bell, Printer, Pencil, MessageCircle, Mail, AlertTriangle
+  Bell, Printer, Pencil, MessageCircle, Mail, AlertTriangle, Droplets
 } from 'lucide-react';
 import { OrdenTrabajo, OTEstado, LineaOT, LineaOTTipo, Vehiculo, Cliente, EventoOT, Tecnico } from '../types';
 import { getEmpresaConfig } from '../data/empresaConfig';
 import { FLOTA_CLIENTE_ID } from '../utils/flota';
 import { formatoDuracion, formatoHorasCobradas, horasCobradas, tiempoRegistrado } from '../utils/duracionTarea';
 import TableroTaller from './TableroTaller';
+import { ChecklistFiltros } from './ChecklistFiltros';
+import type { EstadoFiltros, FiltroId } from '../utils/filtrosAceite';
+import { FILTROS_ACEITE } from '../utils/filtrosAceite';
 import { enlaceWhatsApp, mensajeAvisoMecanico } from '../utils/tallerMecanico';
 import { genId } from '../utils/id';
 import { InputPrecio } from './InputPrecio';
@@ -34,6 +37,10 @@ interface Props {
   tareasHechas?: Record<string, string[]>;
   /** Lo que le llevó cada tarea hecha, en minutos: { otId: { lineaId: minutos } }. */
   duracionesTareas?: Record<string, Record<string, number>>;
+  /** Check list del cambio de aceite de cada orden: { otId: { aire: true, diesel: false } }. */
+  filtrosOT?: Record<string, EstadoFiltros>;
+  /** Marca un filtro (true = cambiado, false = no se cambió, null = quitar la marca). */
+  onFiltro?: (otId: string, filtro: FiltroId, cambiado: boolean | null) => void;
   /** Orden que debe abrirse al entrar (por ejemplo, al llegar desde una cita de la Agenda). */
   abrirId?: string | null;
   /** Se llama cuando ya se ha atendido `abrirId`, para que la app lo olvide. */
@@ -87,6 +94,8 @@ interface OTForm {
   tecnicoAsignado: string;
   notas: string;
   ivaPct: number;
+  /** Solo al crear: la orden es un cambio de aceite y lleva el check list de filtros. */
+  esCambioAceite?: boolean;
 }
 
 const EMPTY_OT_FORM: OTForm = {
@@ -126,7 +135,7 @@ function evento(descripcion: string): EventoOT {
   return { fecha: new Date().toISOString(), descripcion };
 }
 
-export default function OrdenesTrabajoTab({ ordenes, vehiculos, clientes, tecnicos, onAdd, onUpdate, onDelete, tareasHechas = {}, duracionesTareas = {}, abrirId, onAbierta }: Props) {
+export default function OrdenesTrabajoTab({ ordenes, vehiculos, clientes, tecnicos, onAdd, onUpdate, onDelete, tareasHechas = {}, duracionesTareas = {}, filtrosOT = {}, onFiltro, abrirId, onAbierta }: Props) {
   const [search, setSearch] = useState('');
   const [filterEstado, setFilterEstado] = useState<OTEstado | 'todas'>('todas');
   const [selected, setSelected] = useSeleccion(ordenes);
@@ -253,6 +262,7 @@ export default function OrdenesTrabajoTab({ ordenes, vehiculos, clientes, tecnic
       diagnostico: otForm.diagnostico || undefined,
       tecnicoAsignado: otForm.tecnicoAsignado || undefined,
       notas: otForm.notas || undefined,
+      ...(otForm.esCambioAceite ? { esCambioAceite: true } : {}),
       lineas: formLineas,
       subtotal,
       ivaPct: otForm.ivaPct,
@@ -326,6 +336,31 @@ export default function OrdenesTrabajoTab({ ordenes, vehiculos, clientes, tecnic
       notificacionEnviada: true,
       fechaActualizacion: new Date().toISOString(),
       historial: [...(ot.historial ?? []), evento('Cliente notificado — vehículo listo para recoger')],
+    };
+    onUpdate(updated);
+    setSelected(updated);
+  };
+
+  // Check list del cambio de aceite (también lo marca el mecánico desde su enlace): lo marcado queda en el historial de la orden.
+  const handleFiltro = (ot: OrdenTrabajo, filtro: FiltroId, cambiado: boolean | null) => {
+    if (!onFiltro) return;
+    const nombre = FILTROS_ACEITE.find(f => f.id === filtro)?.nombre.toLowerCase() ?? filtro;
+    onFiltro(ot.id, filtro, cambiado);
+    const updated: OrdenTrabajo = {
+      ...ot,
+      fechaActualizacion: new Date().toISOString(),
+      historial: [...(ot.historial ?? []), evento(cambiado === null ? `El taller quitó la marca del ${nombre}` : `El taller marcó el ${nombre}: ${cambiado ? 'cambiado' : 'no se cambió'}`)],
+    };
+    onUpdate(updated);
+    setSelected(updated);
+  };
+
+  const handleCambioAceite = (ot: OrdenTrabajo, activo: boolean) => {
+    const updated: OrdenTrabajo = {
+      ...ot,
+      esCambioAceite: activo,
+      fechaActualizacion: new Date().toISOString(),
+      historial: [...(ot.historial ?? []), evento(activo ? 'Marcada como cambio de aceite' : 'Se quitó la marca de cambio de aceite')],
     };
     onUpdate(updated);
     setSelected(updated);
@@ -658,6 +693,24 @@ export default function OrdenesTrabajoTab({ ordenes, vehiculos, clientes, tecnic
                     </div>
                   );
                 })()}
+
+                {/* Cambio de aceite: interruptor y check list de filtros */}
+                {selected.estado !== 'cancelado' && (
+                  <div data-testid="bloque-cambio-aceite" className="rounded-xl border border-amber-100 bg-amber-50/40 p-3 space-y-2">
+                    <label className="flex items-center gap-2 text-xs font-bold text-slate-700 cursor-pointer">
+                      <input type="checkbox" data-testid="es-cambio-aceite" checked={!!selected.esCambioAceite} onChange={e => handleCambioAceite(selected, e.target.checked)} className="w-4 h-4 cursor-pointer" />
+                      <Droplets size={13} className="text-amber-500" /> Es un cambio de aceite
+                    </label>
+                    {selected.esCambioAceite && (
+                      <>
+                        <ChecklistFiltros estado={filtrosOT[selected.id] ?? {}} onCambiar={(f, v) => handleFiltro(selected, f, v)} />
+                        <p className="text-[11px] text-slate-400">
+                          Lo marca el mecánico desde su enlace o tú aquí, y aparece en el historial del vehículo. Al entregar el coche se anotan en su ficha la fecha y los km del cambio; el próximo cambio lo indicas tú en la ficha.
+                        </p>
+                      </>
+                    )}
+                  </div>
+                )}
 
                 {/* Lines */}
                 <div>
@@ -1341,6 +1394,11 @@ export default function OrdenesTrabajoTab({ ordenes, vehiculos, clientes, tecnic
                     </select>
                   </div>
                 )}
+
+                <label className="flex items-center gap-2 text-xs font-bold text-slate-700 cursor-pointer">
+                  <input type="checkbox" data-testid="nueva-es-cambio-aceite" checked={!!otForm.esCambioAceite} onChange={e => setOTForm(f => ({ ...f, esCambioAceite: e.target.checked }))} className="w-4 h-4 cursor-pointer" />
+                  <Droplets size={13} className="text-amber-500" /> Es un cambio de aceite (check list de filtros)
+                </label>
 
                 {/* Problema */}
                 <div>

@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { errorCambioAceite, estadoProximoCambio, normalizarAceite } from './cambioAceite';
+import { aceiteTrasEntrega, errorCambioAceite, estadoProximoCambio, normalizarAceite } from './cambioAceite';
 
 describe('errorCambioAceite', () => {
   it('todo vacío o completo y coherente es válido', () => {
@@ -46,5 +46,26 @@ describe('normalizarAceite', () => {
   it('conserva lo escrito y redondea los km', () => {
     expect(normalizarAceite({ aceiteFecha: '2026-10-01', aceiteKm: 85000.4, aceiteProximaFecha: '2027-10-01' })).toEqual({ aceiteFecha: '2026-10-01', aceiteKm: 85000, aceiteProximaFecha: '2027-10-01' });
     expect(normalizarAceite({ aceiteKm: 0 }).aceiteKm).toBe(0);
+  });
+});
+
+describe('aceiteTrasEntrega', () => {
+  const ot = { fechaEntrega: '2026-11-10', kilometrajeEntrada: 85000, kilometrajeSalida: 85010 };
+  it('anota la fecha de entrega y los km de salida, y borra el próximo cambio anterior', () => {
+    expect(aceiteTrasEntrega({ aceiteFecha: '2025-11-01', aceiteKm: 70000, aceiteProximaFecha: '2026-11-01' }, ot, '2026-11-11'))
+      .toEqual({ aceiteFecha: '2026-11-10', aceiteKm: 85010, aceiteProximaFecha: null });
+  });
+  it('sin km de salida usa los de entrada; sin fecha de entrega usa hoy', () => {
+    expect(aceiteTrasEntrega({}, { kilometrajeEntrada: 85000 }, '2026-11-11')).toEqual({ aceiteFecha: '2026-11-11', aceiteKm: 85000, aceiteProximaFecha: null });
+  });
+  it('sin km válidos conserva los que ya había', () => {
+    expect(aceiteTrasEntrega({ aceiteKm: 70000 }, { fechaEntrega: '2026-11-10', kilometrajeEntrada: 0 }, '2026-11-11')?.aceiteKm).toBe(70000);
+    expect(aceiteTrasEntrega({}, { fechaEntrega: '2026-11-10', kilometrajeEntrada: 0 }, '2026-11-11')?.aceiteKm).toBeNull();
+  });
+  it('si la ficha ya tiene un cambio posterior, no toca nada', () => {
+    expect(aceiteTrasEntrega({ aceiteFecha: '2026-11-11', aceiteKm: 86000 }, ot, '2026-11-11')).toBeNull();
+  });
+  it('el mismo día sí actualiza', () => {
+    expect(aceiteTrasEntrega({ aceiteFecha: '2026-11-10', aceiteKm: 1 }, ot, '2026-11-11')).not.toBeNull();
   });
 });

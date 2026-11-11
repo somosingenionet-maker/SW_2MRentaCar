@@ -12,6 +12,9 @@ import { sinClienteFlota } from './utils/flota';
 import { fetchSolicitudes, updateGestionSolicitud } from './data/solicitudesDb';
 import { fetchFirmasVigentes } from './data/contratosFirmadosDb';
 import { fetchTecnicos, guardarTecnico, fetchTareasTaller, renombrarTecnicoEnOrdenes } from './data/tecnicosDb';
+import { fetchFiltros, guardarFiltro } from './data/filtrosDb';
+import { aceiteTrasEntrega } from './utils/cambioAceite';
+import type { EstadoFiltros, FiltroId } from './utils/filtrosAceite';
 import { fetchInvitaciones, crearInvitacion, updateEstadoInvitacion } from './data/invitacionesDb';
 import LoginScreen from './components/LoginScreen';
 import {
@@ -68,6 +71,8 @@ export default function App() {
   // Tareas que los mecánicos han marcado como hechas: { otId: [lineaId, ...] }.
   const [tareasHechas, setTareasHechas] = useState<Record<string, string[]>>({});
   const [duracionesTareas, setDuracionesTareas] = useState<Record<string, Record<string, number>>>({});
+  // Check list del cambio de aceite de cada orden: { otId: { aire: true, diesel: false } }.
+  const [filtrosOT, setFiltrosOT] = useState<Record<string, EstadoFiltros>>({});
   // Catálogo de complementos de alquiler (sillitas, baca...), editable en Empresa.
   const [complementos, setComplementos] = useState<Complemento[]>([]);
   // Orden que Taller debe abrir al entrar (al llegar desde una cita de la Agenda).
@@ -108,6 +113,7 @@ export default function App() {
     fetchTecnicos().then(setTecnicos).catch(log('técnicos'));
     fetchAll<Complemento>('complementos').then(setComplementos).catch(log('complementos'));
     fetchTareasTaller().then(t => { setTareasHechas(t.hechas); setDuracionesTareas(t.duraciones); }).catch(log('tareas de los mecánicos'));
+    fetchFiltros().then(setFiltrosOT).catch(log('filtros del cambio de aceite'));
     fetchAll<Cita>('citas').then(setCitas).catch(log('citas'));
     fetchSolicitudes().then(setSolicitudes).catch(log('solicitudes de reserva'));
     fetchInvitaciones().then(setInvitaciones).catch(log('invitaciones de clientes'));
@@ -118,7 +124,7 @@ export default function App() {
   useEffect(() => {
     if (!currentUser) {
       setVehiculos([]); setClientes([]); setReservas([]);
-      setAlertas([]); setNotificaciones([]); setFacturas([]); setOrdenesTrabajo([]); setTecnicos([]); setCitas([]); setSolicitudes([]); setInvitaciones([]); setFirmasVigentes({}); setTareasHechas({}); setDuracionesTareas({}); setComplementos([]);
+      setAlertas([]); setNotificaciones([]); setFacturas([]); setOrdenesTrabajo([]); setTecnicos([]); setCitas([]); setSolicitudes([]); setInvitaciones([]); setFirmasVigentes({}); setTareasHechas({}); setDuracionesTareas({}); setFiltrosOT({}); setComplementos([]);
       return;
     }
     cargarTodo();
@@ -178,12 +184,14 @@ export default function App() {
       pendiente = setTimeout(() => {
         fetchAll<OrdenTrabajo>('ordenes_trabajo').then(setOrdenesTrabajo).catch(err => console.error('Error recargando órdenes', err));
         fetchTareasTaller().then(t => { setTareasHechas(t.hechas); setDuracionesTareas(t.duraciones); }).catch(err => console.error('Error recargando tareas', err));
+        fetchFiltros().then(setFiltrosOT).catch(err => console.error('Error recargando filtros', err));
       }, 400);
     };
     const canal = supabase
       .channel('taller')
       .on('postgres_changes', { event: '*', schema: 'public', table: 'ordenes_trabajo' }, recargar)
       .on('postgres_changes', { event: '*', schema: 'public', table: 'ot_tareas' }, recargar)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'ot_filtros' }, recargar)
       .subscribe();
     return () => { clearTimeout(pendiente); void supabase.removeChannel(canal); };
   }, [currentUser]);
@@ -506,7 +514,23 @@ export default function App() {
     if (ingresado(ot) && (!anterior || !ingresado(anterior) || anterior.kilometrajeEntrada !== ot.kilometrajeEntrada)) {
       sincronizarKilometraje(ot.vehiculoId, ot.kilometrajeEntrada);
     }
-  }, [fallo, ordenesTrabajo, sincronizarKilometraje]);
+    // Cambio de aceite entregado: la ficha del vehículo anota la fecha y los km (el próximo cambio lo indica el taller).
+    if (ot.esCambioAceite && ot.estado === 'entregado' && anterior && anterior.estado !== 'entregado') {
+      const veh = vehiculos.find(v => v.id === ot.vehiculoId);
+      const datos = veh && aceiteTrasEntrega(veh, ot, new Date().toISOString().split('T')[0]);
+      if (veh && datos) handleUpdateVehiculo({ ...veh, ...datos });
+    }
+  }, [fallo, ordenesTrabajo, vehiculos, sincronizarKilometraje, handleUpdateVehiculo]);
+
+  // Check list de filtros: se ve al momento y se guarda aparte de la orden (el mecánico escribe en la misma tabla).
+  const handleFiltroOT = useCallback((otId: string, filtro: FiltroId, cambiado: boolean | null) => {
+    setFiltrosOT(prev => {
+      const actual = { ...(prev[otId] ?? {}) };
+      if (cambiado === null) delete actual[filtro]; else actual[filtro] = cambiado;
+      return { ...prev, [otId]: actual };
+    });
+    guardarFiltro(otId, filtro, cambiado, currentUser?.nombre ?? 'Taller').catch(fallo('guardar el check list del cambio de aceite'));
+  }, [fallo, currentUser]);
 
   const handleDeleteOT = useCallback((id: string) => {
     setOrdenesTrabajo(prev => prev.filter(x => x.id !== id));
@@ -893,6 +917,7 @@ export default function App() {
           <VehiclesTab
             vehiculos={vehiculos}
             ordenesTrabajo={ordenesTrabajo}
+            filtrosOT={filtrosOT}
             hasAlquileres={hasAlquileres}
             onAddVehiculo={handleAddVehiculo}
             onUpdateVehiculo={handleUpdateVehiculo}
@@ -911,6 +936,8 @@ export default function App() {
             onDelete={handleDeleteOT}
             tareasHechas={tareasHechas}
             duracionesTareas={duracionesTareas}
+            filtrosOT={filtrosOT}
+            onFiltro={handleFiltroOT}
             abrirId={otAAbrir}
             onAbierta={() => setOtAAbrir(null)}
           />

@@ -1,11 +1,13 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { Bell, BellOff, Check, ChevronDown, ChevronUp, Clock, Gauge, RefreshCw, Wrench, Package, StickyNote, WifiOff } from 'lucide-react';
+import { Bell, BellOff, Check, ChevronDown, ChevronUp, Clock, Droplets, Gauge, RefreshCw, Wrench, Package, StickyNote, WifiOff } from 'lucide-react';
 import {
   ETIQUETA_ESTADO_TALLER, descripcionVehiculo, formatoIngreso, haceCuanto, ordenarParaMecanico, ordenesNuevas, progresoMecanico,
   type OrdenMecanico, type PaginaMecanico,
 } from '../utils/tallerMecanico';
 import { formatDate } from '../utils/dateFormat';
 import { OPCIONES_DURACION, formatoDuracion } from '../utils/duracionTarea';
+import { ChecklistFiltros } from './ChecklistFiltros';
+import type { FiltroId } from '../utils/filtrosAceite';
 
 // Página pública del mecánico: la abre desde el enlace personal que le manda el taller (/?taller=<token>).
 // No hay sesión ni acceso a la base de datos: todo pasa por la función `taller-mecanico`, que solo le da
@@ -210,6 +212,7 @@ export default function TallerMecanico({ token }: { token: string }) {
               setNuevas(prev => { const n = new Set(prev); n.delete(o.id); return n; });
             }}
             onTarea={(lineaId, hecha, duracion) => void enviar(`t-${lineaId}`, { accion: 'tarea', otId: o.id, lineaId, hecha, ...(duracion ? { duracion } : {}) })}
+            onFiltro={(filtro, cambiado) => void enviar(`f-${filtro}`, { accion: 'filtro', otId: o.id, filtro, cambiado })}
             onEmpezar={() => void enviar(`e-${o.id}`, { accion: 'empezar', otId: o.id })}
             onListo={() => {
               const { hechas, total } = progresoMecanico(o);
@@ -244,6 +247,8 @@ interface TarjetaProps {
   onAbrir: () => void;
   /** `duracion` en minutos: lo que le llevó la tarea al marcarla (o al corregirlo después). */
   onTarea: (lineaId: string, hecha: boolean, duracion?: number) => void;
+  /** Check list del cambio de aceite: true = cambiado, false = no se cambió, null = quitar la marca. */
+  onFiltro?: (filtro: FiltroId, cambiado: boolean | null) => void;
   onEmpezar: () => void;
   onListo: () => void;
   onCancelarListo: () => void;
@@ -252,7 +257,7 @@ interface TarjetaProps {
   onEnviarNota: () => void;
 }
 
-export function Tarjeta({ orden: o, color, ahora, abierta, nueva, ocupado, nota, confirmandoListo, onAbrir, onTarea, onEmpezar, onListo, onCancelarListo, onReabrir, onNota, onEnviarNota }: TarjetaProps) {
+export function Tarjeta({ orden: o, color, ahora, abierta, nueva, ocupado, nota, confirmandoListo, onAbrir, onTarea, onFiltro, onEmpezar, onListo, onCancelarListo, onReabrir, onNota, onEnviarNota }: TarjetaProps) {
   const { hechas, total } = progresoMecanico(o);
   const pct = total > 0 ? Math.round((hechas / total) * 100) : 0;
   const bloqueado = ocupado !== null;
@@ -345,6 +350,13 @@ export function Tarjeta({ orden: o, color, ahora, abierta, nueva, ocupado, nota,
               </ul>
             )}
           </section>
+
+          {o.cambioAceite && (
+            <section data-testid="filtros-orden">
+              <h3 className="text-[11px] font-bold uppercase tracking-wider text-slate-500 mb-2 flex items-center gap-1"><Droplets className="w-3.5 h-3.5" /> Cambio de aceite: filtros</h3>
+              <ChecklistFiltros grande estado={o.filtros ?? {}} deshabilitado={bloqueado || !onFiltro} onCambiar={(f, v) => onFiltro?.(f, v)} />
+            </section>
+          )}
 
           {o.piezas.length > 0 && (
             <section>

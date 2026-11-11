@@ -101,6 +101,8 @@ export interface OrdenTrabajo {
   historial: EventoOT[];
   /** Factura generada desde esta OT. */
   facturaId?: string;
+  /** La orden es un cambio de aceite: lleva el check list de filtros (aire, aceite, diésel y habitáculo). */
+  esCambioAceite?: boolean;
 }
 
 export interface InteraccionCliente {
