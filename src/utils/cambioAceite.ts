@@ -40,15 +40,28 @@ export function normalizarAceite(d: DatosAceite): { aceiteFecha: string | null; 
 /**
  * Al entregar una orden de cambio de aceite, la ficha del vehículo se actualiza con la fecha de entrega y los km de la orden
  * (los de salida si constan, si no los de entrada). El próximo cambio se borra: el anterior ya no vale y lo indica el taller.
- * Si la ficha ya tiene un cambio posterior a esa fecha (una orden antigua entregada tarde), no se toca nada: devuelve null.
+ * Si la ficha ya tiene un cambio de esta visita o posterior (por ejemplo, lo anotó el mecánico al terminar), no se toca nada: devuelve null.
  */
 export function aceiteTrasEntrega(
   actual: DatosAceite,
-  ot: { fechaEntrega?: string | null; kilometrajeEntrada: number; kilometrajeSalida?: number | null },
+  ot: { fechaRecepcion?: string | null; fechaEntrega?: string | null; kilometrajeEntrada: number; kilometrajeSalida?: number | null },
   hoy: string,
 ): { aceiteFecha: string; aceiteKm: number | null; aceiteProximaFecha: null } | null {
   const fecha = hayFecha(ot.fechaEntrega) ? ot.fechaEntrega : hoy;
-  if (hayFecha(actual.aceiteFecha) && actual.aceiteFecha > fecha) return null;
+  if (hayFecha(actual.aceiteFecha) && actual.aceiteFecha >= (hayFecha(ot.fechaRecepcion) ? ot.fechaRecepcion : fecha)) return null;
   const km = ot.kilometrajeSalida || ot.kilometrajeEntrada;
   return { aceiteFecha: fecha, aceiteKm: km > 0 ? Math.round(km) : (actual.aceiteKm ?? null), aceiteProximaFecha: null };
 }
+
+const dos = (n: number) => String(n).padStart(2, '0');
+
+/** Fecha (AAAA-MM-DD) tantos meses después de `desde`, sin pasarse de mes (31 ene + 1 mes = 28 feb). */
+export function fechaMasMeses(desde: Date, meses: number): string {
+  const total = desde.getFullYear() * 12 + desde.getMonth() + meses;
+  const anio = Math.floor(total / 12), mes = total % 12;
+  const ultimo = new Date(anio, mes + 1, 0).getDate();
+  return `${anio}-${dos(mes + 1)}-${dos(Math.min(desde.getDate(), ultimo))}`;
+}
+
+/** Hoy (AAAA-MM-DD) con el reloj del aparato. */
+export const hoyLocal = (ahora: Date = new Date()): string => `${ahora.getFullYear()}-${dos(ahora.getMonth() + 1)}-${dos(ahora.getDate())}`;

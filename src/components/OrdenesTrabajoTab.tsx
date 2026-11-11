@@ -705,7 +705,7 @@ export default function OrdenesTrabajoTab({ ordenes, vehiculos, clientes, tecnic
                       <>
                         <ChecklistFiltros estado={filtrosOT[selected.id] ?? {}} onCambiar={(f, v) => handleFiltro(selected, f, v)} />
                         <p className="text-[11px] text-slate-400">
-                          Lo marca el mecánico desde su enlace o tú aquí, y aparece en el historial del vehículo. Al entregar el coche se anotan en su ficha la fecha y los km del cambio; el próximo cambio lo indicas tú en la ficha.
+                          Lo marca el mecánico desde su enlace o tú aquí, y aparece en el historial del vehículo. El mecánico anota el próximo cambio al terminar y la ficha del vehículo se rellena sola (último cambio, km y próximo). Si no lo hace él, al entregar el coche se anotan la fecha y los km, y el próximo cambio lo indicas tú en la ficha.
                         </p>
                       </>
                     )}

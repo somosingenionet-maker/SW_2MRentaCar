@@ -33,6 +33,8 @@ export interface OrdenMecanico {
   piezas: { descripcion: string; cantidad: number }[];
   /** La orden es un cambio de aceite: se muestra el check list de filtros. */
   cambioAceite?: boolean;
+  /** Próximo cambio de aceite ya anotado en esta visita (AAAA-MM-DD). */
+  proximoCambio?: string | null;
   /** Filtros ya marcados: true = cambiado, false = no se cambió; los que faltan están sin revisar. */
   filtros?: EstadoFiltros;
 }

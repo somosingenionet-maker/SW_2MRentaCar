@@ -185,6 +185,8 @@ export default function App() {
         fetchAll<OrdenTrabajo>('ordenes_trabajo').then(setOrdenesTrabajo).catch(err => console.error('Error recargando órdenes', err));
         fetchTareasTaller().then(t => { setTareasHechas(t.hechas); setDuracionesTareas(t.duraciones); }).catch(err => console.error('Error recargando tareas', err));
         fetchFiltros().then(setFiltrosOT).catch(err => console.error('Error recargando filtros', err));
+        // El mecánico puede anotar el próximo cambio de aceite en la ficha del vehículo: sin esto, una ficha antigua abierta lo borraría al guardar.
+        fetchVehiculos().then(setVehiculos).catch(err => console.error('Error recargando vehículos', err));
       }, 400);
     };
     const canal = supabase
@@ -192,6 +194,7 @@ export default function App() {
       .on('postgres_changes', { event: '*', schema: 'public', table: 'ordenes_trabajo' }, recargar)
       .on('postgres_changes', { event: '*', schema: 'public', table: 'ot_tareas' }, recargar)
       .on('postgres_changes', { event: '*', schema: 'public', table: 'ot_filtros' }, recargar)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'vehiculos' }, recargar)
       .subscribe();
     return () => { clearTimeout(pendiente); void supabase.removeChannel(canal); };
   }, [currentUser]);

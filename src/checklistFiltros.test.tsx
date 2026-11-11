@@ -44,12 +44,31 @@ const pinta = (o: Partial<OrdenMecanico>) => renderToString(
 );
 
 describe('check list en la página del mecánico', () => {
-  it('solo aparece en las órdenes marcadas como cambio de aceite', () => {
-    expect(pinta({})).not.toContain('filtros-orden');
-    expect(pinta({ cambioAceite: false })).not.toContain('filtros-orden');
+  it('sin marcar como cambio de aceite solo ofrece activarlo', () => {
+    const h = pinta({});
+    expect(h).toContain('activar-cambio-aceite');
+    expect(texto(h)).toContain('Es un cambio de aceite');
+    expect(h).not.toContain('checklist-filtros');
+    expect(h).not.toContain('proximo-cambio');
+    expect(pinta({ cambioAceite: false })).toContain('activar-cambio-aceite');
+  });
+  it('marcada como cambio de aceite muestra los filtros y el próximo cambio, y ya no ofrece activarlo', () => {
     const h = pinta({ cambioAceite: true, filtros: { aire: true } });
-    expect(h).toContain('filtros-orden');
+    expect(h).not.toContain('activar-cambio-aceite');
     expect(texto(h)).toContain('Cambio de aceite: filtros');
     expect(texto(h)).toContain('Faltan 3 filtros por marcar.');
+    expect(texto(h)).toContain('Próximo cambio de aceite');
+    expect(texto(h)).toContain('En 6 meses');
+    expect(texto(h)).toContain('En 1 año');
+    expect(texto(h)).toContain('No es un cambio de aceite');
+    expect(h).not.toContain('proximo-anotado');
+  });
+  it('con el próximo cambio ya anotado lo enseña en el campo y avisa de que está en la ficha', () => {
+    const h = pinta({ cambioAceite: true, proximoCambio: '2027-11-11' });
+    expect(h).toContain('value="2027-11-11"');
+    expect(texto(h)).toMatch(/Anotado: 11 nov\. 2027\s*\. Ya está en la ficha del vehículo\./);
+  });
+  it('sin fecha el botón de guardar está bloqueado', () => {
+    expect(pinta({ cambioAceite: true })).toMatch(/data-testid="guardar-proximo"[^>]*disabled=""|disabled=""[^>]*data-testid="guardar-proximo"/);
   });
 });

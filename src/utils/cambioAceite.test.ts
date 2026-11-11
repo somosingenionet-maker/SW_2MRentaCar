@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { aceiteTrasEntrega, errorCambioAceite, estadoProximoCambio, normalizarAceite } from './cambioAceite';
+import { aceiteTrasEntrega, errorCambioAceite, fechaMasMeses, hoyLocal, estadoProximoCambio, normalizarAceite } from './cambioAceite';
 
 describe('errorCambioAceite', () => {
   it('todo vacío o completo y coherente es válido', () => {
@@ -50,7 +50,7 @@ describe('normalizarAceite', () => {
 });
 
 describe('aceiteTrasEntrega', () => {
-  const ot = { fechaEntrega: '2026-11-10', kilometrajeEntrada: 85000, kilometrajeSalida: 85010 };
+  const ot = { fechaRecepcion: '2026-11-09', fechaEntrega: '2026-11-10', kilometrajeEntrada: 85000, kilometrajeSalida: 85010 };
   it('anota la fecha de entrega y los km de salida, y borra el próximo cambio anterior', () => {
     expect(aceiteTrasEntrega({ aceiteFecha: '2025-11-01', aceiteKm: 70000, aceiteProximaFecha: '2026-11-01' }, ot, '2026-11-11'))
       .toEqual({ aceiteFecha: '2026-11-10', aceiteKm: 85010, aceiteProximaFecha: null });
@@ -62,10 +62,26 @@ describe('aceiteTrasEntrega', () => {
     expect(aceiteTrasEntrega({ aceiteKm: 70000 }, { fechaEntrega: '2026-11-10', kilometrajeEntrada: 0 }, '2026-11-11')?.aceiteKm).toBe(70000);
     expect(aceiteTrasEntrega({}, { fechaEntrega: '2026-11-10', kilometrajeEntrada: 0 }, '2026-11-11')?.aceiteKm).toBeNull();
   });
-  it('si la ficha ya tiene un cambio posterior, no toca nada', () => {
+  it('si la ficha ya tiene un cambio de esta visita o posterior (lo anotó el mecánico), no toca nada y conserva el próximo cambio', () => {
+    expect(aceiteTrasEntrega({ aceiteFecha: '2026-11-10', aceiteKm: 85010, aceiteProximaFecha: '2027-11-10' }, ot, '2026-11-11')).toBeNull();
+    expect(aceiteTrasEntrega({ aceiteFecha: '2026-11-09', aceiteProximaFecha: '2027-11-09' }, ot, '2026-11-11')).toBeNull();
     expect(aceiteTrasEntrega({ aceiteFecha: '2026-11-11', aceiteKm: 86000 }, ot, '2026-11-11')).toBeNull();
   });
-  it('el mismo día sí actualiza', () => {
-    expect(aceiteTrasEntrega({ aceiteFecha: '2026-11-10', aceiteKm: 1 }, ot, '2026-11-11')).not.toBeNull();
+  it('un cambio anterior a la visita sí se sustituye', () => {
+    expect(aceiteTrasEntrega({ aceiteFecha: '2026-11-08', aceiteProximaFecha: '2027-11-08' }, ot, '2026-11-11')).not.toBeNull();
+  });
+});
+
+describe('fechaMasMeses / hoyLocal', () => {
+  it('suma meses cruzando de año', () => {
+    expect(fechaMasMeses(new Date(2026, 10, 11), 6)).toBe('2027-05-11');
+    expect(fechaMasMeses(new Date(2026, 10, 11), 12)).toBe('2027-11-11');
+  });
+  it('no se pasa de mes', () => {
+    expect(fechaMasMeses(new Date(2026, 0, 31), 1)).toBe('2026-02-28');
+    expect(fechaMasMeses(new Date(2028, 1, 29), 12)).toBe('2029-02-28');
+  });
+  it('hoyLocal da la fecha del aparato', () => {
+    expect(hoyLocal(new Date(2026, 10, 5, 23, 59))).toBe('2026-11-05');
   });
 });
