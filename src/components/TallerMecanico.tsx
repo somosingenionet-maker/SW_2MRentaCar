@@ -1,10 +1,11 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { Bell, BellOff, Check, ChevronDown, ChevronUp, Gauge, RefreshCw, Wrench, Package, StickyNote, WifiOff } from 'lucide-react';
+import { Bell, BellOff, Check, ChevronDown, ChevronUp, Clock, Gauge, RefreshCw, Wrench, Package, StickyNote, WifiOff } from 'lucide-react';
 import {
   ETIQUETA_ESTADO_TALLER, descripcionVehiculo, formatoIngreso, haceCuanto, ordenarParaMecanico, ordenesNuevas, progresoMecanico,
   type OrdenMecanico, type PaginaMecanico,
 } from '../utils/tallerMecanico';
 import { formatDate } from '../utils/dateFormat';
+import { OPCIONES_DURACION, formatoDuracion } from '../utils/duracionTarea';
 
 // Página pública del mecánico: la abre desde el enlace personal que le manda el taller (/?taller=<token>).
 // No hay sesión ni acceso a la base de datos: todo pasa por la función `taller-mecanico`, que solo le da
@@ -208,7 +209,7 @@ export default function TallerMecanico({ token }: { token: string }) {
               setAbierta(abierta === o.id ? null : o.id);
               setNuevas(prev => { const n = new Set(prev); n.delete(o.id); return n; });
             }}
-            onTarea={(lineaId, hecha) => void enviar(`t-${lineaId}`, { accion: 'tarea', otId: o.id, lineaId, hecha })}
+            onTarea={(lineaId, hecha, duracion) => void enviar(`t-${lineaId}`, { accion: 'tarea', otId: o.id, lineaId, hecha, ...(duracion ? { duracion } : {}) })}
             onEmpezar={() => void enviar(`e-${o.id}`, { accion: 'empezar', otId: o.id })}
             onListo={() => {
               const { hechas, total } = progresoMecanico(o);
@@ -241,7 +242,8 @@ interface TarjetaProps {
   nota: string;
   confirmandoListo: boolean;
   onAbrir: () => void;
-  onTarea: (lineaId: string, hecha: boolean) => void;
+  /** `duracion` en minutos: lo que le llevó la tarea al marcarla (o al corregirlo después). */
+  onTarea: (lineaId: string, hecha: boolean, duracion?: number) => void;
   onEmpezar: () => void;
   onListo: () => void;
   onCancelarListo: () => void;
@@ -254,6 +256,8 @@ export function Tarjeta({ orden: o, color, ahora, abierta, nueva, ocupado, nota,
   const { hechas, total } = progresoMecanico(o);
   const pct = total > 0 ? Math.round((hechas / total) * 100) : 0;
   const bloqueado = ocupado !== null;
+  // Tarea para la que se está eligiendo el tiempo (al marcarla, o al corregirlo después).
+  const [eligiendo, setEligiendo] = useState<string | null>(null);
   // Todas las tareas marcadas y el coche aún no está listo: se le recuerda al mecánico el último paso.
   const todoHecho = total > 0 && hechas === total && o.estado !== 'listo';
 
@@ -300,9 +304,10 @@ export function Tarjeta({ orden: o, color, ahora, abierta, nueva, ocupado, nota,
             ) : (
               <ul className="space-y-2">
                 {o.tareas.map(t => (
-                  <li key={t.id}>
-                    <button type="button" role="checkbox" aria-checked={t.hecha} disabled={bloqueado} onClick={() => onTarea(t.id, !t.hecha)}
-                      className={`w-full min-h-[52px] px-3 py-2 rounded-xl border-2 flex items-center gap-3 text-left transition cursor-pointer disabled:opacity-60 ${t.hecha ? 'bg-emerald-50 border-emerald-300' : 'bg-white border-slate-200 active:bg-slate-50'}`}>
+                  <li key={t.id} className="space-y-1.5">
+                    <button type="button" role="checkbox" aria-checked={t.hecha} disabled={bloqueado}
+                      onClick={() => { if (t.hecha) { setEligiendo(null); onTarea(t.id, false); } else setEligiendo(eligiendo === t.id ? null : t.id); }}
+                      className={`w-full min-h-[52px] px-3 py-2 rounded-xl border-2 flex items-center gap-3 text-left transition cursor-pointer disabled:opacity-60 ${t.hecha ? 'bg-emerald-50 border-emerald-300' : eligiendo === t.id ? 'bg-white border-blue-400' : 'bg-white border-slate-200 active:bg-slate-50'}`}>
                       <span className={`w-7 h-7 rounded-lg border-2 shrink-0 flex items-center justify-center ${t.hecha ? 'bg-emerald-500 border-emerald-500 text-white' : 'border-slate-300'}`}>
                         {t.hecha && <Check className="w-5 h-5" />}
                       </span>
@@ -311,6 +316,30 @@ export function Tarjeta({ orden: o, color, ahora, abierta, nueva, ocupado, nota,
                         {t.hecha && t.hechaEn && <span className="block text-[11px] text-slate-400">{t.hechaPor} · {haceCuanto(t.hechaEn, ahora)}</span>}
                       </span>
                     </button>
+                    {t.hecha && (
+                      <button type="button" data-testid="duracion-tarea" disabled={bloqueado} onClick={() => setEligiendo(eligiendo === t.id ? null : t.id)}
+                        className={`ml-1 min-h-[36px] px-3 rounded-lg text-xs font-bold inline-flex items-center gap-1.5 cursor-pointer disabled:opacity-60 ${t.duracionMin ? 'bg-emerald-100 text-emerald-800' : 'bg-amber-100 text-amber-800'}`}>
+                        <Clock className="w-3.5 h-3.5" />
+                        {t.duracionMin ? `${formatoDuracion(t.duracionMin)} · cambiar` : 'Indicar cuánto tiempo te llevó'}
+                      </button>
+                    )}
+                    {eligiendo === t.id && (
+                      <div data-testid="selector-duracion" role="group" aria-label={`Tiempo que te llevó: ${t.descripcion}`} className="rounded-xl border-2 border-blue-200 bg-blue-50/60 p-3 space-y-2">
+                        <p className="text-sm font-bold text-slate-800">{t.hecha ? '¿Cuánto tiempo te llevó?' : 'Al terminar, ¿cuánto tiempo te llevó?'}</p>
+                        <div className="grid grid-cols-3 gap-2">
+                          {OPCIONES_DURACION.map(min => (
+                            <button key={min} type="button" disabled={bloqueado} aria-pressed={t.duracionMin === min}
+                              onClick={() => { setEligiendo(null); onTarea(t.id, true, min); }}
+                              className={`min-h-[48px] rounded-xl border-2 text-sm font-bold cursor-pointer disabled:opacity-60 ${t.duracionMin === min ? 'bg-blue-600 border-blue-600 text-white' : 'bg-white border-slate-200 text-slate-800 active:bg-slate-100'}`}>
+                              {formatoDuracion(min)}
+                            </button>
+                          ))}
+                        </div>
+                        <button type="button" onClick={() => setEligiendo(null)} className="min-h-[40px] px-2 text-xs font-bold text-slate-500 cursor-pointer">
+                          {t.hecha ? 'Cerrar' : 'Cancelar (la tarea no se marca)'}
+                        </button>
+                      </div>
+                    )}
                   </li>
                 ))}
               </ul>

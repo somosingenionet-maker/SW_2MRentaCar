@@ -15,6 +15,7 @@ import {
 import { OrdenTrabajo, OTEstado, LineaOT, LineaOTTipo, Vehiculo, Cliente, EventoOT, Tecnico } from '../types';
 import { getEmpresaConfig } from '../data/empresaConfig';
 import { FLOTA_CLIENTE_ID } from '../utils/flota';
+import { formatoDuracion, formatoHorasCobradas, horasCobradas, tiempoRegistrado } from '../utils/duracionTarea';
 import TableroTaller from './TableroTaller';
 import { enlaceWhatsApp, mensajeAvisoMecanico } from '../utils/tallerMecanico';
 import { genId } from '../utils/id';
@@ -31,6 +32,8 @@ interface Props {
   onDelete: (id: string) => void;
   /** Tareas que los mecánicos han marcado como hechas: { otId: [lineaId, ...] }. */
   tareasHechas?: Record<string, string[]>;
+  /** Lo que le llevó cada tarea hecha, en minutos: { otId: { lineaId: minutos } }. */
+  duracionesTareas?: Record<string, Record<string, number>>;
   /** Orden que debe abrirse al entrar (por ejemplo, al llegar desde una cita de la Agenda). */
   abrirId?: string | null;
   /** Se llama cuando ya se ha atendido `abrirId`, para que la app lo olvide. */
@@ -123,7 +126,7 @@ function evento(descripcion: string): EventoOT {
   return { fecha: new Date().toISOString(), descripcion };
 }
 
-export default function OrdenesTrabajoTab({ ordenes, vehiculos, clientes, tecnicos, onAdd, onUpdate, onDelete, tareasHechas = {}, abrirId, onAbierta }: Props) {
+export default function OrdenesTrabajoTab({ ordenes, vehiculos, clientes, tecnicos, onAdd, onUpdate, onDelete, tareasHechas = {}, duracionesTareas = {}, abrirId, onAbierta }: Props) {
   const [search, setSearch] = useState('');
   const [filterEstado, setFilterEstado] = useState<OTEstado | 'todas'>('todas');
   const [selected, setSelected] = useSeleccion(ordenes);
@@ -598,6 +601,8 @@ export default function OrdenesTrabajoTab({ ordenes, vehiculos, clientes, tecnic
                 {(['recibido', 'en_reparacion', 'listo'] as OTEstado[]).includes(selected.estado) && (() => {
                   const tarea = selected.lineas.filter(l => l.tipo === 'mano_de_obra');
                   const hechas = new Set(tareasHechas[selected.id] ?? []);
+                  const duraciones = duracionesTareas[selected.id] ?? {};
+                  const tiempo = tiempoRegistrado(tarea.filter(l => hechas.has(l.id)).map(l => duraciones[l.id]));
                   const tec = selected.tecnicoAsignado ? tecnicos.find(t => t.nombre === selected.tecnicoAsignado) : undefined;
                   const veh = vehiculos.find(v => v.id === selected.vehiculoId);
                   return (
@@ -613,9 +618,22 @@ export default function OrdenesTrabajoTab({ ordenes, vehiculos, clientes, tecnic
                                 {hechas.has(l.id) && <Check size={11} />}
                               </span>
                               <span className={hechas.has(l.id) ? 'text-slate-400 line-through' : 'text-slate-700'}>{l.descripcion}</span>
+                              {hechas.has(l.id) && (
+                                <span data-testid="tiempo-tarea" className="ml-auto shrink-0 text-[11px] font-semibold text-slate-500">
+                                  {duraciones[l.id] ? <>Real <strong className="text-slate-700">{formatoDuracion(duraciones[l.id])}</strong></> : 'Sin tiempo indicado'}
+                                  {' · '}Cobrado <strong className="text-slate-700">{formatoHorasCobradas(l.cantidad)}</strong>
+                                </span>
+                              )}
                             </li>
                           ))}
                         </ul>
+                      )}
+                      {tiempo.conDato > 0 && (
+                        <p data-testid="resumen-tiempo" className="border-t border-orange-100 pt-2 text-xs text-slate-600">
+                          Tiempo real registrado: <strong className="text-slate-800">{formatoDuracion(tiempo.minutos)}</strong>
+                          {' · '}Horas cobradas: <strong className="text-slate-800">{formatoHorasCobradas(horasCobradas(selected.lineas))}</strong>
+                          {tiempo.conDato < hechas.size && <span className="block text-[11px] text-slate-400">Solo suma las tareas con tiempo indicado ({tiempo.conDato} de {hechas.size} hechas).</span>}
+                        </p>
                       )}
                       {selected.tecnicoAsignado ? (
                         <div className="flex items-center gap-2 flex-wrap pt-1">

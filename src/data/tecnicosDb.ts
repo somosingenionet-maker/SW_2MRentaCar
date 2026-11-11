@@ -2,6 +2,7 @@ import { supabase } from '../lib/supabase';
 import { rowToObj, objToRow } from '../lib/caseMap';
 import { fetchPaginado } from './db';
 import { agruparTareasHechas } from '../utils/tallerMecanico';
+import { agruparDuraciones } from '../utils/duracionTarea';
 import type { Tecnico } from '../types';
 
 // Nunca se descarga `enlace_hash`: el personal no lo necesita y no debe circular.
@@ -42,16 +43,16 @@ export async function revocarEnlaceTecnico(id: string): Promise<void> {
   if (error) throw error;
 }
 
-/** Tareas que los mecánicos han marcado como hechas: { otId: [lineaId, ...] }. */
-export async function fetchTareasHechas(): Promise<Record<string, string[]>> {
+/** Tareas que los mecánicos han marcado como hechas ({ otId: [lineaId, ...] }) y lo que les llevó cada una ({ otId: { lineaId: minutos } }). */
+export async function fetchTareasTaller(): Promise<{ hechas: Record<string, string[]>; duraciones: Record<string, Record<string, number>> }> {
   // La tabla no tiene columna `id` (su clave es orden + línea), así que se pagina con ese orden.
-  const filas: { otId: string; lineaId: string }[] = [];
+  const filas: { otId: string; lineaId: string; duracionMin: number | null }[] = [];
   for (let desde = 0; ; desde += 1000) {
-    const { data, error } = await supabase.from('ot_tareas').select('ot_id,linea_id').order('ot_id').order('linea_id').range(desde, desde + 999);
+    const { data, error } = await supabase.from('ot_tareas').select('ot_id,linea_id,duracion_min').order('ot_id').order('linea_id').range(desde, desde + 999);
     if (error) throw error;
     const bloque = data ?? [];
-    filas.push(...bloque.map(f => ({ otId: String(f.ot_id), lineaId: String(f.linea_id) })));
-    if (bloque.length < 1000) return agruparTareasHechas(filas);
+    filas.push(...bloque.map(f => ({ otId: String(f.ot_id), lineaId: String(f.linea_id), duracionMin: f.duracion_min == null ? null : Number(f.duracion_min) })));
+    if (bloque.length < 1000) return { hechas: agruparTareasHechas(filas), duraciones: agruparDuraciones(filas) };
   }
 }
 

@@ -28,7 +28,7 @@ export interface OrdenMecanico {
   /** ISO de la última modificación. */
   actualizada?: string | null;
   vehiculo: { matricula?: string | null; marca?: string | null; modelo?: string | null; anio?: number | null; color?: string | null };
-  tareas: { id: string; descripcion: string; hecha: boolean; hechaPor?: string | null; hechaEn?: string | null }[];
+  tareas: { id: string; descripcion: string; hecha: boolean; hechaPor?: string | null; hechaEn?: string | null; /** Minutos que le llevó, si lo indicó. */ duracionMin?: number | null }[];
   piezas: { descripcion: string; cantidad: number }[];
 }
 

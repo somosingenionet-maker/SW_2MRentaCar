@@ -34,6 +34,12 @@ describe('tablero del taller', () => {
     expect(t).toContain('Ingreso: 25 oct. 2026');
   });
 
+  it('enseña el tiempo real registrado de las tareas de la orden; sin tiempos no enseña nada', () => {
+    const con = renderToString(<TableroTaller ordenes={[ot('1', 'v1', 'en_reparacion')]} vehiculos={vehiculos} tareasHechas={{ '1': ['l1', 'l2'] }} duracionesTareas={{ '1': { l1: 45, l2: 90, otra: 600 } }} ahora={ahora} />);
+    expect(texto(con)).toContain('Tiempo registrado: 2 h 15 min');
+    expect(texto(pinta([ot('1', 'v1', 'en_reparacion')], { '1': ['l1'] }))).not.toContain('Tiempo registrado');
+  });
+
   it('solo los coches que están en el taller, lo que se trabaja primero', () => {
     const h = pinta([ot('p', 'v1', 'presupuesto'), ot('r', 'v1', 'recibido'), ot('e', 'v2', 'en_reparacion'), ot('x', 'v1', 'entregado')]);
     expect((h.match(/data-testid="ficha-taller"/g) ?? []).length).toBe(2);

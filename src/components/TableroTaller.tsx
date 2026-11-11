@@ -1,6 +1,7 @@
 import { Wrench, UserX } from 'lucide-react';
 import type { OrdenTrabajo, Vehiculo } from '../types';
 import { fichasTaller, formatoIngreso, haceCuanto, type EstadoTaller } from '../utils/tallerMecanico';
+import { formatoDuracion, tiempoRegistrado } from '../utils/duracionTarea';
 import { ingresoDeOT } from '../utils/tallerOcupacion';
 
 const ESTADO: Record<EstadoTaller, { etiqueta: string; cls: string }> = {
@@ -14,13 +15,15 @@ interface Props {
   vehiculos: Vehiculo[];
   /** Tareas que los mecánicos han marcado como hechas: { otId: [lineaId, ...] }. */
   tareasHechas: Record<string, string[]>;
+  /** Lo que le llevó cada tarea hecha, en minutos: { otId: { lineaId: minutos } }. */
+  duracionesTareas?: Record<string, Record<string, number>>;
   onSeleccionar?: (ot: OrdenTrabajo) => void;
   /** Hora de referencia para «hace X min» (se puede fijar en los tests). */
   ahora?: number;
 }
 
 /** Cada coche que hay ahora en el taller: estado, mecánico, avance de tareas y última novedad. */
-export default function TableroTaller({ ordenes, vehiculos, tareasHechas, onSeleccionar, ahora }: Props) {
+export default function TableroTaller({ ordenes, vehiculos, tareasHechas, duracionesTareas = {}, onSeleccionar, ahora }: Props) {
   const fichas = fichasTaller(ordenes, tareasHechas);
   if (fichas.length === 0) {
     return (
@@ -66,6 +69,11 @@ export default function TableroTaller({ ordenes, vehiculos, tareasHechas, onSele
               ) : (
                 <p className="text-[11px] text-slate-400">Sin tareas detalladas</p>
               )}
+              {(() => {
+                const d = duracionesTareas[ot.id] ?? {};
+                const t = tiempoRegistrado((ot.lineas ?? []).filter(l => l.tipo === 'mano_de_obra').map(l => d[l.id]));
+                return t.conDato > 0 ? <p data-testid="tiempo-ficha" className="text-[11px] text-slate-500">Tiempo registrado: <strong className="text-slate-700">{formatoDuracion(t.minutos)}</strong></p> : null;
+              })()}
               <p data-testid="ingreso-ficha" className="text-[11px] text-slate-500">Ingreso: <strong className="text-slate-700">{formatoIngreso(ingresoDeOT(ot)?.fechaHora ?? ot.fechaRecepcion)}</strong></p>
               <p className="text-[10px] text-slate-400">Actualizado {haceCuanto(ot.fechaActualizacion, ahora) || '—'}</p>
             </Tag>

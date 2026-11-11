@@ -60,6 +60,14 @@ describe('tarjeta del mecánico', () => {
     expect(texto(pinta({ estado: 'en_reparacion', tareas: [] }))).not.toContain('Todas las tareas están hechas');
   });
 
+  it('las tareas hechas enseñan cuánto tiempo llevaron, o piden indicarlo si no consta; las pendientes no enseñan botón de tiempo', () => {
+    const conTiempo = pinta({ tareas: [{ id: 'l1', descripcion: 'Cambiar pastillas', hecha: true, hechaPor: 'Pedro', hechaEn: '2026-10-30T11:00:00.000Z', duracionMin: 75 }, { id: 'l2', descripcion: 'Purgar frenos', hecha: false }] });
+    expect(texto(conTiempo)).toContain('1 h 15 min · cambiar');
+    expect((conTiempo.match(/data-testid="duracion-tarea"/g) ?? []).length).toBe(1);
+    expect(conTiempo).not.toContain('selector-duracion');
+    expect(texto(pinta())).toContain('Indicar cuánto tiempo te llevó');
+  });
+
   it('por empezar: ofrece Empezar y Marcar como listo, no Reabrir', () => {
     const t = texto(pinta({ estado: 'recibido' }));
     expect(t).toContain('Empezar reparación');

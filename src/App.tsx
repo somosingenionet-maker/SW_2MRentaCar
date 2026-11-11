@@ -11,7 +11,7 @@ import { fetchAll, upsertOne, deleteOne } from './data/db';
 import { sinClienteFlota } from './utils/flota';
 import { fetchSolicitudes, updateGestionSolicitud } from './data/solicitudesDb';
 import { fetchFirmasVigentes } from './data/contratosFirmadosDb';
-import { fetchTecnicos, guardarTecnico, fetchTareasHechas, renombrarTecnicoEnOrdenes } from './data/tecnicosDb';
+import { fetchTecnicos, guardarTecnico, fetchTareasTaller, renombrarTecnicoEnOrdenes } from './data/tecnicosDb';
 import { fetchInvitaciones, crearInvitacion, updateEstadoInvitacion } from './data/invitacionesDb';
 import LoginScreen from './components/LoginScreen';
 import {
@@ -67,6 +67,7 @@ export default function App() {
   const [firmasVigentes, setFirmasVigentes] = useState<Record<string, string>>({});
   // Tareas que los mecánicos han marcado como hechas: { otId: [lineaId, ...] }.
   const [tareasHechas, setTareasHechas] = useState<Record<string, string[]>>({});
+  const [duracionesTareas, setDuracionesTareas] = useState<Record<string, Record<string, number>>>({});
   // Catálogo de complementos de alquiler (sillitas, baca...), editable en Empresa.
   const [complementos, setComplementos] = useState<Complemento[]>([]);
   // Orden que Taller debe abrir al entrar (al llegar desde una cita de la Agenda).
@@ -106,7 +107,7 @@ export default function App() {
     fetchAll<OrdenTrabajo>('ordenes_trabajo').then(setOrdenesTrabajo).catch(log('órdenes de trabajo'));
     fetchTecnicos().then(setTecnicos).catch(log('técnicos'));
     fetchAll<Complemento>('complementos').then(setComplementos).catch(log('complementos'));
-    fetchTareasHechas().then(setTareasHechas).catch(log('tareas de los mecánicos'));
+    fetchTareasTaller().then(t => { setTareasHechas(t.hechas); setDuracionesTareas(t.duraciones); }).catch(log('tareas de los mecánicos'));
     fetchAll<Cita>('citas').then(setCitas).catch(log('citas'));
     fetchSolicitudes().then(setSolicitudes).catch(log('solicitudes de reserva'));
     fetchInvitaciones().then(setInvitaciones).catch(log('invitaciones de clientes'));
@@ -117,7 +118,7 @@ export default function App() {
   useEffect(() => {
     if (!currentUser) {
       setVehiculos([]); setClientes([]); setReservas([]);
-      setAlertas([]); setNotificaciones([]); setFacturas([]); setOrdenesTrabajo([]); setTecnicos([]); setCitas([]); setSolicitudes([]); setInvitaciones([]); setFirmasVigentes({}); setTareasHechas({}); setComplementos([]);
+      setAlertas([]); setNotificaciones([]); setFacturas([]); setOrdenesTrabajo([]); setTecnicos([]); setCitas([]); setSolicitudes([]); setInvitaciones([]); setFirmasVigentes({}); setTareasHechas({}); setDuracionesTareas({}); setComplementos([]);
       return;
     }
     cargarTodo();
@@ -176,7 +177,7 @@ export default function App() {
       clearTimeout(pendiente);
       pendiente = setTimeout(() => {
         fetchAll<OrdenTrabajo>('ordenes_trabajo').then(setOrdenesTrabajo).catch(err => console.error('Error recargando órdenes', err));
-        fetchTareasHechas().then(setTareasHechas).catch(err => console.error('Error recargando tareas', err));
+        fetchTareasTaller().then(t => { setTareasHechas(t.hechas); setDuracionesTareas(t.duraciones); }).catch(err => console.error('Error recargando tareas', err));
       }, 400);
     };
     const canal = supabase
@@ -909,6 +910,7 @@ export default function App() {
             onUpdate={handleUpdateOT}
             onDelete={handleDeleteOT}
             tareasHechas={tareasHechas}
+            duracionesTareas={duracionesTareas}
             abrirId={otAAbrir}
             onAbierta={() => setOtAAbrir(null)}
           />
