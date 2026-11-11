@@ -9,7 +9,7 @@ import { Vehiculo, OrdenTrabajo, OTEstado, TarifasAlquiler } from '../types';
 import { cambiarTarifa, precioConvenio } from '../utils/tarifasAlquiler';
 import { InputPrecio } from './InputPrecio';
 import {
-  Car, Search, Plus, Wrench, Calendar, Shield, CreditCard, PenTool, Trash2, X, Check, Save, Download, ClipboardList
+  Car, Search, Plus, Wrench, Calendar, Droplets, Shield, CreditCard, PenTool, Trash2, X, Check, Save, Download, ClipboardList
 } from 'lucide-react';
 import { AnimatePresence } from 'motion/react';
 import ConfirmDialog from './ConfirmDialog';
@@ -19,6 +19,8 @@ import { downloadCsv, slugify } from '../utils/csvExport';
 import { getEmpresaConfig } from '../data/empresaConfig';
 import { genId } from '../utils/id';
 import { fmt2 } from '../utils/moneda';
+import CambioAceiteFields from './CambioAceiteFields';
+import { errorCambioAceite, estadoProximoCambio, normalizarAceite } from '../utils/cambioAceite';
 
 interface VehiclesTabProps {
   vehiculos: Vehiculo[];
@@ -131,9 +133,12 @@ export default function VehiclesTab({
       setAddFormError(`Ya existe otro vehículo con esa ${repetido}. Revisa que no estés dando de alta el mismo coche dos veces.`);
       return;
     }
+    const errorAceite = errorCambioAceite(formData);
+    if (errorAceite) { setAddFormError(errorAceite); return; }
     setAddFormError('');
     const nuevo: Vehiculo = {
       ...formData,
+      ...normalizarAceite(formData),
       id: genId('veh'),
       fechaRegistro: new Date().toISOString().split('T')[0],
       kilometraje: Number(formData.kilometraje)
@@ -156,15 +161,15 @@ export default function VehiclesTab({
         setEditFormError(`Ya existe otro vehículo con esa ${repetido}.`);
         return;
       }
+      const errorAceite = errorCambioAceite(editFormData);
+      if (errorAceite) { setEditFormError(errorAceite); return; }
       setEditFormError('');
-      onUpdateVehiculo({
-        ...editFormData,
-        kilometraje: Number(editFormData.kilometraje)
-      });
+      const guardado: Vehiculo = { ...editFormData, ...normalizarAceite(editFormData), kilometraje: Number(editFormData.kilometraje) };
+      onUpdateVehiculo(guardado);
       setIsEditing(false);
       // Update selected interactive vehicle view if open
       if (selectedVehiculo?.id === editFormData.id) {
-        setSelectedVehiculo(editFormData);
+        setSelectedVehiculo(guardado);
       }
     }
   };
@@ -186,9 +191,10 @@ export default function VehiclesTab({
   };
 
   const handleExportCsv = () => {
-    const headers = ['Marca', 'Modelo', 'Matrícula', 'Bastidor', 'Km', 'ITV Vencimiento', 'Seguro Vencimiento', 'Aseguradora', 'Impuesto Vencimiento', 'Fecha Registro', 'Transmisión', 'Fianza (€)', 'Seguro ampliado (€/día)'];
+    const headers = ['Marca', 'Modelo', 'Matrícula', 'Bastidor', 'Km', 'ITV Vencimiento', 'Seguro Vencimiento', 'Aseguradora', 'Impuesto Vencimiento', 'Fecha Registro', 'Transmisión', 'Fianza (€)', 'Seguro ampliado (€/día)', 'Último cambio de aceite', 'Km del cambio de aceite', 'Próximo cambio de aceite'];
     const rows = vehiculos.map(v => [v.marca, v.modelo, v.matricula, v.bastidor, String(v.kilometraje), v.itvVencimiento ?? '', v.seguroVencimiento ?? '', v.aseguradora ?? '', v.impuestoVencimiento ?? '', v.fechaRegistro,
-      v.esFlotaAlquiler ? etiquetaTransmision(v.transmision) : '', v.esFlotaAlquiler && v.fianza ? String(v.fianza) : '', v.seguroAmpliadoDia != null ? String(v.seguroAmpliadoDia) : '']);
+      v.esFlotaAlquiler ? etiquetaTransmision(v.transmision) : '', v.esFlotaAlquiler && v.fianza ? String(v.fianza) : '', v.seguroAmpliadoDia != null ? String(v.seguroAmpliadoDia) : '',
+      v.aceiteFecha ?? '', v.aceiteKm != null ? String(v.aceiteKm) : '', v.aceiteProximaFecha ?? '']);
     downloadCsv(`${slugify(getEmpresaConfig().nombre)}_flota_${new Date().toISOString().slice(0, 10)}.csv`, [headers, ...rows]);
   };
 
@@ -409,6 +415,27 @@ export default function VehiclesTab({
                   </div>
                   {selectedVehiculo.aseguradora && (
                     <div className="text-[10px] text-slate-500 mt-0.5">{selectedVehiculo.aseguradora}</div>
+                  )}
+                </div>
+
+                <div data-testid="ficha-cambio-aceite" className="col-span-2 p-3 bg-slate-50 rounded-xl border border-slate-100">
+                  <div className="flex items-center justify-between gap-2">
+                    <div className="text-[10px] text-slate-400 font-semibold uppercase flex items-center gap-1">
+                      <Droplets className="w-3 h-3 text-amber-500" /> Cambio de aceite
+                    </div>
+                    {(() => {
+                      const e = estadoProximoCambio(selectedVehiculo.aceiteProximaFecha, new Date().toISOString().slice(0, 10));
+                      if (!e || e === 'al_dia') return null;
+                      return <span data-testid="estado-cambio-aceite" className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${e === 'vencido' ? 'bg-rose-100 text-rose-700' : 'bg-amber-100 text-amber-800'}`}>{e === 'vencido' ? 'Vencido' : 'Próximo'}</span>;
+                    })()}
+                  </div>
+                  {selectedVehiculo.aceiteFecha || selectedVehiculo.aceiteKm != null || selectedVehiculo.aceiteProximaFecha ? (
+                    <div className="text-xs font-semibold text-slate-700 mt-1 space-y-0.5">
+                      <div>Último: {selectedVehiculo.aceiteFecha ? formatDate(selectedVehiculo.aceiteFecha) : '—'}{selectedVehiculo.aceiteKm != null && <> · {selectedVehiculo.aceiteKm.toLocaleString('es-ES')} km</>}</div>
+                      <div>Próximo cambio: {selectedVehiculo.aceiteProximaFecha ? formatDate(selectedVehiculo.aceiteProximaFecha) : '—'}</div>
+                    </div>
+                  ) : (
+                    <div className="text-xs text-slate-400 mt-1">Sin registrar. Se añade al editar el vehículo.</div>
                   )}
                 </div>
 
@@ -689,6 +716,7 @@ export default function VehiclesTab({
                       placeholder="Ej.: Mutua, FIATC…"
                     />
                   </div>
+                  <CambioAceiteFields idBase="alta" valor={formData} onChange={c => setFormData(fd => ({ ...fd, ...c }))} />
                 </div>
 
                 {hasAlquileres && (
@@ -888,6 +916,7 @@ export default function VehiclesTab({
                       placeholder="Ej.: Mutua, FIATC…"
                     />
                   </div>
+                  <CambioAceiteFields idBase="edicion" valor={editFormData} onChange={c => setEditFormData(ef => ef ? { ...ef, ...c } : ef)} />
                 </div>
 
                 {hasAlquileres && (

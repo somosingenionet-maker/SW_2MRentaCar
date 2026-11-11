@@ -33,6 +33,10 @@ export interface Vehiculo {
   fianza?: number;
   /** Precio por día (€) del seguro a todo riesgo. null o ausente = este vehículo no lo ofrece. */
   seguroAmpliadoDia?: number | null;
+  /** Último cambio de aceite: fecha (YYYY-MM-DD), kilómetros del vehículo en ese momento y fecha del próximo cambio. Todo opcional. */
+  aceiteFecha?: string | null;
+  aceiteKm?: number | null;
+  aceiteProximaFecha?: string | null;
 }
 
 // ─── Órdenes de Trabajo ───────────────────────────────────────────────────────
