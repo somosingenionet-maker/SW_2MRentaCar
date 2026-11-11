@@ -65,6 +65,8 @@ export default function CompanySettingsPanel({ config, onSave, tecnicos, onAddTe
   const [enlaceNuevo, setEnlaceNuevo] = useState<{ tecnicoId: string; url: string } | null>(null);
   const [enlaceOcupado, setEnlaceOcupado] = useState<string | null>(null);
   const [enlaceError, setEnlaceError] = useState('');
+  // Técnico para el que se pide confirmar el borrado (se pregunta antes de eliminar: no se puede deshacer).
+  const [borrarTecnico, setBorrarTecnico] = useState<string | null>(null);
   const [confirmarEnlace, setConfirmarEnlace] = useState<{ id: string; tipo: 'nuevo' | 'revocar' } | null>(null);
   const [copiado, setCopiado] = useState(false);
 
@@ -554,10 +556,24 @@ export default function CompanySettingsPanel({ config, onSave, tecnicos, onAddTe
                       {(t.especialidad || t.telefono) && <p className="text-xs text-slate-400">{[t.especialidad, t.telefono].filter(Boolean).join(' · ')}</p>}
                     </div>
                     <div className="flex gap-1">
-                      <button onClick={() => openTecnicoForm(t)} className="p-1.5 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition cursor-pointer"><Edit2 className="w-3.5 h-3.5" /></button>
-                      <button onClick={() => onDeleteTecnico(t.id)} className="p-1.5 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition cursor-pointer"><Trash2 className="w-3.5 h-3.5" /></button>
+                      <button onClick={() => openTecnicoForm(t)} aria-label={`Editar ${t.nombre}`} className="p-1.5 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition cursor-pointer"><Edit2 className="w-3.5 h-3.5" /></button>
+                      <button onClick={() => setBorrarTecnico(t.id)} aria-label={`Eliminar ${t.nombre}`} className="p-1.5 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition cursor-pointer"><Trash2 className="w-3.5 h-3.5" /></button>
                     </div>
                   </div>
+
+                  {borrarTecnico === t.id && (
+                    <div data-testid="confirmar-borrar-tecnico" role="alert" className="rounded-lg border border-rose-200 bg-rose-50 p-2.5 space-y-2">
+                      <p className="text-xs font-semibold text-rose-900">¿Eliminar a {t.nombre}? No se puede deshacer.</p>
+                      <p className="text-[11px] text-rose-800">
+                        {t.enlaceCreadoEn ? 'Su enlace del taller dejará de funcionar. ' : ''}Las órdenes que tenga asignadas se quedan a su nombre y nadie las verá en su lista hasta que las asignes a otro mecánico.
+                        {t.activo ? ' Si solo quieres que deje de trabajar, mejor edítalo y desmarca «Activo».' : ''}
+                      </p>
+                      <div className="flex gap-2 text-[11px] font-bold">
+                        <button onClick={() => { onDeleteTecnico(t.id); setBorrarTecnico(null); }} className="px-3 py-1.5 rounded-md bg-rose-600 hover:bg-rose-700 text-white cursor-pointer">Sí, eliminar</button>
+                        <button onClick={() => setBorrarTecnico(null)} className="px-3 py-1.5 rounded-md border border-slate-300 bg-white text-slate-600 cursor-pointer">No, conservar</button>
+                      </div>
+                    </div>
+                  )}
 
                   {/* Enlace personal del mecánico */}
                   <div className="flex items-center gap-2 flex-wrap text-[11px]">

@@ -36,6 +36,13 @@ describe('técnicos y enlace del taller', () => {
     expect(t).toContain('Inactivo');
   });
 
+  it('cada técnico tiene su botón de eliminar, pero no pide confirmar hasta que se pulsa (el borrado no es inmediato)', () => {
+    const h = pinta(tecnicos);
+    expect(h).toContain('aria-label="Eliminar Pedro"');
+    expect(h).toContain('aria-label="Eliminar Luis"');
+    expect(h).not.toContain('confirmar-borrar-tecnico');
+  });
+
   it('no enseña ningún token ni enlace hasta que se crea uno', () => {
     const h = pinta(tecnicos);
     expect(h).not.toContain('?taller=');
