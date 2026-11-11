@@ -47,6 +47,19 @@ describe('tarjeta del mecánico', () => {
     expect(pinta()).toContain('aria-checked="false"');
   });
 
+  it('con todas las tareas hechas avisa y resalta «marcar como listo»; con tareas pendientes o ya listo, no', () => {
+    const hecha = (id: string) => ({ id, descripcion: `t${id}`, hecha: true, hechaPor: 'Pedro', hechaEn: '2026-10-30T11:00:00.000Z' });
+    const todo = texto(pinta({ estado: 'en_reparacion', tareas: [hecha('1'), hecha('2')] }));
+    expect(todo).toContain('Todas las tareas están hechas');
+    expect(todo).toContain('Todo hecho: marcar como listo');
+    const pendiente = texto(pinta({ estado: 'en_reparacion' }));
+    expect(pendiente).not.toContain('Todas las tareas están hechas');
+    expect(pendiente).toContain('Marcar como listo');
+    const listo = texto(pinta({ estado: 'listo', tareas: [hecha('1'), hecha('2')] }));
+    expect(listo).not.toContain('Todas las tareas están hechas');
+    expect(texto(pinta({ estado: 'en_reparacion', tareas: [] }))).not.toContain('Todas las tareas están hechas');
+  });
+
   it('por empezar: ofrece Empezar y Marcar como listo, no Reabrir', () => {
     const t = texto(pinta({ estado: 'recibido' }));
     expect(t).toContain('Empezar reparación');

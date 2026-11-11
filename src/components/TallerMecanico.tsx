@@ -254,6 +254,8 @@ export function Tarjeta({ orden: o, color, ahora, abierta, nueva, ocupado, nota,
   const { hechas, total } = progresoMecanico(o);
   const pct = total > 0 ? Math.round((hechas / total) * 100) : 0;
   const bloqueado = ocupado !== null;
+  // Todas las tareas marcadas y el coche aún no está listo: se le recuerda al mecánico el último paso.
+  const todoHecho = total > 0 && hechas === total && o.estado !== 'listo';
 
   return (
     <article className={`bg-white rounded-2xl border shadow-sm overflow-hidden ${nueva ? 'border-2' : 'border-slate-200'}`} style={nueva ? { borderColor: color } : undefined}>
@@ -333,6 +335,11 @@ export function Tarjeta({ orden: o, color, ahora, abierta, nueva, ocupado, nota,
           </section>
 
           <div className="space-y-2 pt-1">
+            {todoHecho && (
+              <p data-testid="aviso-todo-hecho" role="status" className="p-3 rounded-xl bg-emerald-50 border border-emerald-200 text-sm font-semibold text-emerald-900">
+                Todas las tareas están hechas. Cuando termines, marca el coche como listo.
+              </p>
+            )}
             {o.estado === 'recibido' && (
               <button type="button" onClick={onEmpezar} disabled={bloqueado}
                 className="w-full py-4 rounded-xl text-base font-extrabold text-white bg-amber-500 active:bg-amber-600 disabled:opacity-60 cursor-pointer">Empezar reparación</button>
@@ -348,7 +355,7 @@ export function Tarjeta({ orden: o, color, ahora, abierta, nueva, ocupado, nota,
                 </div>
               ) : (
                 <button type="button" onClick={onListo} disabled={bloqueado}
-                  className={`w-full py-4 rounded-xl text-base font-extrabold text-white bg-emerald-600 active:bg-emerald-700 disabled:opacity-60 cursor-pointer ${o.estado === 'recibido' ? 'opacity-90' : ''}`}>Marcar como listo</button>
+                  className={`w-full py-4 rounded-xl text-base font-extrabold text-white bg-emerald-600 active:bg-emerald-700 disabled:opacity-60 cursor-pointer ${todoHecho ? 'ring-4 ring-emerald-300' : o.estado === 'recibido' ? 'opacity-90' : ''}`}>{todoHecho ? 'Todo hecho: marcar como listo' : 'Marcar como listo'}</button>
               )
             )}
             {o.estado === 'listo' && (
