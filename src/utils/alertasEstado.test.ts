@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { alertasUrgentes, alertasVisibles, diasHasta, estadoAlerta, ordenarAlertas, resumenAlertas, textoPlazo } from './alertasEstado';
+import { alertasUrgentes, coincideBusqueda, diasHasta, estadoAlerta, ordenarAlertas, resumenAlertas, textoPlazo } from './alertasEstado';
 import type { Alerta } from '../types';
 
 const HOY = '2026-11-12';
@@ -22,11 +22,6 @@ describe('estado de las alertas', () => {
     expect(estadoAlerta(al('a', undefined), HOY)).toBe('programada');
     expect(estadoAlerta(al('a', '2020-01-01', 'atendida'), HOY)).toBe('atendida');
   });
-  it('las alertas antiguas de mantenimiento no se cuentan ni se enseñan', () => {
-    const lista = [al('1', '2026-11-01'), al('2', undefined, 'activa', 'mantenimiento'), al('3', '2027-05-01', 'activa', 'aceite')];
-    expect(alertasVisibles(lista).map(a => a.id)).toEqual(['1', '3']);
-    expect(resumenAlertas(lista, HOY)).toEqual({ vencidas: 1, pronto: 0, programadas: 1, atendidas: 0 });
-  });
   it('el número urgente son vencidas más las que vencen pronto', () => {
     const lista = [al('1', '2026-11-01'), al('2', '2026-11-20'), al('3', '2027-02-01'), al('4', '2026-11-20', 'atendida')];
     expect(alertasUrgentes(lista, HOY)).toBe(2);
@@ -44,5 +39,26 @@ describe('estado de las alertas', () => {
     expect(textoPlazo(al('a', '2026-11-21'), HOY)).toBe('Vence en 9 días');
     expect(textoPlazo(al('a', '2027-01-01'), HOY)).toBe('Programada · en 50 días');
     expect(textoPlazo(al('a', '2026-01-01', 'atendida'), HOY)).toBe('Atendida');
+  });
+});
+
+describe('buscador de vencimientos', () => {
+  const v = { matricula: '1234 ABC', marca: 'Seat', modelo: 'Ibiza' };
+  it('encuentra por matrícula sin importar mayúsculas, espacios ni guiones, y por trozos', () => {
+    expect(coincideBusqueda(v, '1234abc')).toBe(true);
+    expect(coincideBusqueda(v, '1234-ABC')).toBe(true);
+    expect(coincideBusqueda(v, ' 34 a ')).toBe(true);
+    expect(coincideBusqueda(v, 'abc')).toBe(true);
+    expect(coincideBusqueda(v, '9999')).toBe(false);
+  });
+  it('también por marca y modelo, y sin tildes', () => {
+    expect(coincideBusqueda(v, 'seat ibiza')).toBe(true);
+    expect(coincideBusqueda({ matricula: 'X', marca: 'Citroën', modelo: 'C3' }, 'citroen')).toBe(true);
+  });
+  it('sin texto coincide todo; sin vehículo, nada si hay texto', () => {
+    expect(coincideBusqueda(v, '')).toBe(true);
+    expect(coincideBusqueda(v, '   ')).toBe(true);
+    expect(coincideBusqueda(undefined, '')).toBe(true);
+    expect(coincideBusqueda(undefined, 'a')).toBe(false);
   });
 });

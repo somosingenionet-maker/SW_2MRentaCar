@@ -7,6 +7,13 @@ describe('errorCambioAceite', () => {
     expect(errorCambioAceite({ aceiteFecha: '2026-10-01', aceiteKm: 85000, aceiteProximaFecha: '2027-10-01' })).toBe('');
     expect(errorCambioAceite({ aceiteFecha: '2026-10-01', aceiteProximaFecha: '2026-10-01' })).toBe('');
   });
+  it('los km del próximo cambio deben ser mayores que los del último y no negativos', () => {
+    expect(errorCambioAceite({ aceiteKm: 85000, aceiteProximoKm: 100000 })).toBe('');
+    expect(errorCambioAceite({ aceiteProximoKm: 100000 })).toBe('');
+    expect(errorCambioAceite({ aceiteKm: 85000, aceiteProximoKm: 85000 })).toContain('mayores');
+    expect(errorCambioAceite({ aceiteKm: 85000, aceiteProximoKm: 70000 })).toContain('mayores');
+    expect(errorCambioAceite({ aceiteProximoKm: -1 })).toContain('negativos');
+  });
   it('el próximo cambio no puede ser anterior al último', () => {
     expect(errorCambioAceite({ aceiteFecha: '2026-10-01', aceiteProximaFecha: '2026-09-30' })).toContain('no puede ser anterior');
   });
@@ -40,11 +47,11 @@ describe('estadoProximoCambio', () => {
 
 describe('normalizarAceite', () => {
   it('lo vacío pasa a null para poder borrar el dato en la base', () => {
-    expect(normalizarAceite({ aceiteFecha: '', aceiteKm: null, aceiteProximaFecha: '  ' })).toEqual({ aceiteFecha: null, aceiteKm: null, aceiteProximaFecha: null });
-    expect(normalizarAceite({})).toEqual({ aceiteFecha: null, aceiteKm: null, aceiteProximaFecha: null });
+    expect(normalizarAceite({ aceiteFecha: '', aceiteKm: null, aceiteProximaFecha: '  ', aceiteProximoKm: null })).toEqual({ aceiteFecha: null, aceiteKm: null, aceiteProximaFecha: null, aceiteProximoKm: null });
+    expect(normalizarAceite({})).toEqual({ aceiteFecha: null, aceiteKm: null, aceiteProximaFecha: null, aceiteProximoKm: null });
   });
   it('conserva lo escrito y redondea los km', () => {
-    expect(normalizarAceite({ aceiteFecha: '2026-10-01', aceiteKm: 85000.4, aceiteProximaFecha: '2027-10-01' })).toEqual({ aceiteFecha: '2026-10-01', aceiteKm: 85000, aceiteProximaFecha: '2027-10-01' });
+    expect(normalizarAceite({ aceiteFecha: '2026-10-01', aceiteKm: 85000.4, aceiteProximaFecha: '2027-10-01', aceiteProximoKm: 100000.6 })).toEqual({ aceiteFecha: '2026-10-01', aceiteKm: 85000, aceiteProximaFecha: '2027-10-01', aceiteProximoKm: 100001 });
     expect(normalizarAceite({ aceiteKm: 0 }).aceiteKm).toBe(0);
   });
 });
@@ -53,10 +60,10 @@ describe('aceiteTrasEntrega', () => {
   const ot = { fechaRecepcion: '2026-11-09', fechaEntrega: '2026-11-10', kilometrajeEntrada: 85000, kilometrajeSalida: 85010 };
   it('anota la fecha de entrega y los km de salida, y borra el próximo cambio anterior', () => {
     expect(aceiteTrasEntrega({ aceiteFecha: '2025-11-01', aceiteKm: 70000, aceiteProximaFecha: '2026-11-01' }, ot, '2026-11-11'))
-      .toEqual({ aceiteFecha: '2026-11-10', aceiteKm: 85010, aceiteProximaFecha: null });
+      .toEqual({ aceiteFecha: '2026-11-10', aceiteKm: 85010, aceiteProximaFecha: null, aceiteProximoKm: null });
   });
   it('sin km de salida usa los de entrada; sin fecha de entrega usa hoy', () => {
-    expect(aceiteTrasEntrega({}, { kilometrajeEntrada: 85000 }, '2026-11-11')).toEqual({ aceiteFecha: '2026-11-11', aceiteKm: 85000, aceiteProximaFecha: null });
+    expect(aceiteTrasEntrega({}, { kilometrajeEntrada: 85000 }, '2026-11-11')).toEqual({ aceiteFecha: '2026-11-11', aceiteKm: 85000, aceiteProximaFecha: null, aceiteProximoKm: null });
   });
   it('sin km válidos conserva los que ya había', () => {
     expect(aceiteTrasEntrega({ aceiteKm: 70000 }, { fechaEntrega: '2026-11-10', kilometrajeEntrada: 0 }, '2026-11-11')?.aceiteKm).toBe(70000);

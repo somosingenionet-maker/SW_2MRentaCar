@@ -4,7 +4,7 @@
 //                      de la empresa para pintar la página.
 //   POST {token, accion, otId, ...} → acciones del mecánico sobre SUS órdenes:
 //        tarea (lineaId, hecha, duracion en minutos) · filtro (cambio de aceite: filtro, cambiado) ·
-//        aceite (activo: marca o quita «es un cambio de aceite») · proximo (fecha del próximo cambio de aceite) ·
+//        aceite (activo: marca o quita «es un cambio de aceite») · proximo (fecha y km del próximo cambio de aceite) ·
 //        empezar · listo · reabrir · nota (texto).
 //
 // Pública a propósito (verify_jwt=false): el mecánico entra desde el móvil sin cuenta. La
@@ -74,7 +74,7 @@ Deno.serve(async (req: Request) => {
     if (req.method === 'POST') {
       const texto = await req.text();
       if (texto.length > 4000) return json({ error: 'demasiado_grande' }, 413);
-      let b: { token?: string; accion?: string; otId?: string; lineaId?: string; hecha?: boolean; duracion?: number; filtro?: string; cambiado?: boolean | null; activo?: boolean; fecha?: string; texto?: string };
+      let b: { token?: string; accion?: string; otId?: string; lineaId?: string; hecha?: boolean; duracion?: number; filtro?: string; cambiado?: boolean | null; activo?: boolean; fecha?: string; km?: number | null; texto?: string };
       try { b = JSON.parse(texto); } catch { return json({ error: 'cuerpo_invalido' }, 400); }
 
       const tec = await tecnicoDe(String(b.token ?? ''));
@@ -114,7 +114,10 @@ Deno.serve(async (req: Request) => {
         case 'proximo': {
           // Fecha del próximo cambio de aceite (AAAA-MM-DD): la base la valida y actualiza la ficha del vehículo.
           if (typeof b.fecha !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(b.fecha)) return json({ error: 'cuerpo_invalido' }, 400);
-          const { data, error } = await admin.rpc('taller_ot_aceite_proximo', { p_ot: otId, p_tecnico: tec.nombre, p_fecha: b.fecha });
+          // Km del próximo cambio (opcional).
+          const km = b.km == null ? null : b.km;
+          if (km !== null && (!Number.isInteger(km) || km < 0 || km > 2_000_000)) return json({ error: 'cuerpo_invalido' }, 400);
+          const { data, error } = await admin.rpc('taller_ot_aceite_proximo', { p_ot: otId, p_tecnico: tec.nombre, p_fecha: b.fecha, p_km: km });
           if (error) throw error;
           hecho = data === true;
           break;

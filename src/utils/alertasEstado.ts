@@ -5,9 +5,6 @@ export const DIAS_VENCE_PRONTO = 14;
 
 export type EstadoAlerta = 'vencida' | 'pronto' | 'programada' | 'atendida';
 
-/** Alertas que la app enseña: las antiguas de «mantenimiento» (km + 15.000) ya no existen para el usuario. */
-export const alertasVisibles = (alertas: Alerta[]): Alerta[] => alertas.filter(a => (a.tipo as string) !== 'mantenimiento');
-
 /** Días hasta la fecha (AAAA-MM-DD) desde `hoy`; negativo si ya pasó. null si la fecha no es válida. */
 export function diasHasta(fecha: string | undefined, hoy: string): number | null {
   if (!fecha) return null;
@@ -29,7 +26,7 @@ export interface ResumenAlertas { vencidas: number; pronto: number; programadas:
 
 export function resumenAlertas(alertas: Alerta[], hoy: string): ResumenAlertas {
   const r: ResumenAlertas = { vencidas: 0, pronto: 0, programadas: 0, atendidas: 0 };
-  for (const a of alertasVisibles(alertas)) {
+  for (const a of alertas) {
     const e = estadoAlerta(a, hoy);
     if (e === 'vencida') r.vencidas++; else if (e === 'pronto') r.pronto++; else if (e === 'programada') r.programadas++; else r.atendidas++;
   }
@@ -58,4 +55,14 @@ export function textoPlazo(alerta: Pick<Alerta, 'estado' | 'fechaLimite'>, hoy: 
   if (d === 0) return 'Vence hoy';
   if (d === 1) return 'Vence mañana';
   return e === 'pronto' ? `Vence en ${d} días` : `Programada · en ${d} días`;
+}
+
+const normaliza = (t: string | undefined | null) => (t ?? '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^a-z0-9]/g, '');
+
+/** ¿El vehículo coincide con lo escrito en el buscador? Por matrícula, marca o modelo, sin importar mayúsculas, espacios, guiones ni tildes. */
+export function coincideBusqueda(vehiculo: { matricula?: string; marca?: string; modelo?: string } | undefined, texto: string): boolean {
+  const q = normaliza(texto);
+  if (!q) return true;
+  if (!vehiculo) return false;
+  return normaliza(vehiculo.matricula).includes(q) || normaliza(`${vehiculo.marca ?? ''}${vehiculo.modelo ?? ''}`).includes(q);
 }

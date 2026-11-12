@@ -37,6 +37,8 @@ export interface Vehiculo {
   aceiteFecha?: string | null;
   aceiteKm?: number | null;
   aceiteProximaFecha?: string | null;
+  /** El próximo cambio también se recomienda a este kilometraje («o a los 100.000 km»). */
+  aceiteProximoKm?: number | null;
 }
 
 // ─── Órdenes de Trabajo ───────────────────────────────────────────────────────

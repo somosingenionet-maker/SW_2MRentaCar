@@ -15,7 +15,7 @@ export default function CambioAceiteFields({ valor, onChange, idBase }: Props) {
   return (
     <div data-testid="campos-cambio-aceite" className="space-y-1.5">
       <p className="text-[10px] font-bold text-slate-500 uppercase flex items-center gap-1"><Droplets className="w-3 h-3 text-amber-500" /> Cambio de aceite</p>
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
         <div>
           <label htmlFor={`${idBase}-aceite-fecha`} className="block text-[10px] font-bold text-slate-500 uppercase">Fecha del último cambio</label>
           <input id={`${idBase}-aceite-fecha`} type="date" className={CAMPO} value={valor.aceiteFecha ?? ''}
@@ -31,6 +31,12 @@ export default function CambioAceiteFields({ valor, onChange, idBase }: Props) {
           <label htmlFor={`${idBase}-aceite-proxima`} className="block text-[10px] font-bold text-slate-500 uppercase">Fecha del próximo cambio</label>
           <input id={`${idBase}-aceite-proxima`} type="date" className={CAMPO} value={valor.aceiteProximaFecha ?? ''}
             onChange={e => onChange({ ...valor, aceiteProximaFecha: e.target.value })} />
+        </div>
+        <div>
+          <label htmlFor={`${idBase}-aceite-proximo-km`} className="block text-[10px] font-bold text-slate-500 uppercase">Km del próximo cambio</label>
+          <input id={`${idBase}-aceite-proximo-km`} type="number" min="0" step="1" inputMode="numeric" placeholder="Ej.: 100000" className={CAMPO}
+            value={valor.aceiteProximoKm ?? ''}
+            onChange={e => onChange({ ...valor, aceiteProximoKm: e.target.value === '' ? null : Number(e.target.value) })} />
         </div>
       </div>
     </div>

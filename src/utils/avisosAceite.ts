@@ -59,6 +59,8 @@ interface Datos {
   empresa: { nombre: string; telefono: string };
   /** Próximo cambio (AAAA-MM-DD), si se conoce. */
   proximo?: string;
+  /** Km del próximo cambio, si se anotaron. */
+  proximoKm?: number | null;
   /** Solo en la entrega. */
   entrega?: { fecha: string; filtros?: EstadoFiltros };
 }
@@ -69,6 +71,7 @@ export function textoAviso(d: Datos): { asunto: string; mensaje: string } {
   const veh = nombreVehiculo(d.vehiculo);
   const cita = d.empresa.telefono ? `Para pedir cita, llámenos o escríbanos al ${d.empresa.telefono}.` : 'Para pedir cita, escríbanos o llámenos.';
   const firma = d.empresa.nombre;
+  const km = d.proximoKm != null ? ` o a los ${d.proximoKm.toLocaleString('es-ES')} km` : '';
   if (d.etapa === 'entrega') {
     const filas = FILTROS_ACEITE
       .filter(f => d.entrega?.filtros?.[f.id] !== undefined)
@@ -76,7 +79,7 @@ export function textoAviso(d: Datos): { asunto: string; mensaje: string } {
     const partes = [
       `${hola} gracias por confiar en ${firma}. El ${formatDate(d.entrega?.fecha ?? '')} le hicimos el cambio de aceite de su ${veh}.`,
       filas.length > 0 ? `Esto es lo que revisamos:\n${filas.join('\n')}` : '',
-      d.proximo ? `Próximo cambio de aceite recomendado: ${formatDate(d.proximo)}.` : '',
+      d.proximo ? `Próximo cambio de aceite recomendado: ${formatDate(d.proximo)}${km}${km ? ', lo que ocurra antes' : ''}.` : '',
       cita,
       firma,
     ].filter(Boolean);
@@ -85,12 +88,12 @@ export function textoAviso(d: Datos): { asunto: string; mensaje: string } {
   if (d.etapa === 'recordatorio') {
     return {
       asunto: `Se acerca el cambio de aceite de su ${d.vehiculo.marca} ${d.vehiculo.matricula}`,
-      mensaje: [`${hola} le recordamos que el próximo cambio de aceite de su ${veh} está previsto para el ${formatDate(d.proximo ?? '')}.`, cita, firma].join('\n\n'),
+      mensaje: [`${hola} le recordamos que el próximo cambio de aceite de su ${veh} está previsto para el ${formatDate(d.proximo ?? '')}${km}${km ? ', lo que ocurra antes' : ''}.`, cita, firma].join('\n\n'),
     };
   }
   return {
     asunto: `Cambio de aceite pendiente de su ${d.vehiculo.marca} ${d.vehiculo.matricula}`,
-    mensaje: [`${hola} el cambio de aceite de su ${veh} estaba previsto para el ${formatDate(d.proximo ?? '')} y todavía no lo hemos hecho. Conviene no retrasarlo mucho.`, cita, firma].join('\n\n'),
+    mensaje: [`${hola} el cambio de aceite de su ${veh} estaba previsto para el ${formatDate(d.proximo ?? '')}${km} y todavía no lo hemos hecho. Conviene no retrasarlo mucho.`, cita, firma].join('\n\n'),
   };
 }
 
@@ -127,7 +130,7 @@ export function avisosPendientes(e: Entrada): AvisoPendiente[] {
     if (!vehiculo || !cliente) continue;
     // El próximo cambio solo vale si la ficha ya tiene un cambio de esta visita (lo anotó el mecánico o el taller).
     const proximo = vehiculo.aceiteFecha && vehiculo.aceiteFecha >= ot.fechaRecepcion && vehiculo.aceiteProximaFecha ? vehiculo.aceiteProximaFecha : undefined;
-    añade('entrega', vehiculo, cliente, ot.id, { proximo, entrega: { fecha: entregada, filtros: e.filtrosOT[ot.id] }, motivo: `Entregado el ${formatDate(entregada)}`, sinProximoCambio: !proximo });
+    añade('entrega', vehiculo, cliente, ot.id, { proximo, proximoKm: proximo ? vehiculo.aceiteProximoKm : null, entrega: { fecha: entregada, filtros: e.filtrosOT[ot.id] }, motivo: `Entregado el ${formatDate(entregada)}`, sinProximoCambio: !proximo });
   }
 
   // Recordatorio y vencido: según la fecha del próximo cambio de cada vehículo de un cliente.
@@ -138,9 +141,9 @@ export function avisosPendientes(e: Entrada): AvisoPendiente[] {
     const cliente = clienteDelVehiculo(v.id, e.ordenes, e.clientes);
     if (!cliente) continue;
     if (dias >= 0 && dias <= DIAS_ANTES_RECORDATORIO) {
-      añade('recordatorio', v, cliente, proximo, { proximo, motivo: dias === 0 ? 'Toca hoy' : `Toca en ${dias} ${dias === 1 ? 'día' : 'días'} (${formatDate(proximo)})` });
+      añade('recordatorio', v, cliente, proximo, { proximo, proximoKm: v.aceiteProximoKm, motivo: dias === 0 ? 'Toca hoy' : `Toca en ${dias} ${dias === 1 ? 'día' : 'días'} (${formatDate(proximo)})` });
     } else if (dias < 0 && -dias >= DIAS_TRAS_VENCER && -dias <= DIAS_MAX_VENCIDO) {
-      añade('vencido', v, cliente, proximo, { proximo, motivo: `Pasó hace ${-dias} días (${formatDate(proximo)})` });
+      añade('vencido', v, cliente, proximo, { proximo, proximoKm: v.aceiteProximoKm, motivo: `Pasó hace ${-dias} días (${formatDate(proximo)})` });
     }
   }
 

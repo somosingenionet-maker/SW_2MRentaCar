@@ -35,6 +35,8 @@ export interface OrdenMecanico {
   cambioAceite?: boolean;
   /** Próximo cambio de aceite ya anotado en esta visita (AAAA-MM-DD). */
   proximoCambio?: string | null;
+  /** Km del próximo cambio ya anotados en esta visita. */
+  proximoKm?: number | null;
   /** Filtros ya marcados: true = cambiado, false = no se cambió; los que faltan están sin revisar. */
   filtros?: EstadoFiltros;
 }

@@ -88,4 +88,14 @@ describe('avisos del cambio de aceite', () => {
     expect(v.mensaje).toContain('estaba previsto para el 20 nov. 2026');
     expect(v.asunto).toContain('Seat 1234ABC');
   });
+  it('los km del próximo cambio salen en los mensajes cuando se anotaron', () => {
+    const [e] = avisosPendientes(entrada({ vehiculos: [veh({ aceiteFecha: '2026-11-11', aceiteProximaFecha: '2027-11-11', aceiteProximoKm: 100000 })] }));
+    expect(e.mensaje).toContain('Próximo cambio de aceite recomendado: 11 nov. 2027 o a los 100.000 km, lo que ocurra antes.');
+    const [r] = avisosPendientes(entrada({ ordenes: [ot({ esCambioAceite: false })], vehiculos: [veh({ aceiteProximaFecha: '2026-11-20', aceiteProximoKm: 100000 })] }));
+    expect(r.mensaje).toContain('está previsto para el 20 nov. 2026 o a los 100.000 km, lo que ocurra antes.');
+    const [v] = avisosPendientes(entrada({ ordenes: [ot({ esCambioAceite: false })], vehiculos: [veh({ aceiteProximaFecha: '2026-11-01', aceiteProximoKm: 100000 })] }));
+    expect(v.mensaje).toContain('estaba previsto para el 1 nov. 2026 o a los 100.000 km y todavía');
+    const [sin] = avisosPendientes(entrada({ ordenes: [ot({ esCambioAceite: false })], vehiculos: [veh({ aceiteProximaFecha: '2026-11-20' })] }));
+    expect(sin.mensaje).not.toContain(' km');
+  });
 });

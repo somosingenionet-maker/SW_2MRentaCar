@@ -455,6 +455,7 @@ export default function App() {
       // Cambio de aceite hecho: queda como último cambio de hoy y se fija el próximo.
       updatedVeh.aceiteFecha = hoyISO();
       updatedVeh.aceiteProximaFecha = nuevaFecha;
+      updatedVeh.aceiteProximoKm = null; // el del ciclo anterior ya no vale; se añade en la ficha si se quiere
     }
 
     // Un trigger en Supabase reabre/actualiza la alerta al guardar la nueva fecha del vehículo;

@@ -16,7 +16,6 @@ const alertas = [
   { id: 'a1', vehiculoId: 'v1', tipo: 'itv', descripcion: 'ITV v1', estado: 'activa', fechaLimite: sumarDias(hoy, -3) },
   { id: 'a2', vehiculoId: 'v1', tipo: 'aceite', descripcion: 'Aceite v1', estado: 'activa', fechaLimite: sumarDias(hoy, 9) },
   { id: 'a3', vehiculoId: 'v2', tipo: 'aceite', descripcion: 'Aceite v2', estado: 'activa', fechaLimite: sumarDias(hoy, 5) },
-  { id: 'a4', vehiculoId: 'v1', tipo: 'mantenimiento', descripcion: 'Revisión antigua', estado: 'activa', kilometrajeLimite: 15000 },
 ] as unknown as Alerta[];
 const pinta = (o: Partial<Parameters<typeof AlertsNotificationsTab>[0]> = {}) => renderToString(
   <AlertsNotificationsTab alertas={alertas} notificaciones={[]} clientes={clientes} vehiculos={vehiculos} ordenesTrabajo={ordenes} onAddNotificacion={nop} onDeleteNotificacion={nop} onTriggerAutoRenew={nop} {...o} />,
@@ -24,13 +23,12 @@ const pinta = (o: Partial<Parameters<typeof AlertsNotificationsTab>[0]> = {}) =>
 const texto = (h: string) => h.replace(/<[^>]*>/g, ' ').replace(/&#x27;/g, "'").replace(/\s+/g, ' ');
 
 describe('pestaña de Alertas', () => {
-  it('agrupa por urgencia y no enseña las alertas antiguas de mantenimiento ni el filtro', () => {
+  it('agrupa por urgencia y ya no tiene el filtro de mantenimiento', () => {
     const t = texto(pinta());
     expect(t).toMatch(/Vencidas\s*1/);
     expect(t).toMatch(/Vencen en 14 días\s*2/);
     expect(t).toContain('Vencida hace 3 días');
     expect(t).toContain('Vence en 9 días');
-    expect(t).not.toContain('Revisión antigua');
     expect(t).not.toMatch(/Mantenimiento/i);
     expect(t).toContain('Cambio de aceite');
   });
@@ -65,5 +63,20 @@ describe('pestaña de Alertas', () => {
     expect(t).toContain('Abrir WhatsApp');
     expect(t).toContain('Abrir correo');
     expect(t).not.toMatch(/\bsms\b/i);
+  });
+  it('tiene buscador por matrícula', () => {
+    const h = pinta();
+    expect(h).toContain('data-testid="buscador-vencimientos"');
+    expect(h).toContain('Buscar por matrícula, marca o modelo');
+  });
+  it('enseña el resumen de la semana con lo vencido y lo próximo, y los botones para enviarlo', () => {
+    const h = pinta();
+    const t = texto(h);
+    expect(t).toContain('Resumen de la semana');
+    expect(t).toContain('VENCIDAS (1)');
+    expect(t).toContain('VENCEN EN LOS PRÓXIMOS 14 DÍAS (2)');
+    expect(t).toContain('Enviar por WhatsApp');
+    expect(t).toContain('Enviar por correo');
+    expect(t).toContain('Todavía no se envía solo');
   });
 });

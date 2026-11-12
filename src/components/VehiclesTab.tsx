@@ -196,10 +196,10 @@ export default function VehiclesTab({
   };
 
   const handleExportCsv = () => {
-    const headers = ['Marca', 'Modelo', 'Matrícula', 'Bastidor', 'Km', 'ITV Vencimiento', 'Seguro Vencimiento', 'Aseguradora', 'Impuesto Vencimiento', 'Fecha Registro', 'Transmisión', 'Fianza (€)', 'Seguro ampliado (€/día)', 'Último cambio de aceite', 'Km del cambio de aceite', 'Próximo cambio de aceite'];
+    const headers = ['Marca', 'Modelo', 'Matrícula', 'Bastidor', 'Km', 'ITV Vencimiento', 'Seguro Vencimiento', 'Aseguradora', 'Impuesto Vencimiento', 'Fecha Registro', 'Transmisión', 'Fianza (€)', 'Seguro ampliado (€/día)', 'Último cambio de aceite', 'Km del cambio de aceite', 'Próximo cambio de aceite', 'Km del próximo cambio de aceite'];
     const rows = vehiculos.map(v => [v.marca, v.modelo, v.matricula, v.bastidor, String(v.kilometraje), v.itvVencimiento ?? '', v.seguroVencimiento ?? '', v.aseguradora ?? '', v.impuestoVencimiento ?? '', v.fechaRegistro,
       v.esFlotaAlquiler ? etiquetaTransmision(v.transmision) : '', v.esFlotaAlquiler && v.fianza ? String(v.fianza) : '', v.seguroAmpliadoDia != null ? String(v.seguroAmpliadoDia) : '',
-      v.aceiteFecha ?? '', v.aceiteKm != null ? String(v.aceiteKm) : '', v.aceiteProximaFecha ?? '']);
+      v.aceiteFecha ?? '', v.aceiteKm != null ? String(v.aceiteKm) : '', v.aceiteProximaFecha ?? '', v.aceiteProximoKm != null ? String(v.aceiteProximoKm) : '']);
     downloadCsv(`${slugify(getEmpresaConfig().nombre)}_flota_${new Date().toISOString().slice(0, 10)}.csv`, [headers, ...rows]);
   };
 
@@ -434,10 +434,10 @@ export default function VehiclesTab({
                       return <span data-testid="estado-cambio-aceite" className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${e === 'vencido' ? 'bg-rose-100 text-rose-700' : 'bg-amber-100 text-amber-800'}`}>{e === 'vencido' ? 'Vencido' : 'Próximo'}</span>;
                     })()}
                   </div>
-                  {selectedVehiculo.aceiteFecha || selectedVehiculo.aceiteKm != null || selectedVehiculo.aceiteProximaFecha ? (
+                  {selectedVehiculo.aceiteFecha || selectedVehiculo.aceiteKm != null || selectedVehiculo.aceiteProximaFecha || selectedVehiculo.aceiteProximoKm != null ? (
                     <div className="text-xs font-semibold text-slate-700 mt-1 space-y-0.5">
                       <div>Último: {selectedVehiculo.aceiteFecha ? formatDate(selectedVehiculo.aceiteFecha) : '—'}{selectedVehiculo.aceiteKm != null && <> · {selectedVehiculo.aceiteKm.toLocaleString('es-ES')} km</>}</div>
-                      <div>Próximo cambio: {selectedVehiculo.aceiteProximaFecha ? formatDate(selectedVehiculo.aceiteProximaFecha) : '—'}</div>
+                      <div>Próximo cambio: {selectedVehiculo.aceiteProximaFecha ? formatDate(selectedVehiculo.aceiteProximaFecha) : '—'}{selectedVehiculo.aceiteProximoKm != null && <> · o a los {selectedVehiculo.aceiteProximoKm.toLocaleString('es-ES')} km</>}</div>
                     </div>
                   ) : (
                     <div className="text-xs text-slate-400 mt-1">Sin registrar. Se añade al editar el vehículo.</div>

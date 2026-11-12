@@ -3,14 +3,15 @@ import { usePaginacion } from '../utils/usePaginacion';
 import Pagination from './Pagination';
 import { Alerta, NotificacionCliente, Cliente, Vehiculo, AlertaTipo, OrdenTrabajo } from '../types';
 import {
-  Bell, Check, MessageSquare, AlertTriangle, Mail, Calendar, Droplets, Send, Clock, BellOff
+  Bell, Check, MessageSquare, AlertTriangle, Mail, Calendar, Droplets, Send, Clock, BellOff, Search, ClipboardList
 } from 'lucide-react';
 import RenovarVencimientoModal from './RenovarVencimientoModal';
 import { formatDate } from '../utils/dateFormat';
 import { getEmpresaConfig } from '../data/empresaConfig';
 import { genId } from '../utils/id';
 import { hoyISO } from '../utils/fechas';
-import { alertasVisibles, estadoAlerta, ordenarAlertas, resumenAlertas, textoPlazo, DIAS_VENCE_PRONTO } from '../utils/alertasEstado';
+import { coincideBusqueda, estadoAlerta, ordenarAlertas, resumenAlertas, textoPlazo, DIAS_VENCE_PRONTO } from '../utils/alertasEstado';
+import { esLunes, resumenSemanal } from '../utils/resumenSemanal';
 import { avisosPendientes, clienteDelVehiculo, tipoEventoAceite, DIAS_ANTES_RECORDATORIO, type AvisoPendiente, type EtapaAviso } from '../utils/avisosAceite';
 import { enlaceWhatsApp } from '../utils/tallerMecanico';
 import type { EstadoFiltros } from '../utils/filtrosAceite';
@@ -62,6 +63,7 @@ export default function AlertsNotificationsTab({
   const empresa = getEmpresaConfig();
   const hoy = hoyISO();
   const [selectedTipoFilter, setSelectedTipoFilter] = useState<string>('all');
+  const [busqueda, setBusqueda] = useState('');
   const [selectedAlertaId, setSelectedAlertaId] = useState<string | null>(null);
   // Alerta que se está cerrando (elige cuándo se hizo y el nuevo vencimiento en un cuadro propio).
   const [renovando, setRenovando] = useState<{ alerta: Alerta; titulo: string; etiqueta: string } | null>(null);
@@ -89,7 +91,7 @@ export default function AlertsNotificationsTab({
     const coche = `${veh.marca} ${veh.modelo} (${veh.matricula})`;
     if (selectedTemplate === 'aceite_recordatorio' || selectedTemplate === 'aceite_vencido' || selectedTemplate === 'aceite_entrega' || selectedTemplate === 'mantenimiento_preventivo') {
       setCustomSubject(`Cambio de aceite de su ${veh.marca} ${veh.matricula}`);
-      setCustomBody(`Hola ${cli.nombre},\n\nLe recordamos que el próximo cambio de aceite de su ${coche}${veh.aceiteProximaFecha ? ` está previsto para el ${formatDate(veh.aceiteProximaFecha)}` : ' se acerca'}. Para pedir cita, llámenos o escríbanos${empresa.telefono ? ` al ${empresa.telefono}` : ''}.\n\n${empresa.nombre}`);
+      setCustomBody(`Hola ${cli.nombre},\n\nLe recordamos que el próximo cambio de aceite de su ${coche}${veh.aceiteProximaFecha ? ` está previsto para el ${formatDate(veh.aceiteProximaFecha)}${veh.aceiteProximoKm != null ? ` o a los ${veh.aceiteProximoKm.toLocaleString('es-ES')} km, lo que ocurra antes` : ''}` : ' se acerca'}. Para pedir cita, llámenos o escríbanos${empresa.telefono ? ` al ${empresa.telefono}` : ''}.\n\n${empresa.nombre}`);
     } else if (selectedTemplate === 'itv_proxima') {
       setCustomSubject(`Recordatorio de ITV: ${veh.marca} ${veh.matricula}`);
       setCustomBody(`Hola ${cli.nombre},\n\nLe recordamos que la ITV de su ${coche} caduca el ${formatDate(veh.itvVencimiento)}.\n\n${empresa.nombre}`);
@@ -151,14 +153,20 @@ export default function AlertsNotificationsTab({
     setRenovando({ alerta, titulo: modal[alerta.tipo].titulo, etiqueta: modal[alerta.tipo].etiqueta });
   };
 
-  const visibles = useMemo(() => alertasVisibles(alertas), [alertas]);
   const filteredAlertas = useMemo(
-    () => ordenarAlertas(visibles.filter(al => selectedTipoFilter === 'all' || al.tipo === selectedTipoFilter), hoy),
-    [visibles, selectedTipoFilter, hoy],
+    () => ordenarAlertas(
+      alertas.filter(al => (selectedTipoFilter === 'all' || al.tipo === selectedTipoFilter) && coincideBusqueda(vehiculos.find(v => v.id === al.vehiculoId), busqueda)),
+      hoy,
+    ),
+    [alertas, vehiculos, selectedTipoFilter, busqueda, hoy],
+  );
+  const resumenDeLaSemana = useMemo(
+    () => resumenSemanal({ alertas, vehiculos, avisosPendientes: pendientes.length, hoy, empresa: empresa.nombre }),
+    [alertas, vehiculos, pendientes.length, hoy, empresa.nombre],
   );
   const resumen = resumenAlertas(alertas, hoy);
 
-  const pagAlertas = usePaginacion(filteredAlertas, 'alertas', selectedTipoFilter);
+  const pagAlertas = usePaginacion(filteredAlertas, 'alertas', `${selectedTipoFilter}|${busqueda}`);
   const avisosOrdenados = [...notificaciones].reverse();
   const pagAvisos = usePaginacion(avisosOrdenados, 'avisos');
 
@@ -188,6 +196,22 @@ export default function AlertsNotificationsTab({
         <div className="bg-white border border-slate-200 rounded-2xl p-5">
           <p className="text-xs font-bold text-slate-400 uppercase tracking-wider">Atendidas</p>
           <p className="text-2xl font-bold text-emerald-600 mt-1">{resumen.atendidas}</p>
+        </div>
+      </div>
+
+      {/* Resumen semanal: los lunes */}
+      <div data-testid="resumen-semanal" className={`p-5 rounded-2xl border shadow-sm space-y-3 ${esLunes(hoy) ? 'bg-blue-50/60 border-blue-200' : 'bg-white border-slate-100'}`}>
+        <div className="flex flex-wrap items-center gap-2">
+          <h2 className="text-sm font-bold text-slate-800 flex items-center gap-2"><ClipboardList className="w-4 h-4 text-blue-600" /> Resumen de la semana</h2>
+          {esLunes(hoy) && <span data-testid="resumen-lunes" className="text-[11px] font-bold bg-blue-600 text-white rounded-full px-2 py-0.5">Hoy es lunes: toca enviarlo</span>}
+        </div>
+        <pre data-testid="texto-resumen-semanal" className="whitespace-pre-wrap font-sans text-xs text-slate-600 bg-white border border-slate-200 rounded-xl p-3 max-h-64 overflow-auto">{resumenDeLaSemana.texto}</pre>
+        <div className="flex flex-wrap items-center gap-2 text-xs font-bold">
+          <button type="button" onClick={() => abrir(enlaceWhatsApp(undefined, resumenDeLaSemana.texto))}
+            className="px-3 py-1.5 rounded-lg bg-green-600 hover:bg-green-500 text-white inline-flex items-center gap-1 cursor-pointer"><MessageSquare className="w-3.5 h-3.5" /> Enviar por WhatsApp</button>
+          <button type="button" onClick={() => abrir(enlaceCorreo(empresa.correo, resumenDeLaSemana.asunto, resumenDeLaSemana.texto))}
+            className="px-3 py-1.5 rounded-lg bg-blue-600 hover:bg-blue-500 text-white inline-flex items-center gap-1 cursor-pointer"><Mail className="w-3.5 h-3.5" /> Enviar por correo</button>
+          <span className="text-[11px] font-normal text-slate-400">Al pulsar se abre con el texto escrito; tú eliges a quién. Todavía no se envía solo.</span>
         </div>
       </div>
 
@@ -273,11 +297,17 @@ export default function AlertsNotificationsTab({
           ))}
         </div>
 
+        <div className="relative max-w-sm">
+          <Search className="w-3.5 h-3.5 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
+          <input type="search" data-testid="buscador-vencimientos" aria-label="Buscar vencimiento por matrícula" placeholder="Buscar por matrícula, marca o modelo…" value={busqueda} onChange={e => setBusqueda(e.target.value)}
+            className="w-full pl-8 pr-3 py-2 border border-slate-200 rounded-lg text-xs focus:outline-none focus:ring-1 focus:ring-blue-500" />
+        </div>
+
         <div className="space-y-3.5" id="active-alerts-scroller">
           {filteredAlertas.length === 0 ? (
             <div className="text-center py-10 bg-slate-50 border border-slate-100 rounded-xl text-slate-400 text-xs">
               <Check className="w-6 h-6 text-blue-500 mx-auto mb-2" />
-              No hay vencimientos en este momento.
+              {busqueda.trim() ? `Ningún vencimiento coincide con «${busqueda.trim()}».` : 'No hay vencimientos en este momento.'}
             </div>
           ) : (
             pagAlertas.items.map(al => {

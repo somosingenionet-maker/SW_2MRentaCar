@@ -68,6 +68,14 @@ describe('check list en la página del mecánico', () => {
     expect(h).toContain('value="2027-11-11"');
     expect(texto(h)).toMatch(/Anotado: 11 nov\. 2027\s*\. Ya está en la ficha del vehículo\./);
   });
+  it('pide también los km del próximo cambio (opcional) y enseña los ya anotados', () => {
+    const h = pinta({ cambioAceite: true, kilometraje: 85000, proximoCambio: '2027-11-11', proximoKm: 100000 });
+    expect(h).toContain('data-testid="proximo-km"');
+    expect(h).toContain('value="100000"');
+    expect(texto(h)).toContain('Km del próximo cambio');
+    expect(texto(h)).toContain('(opcional)');
+    expect(texto(h)).toMatch(/Anotado: 11 nov\. 2027 o a los 100\.000 km\s*\. Ya está en la ficha del vehículo\./);
+  });
   it('sin fecha el botón de guardar está bloqueado', () => {
     expect(pinta({ cambioAceite: true })).toMatch(/data-testid="guardar-proximo"[^>]*disabled=""|disabled=""[^>]*data-testid="guardar-proximo"/);
   });

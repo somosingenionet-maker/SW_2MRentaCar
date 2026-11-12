@@ -215,7 +215,7 @@ export default function TallerMecanico({ token }: { token: string }) {
             onTarea={(lineaId, hecha, duracion) => void enviar(`t-${lineaId}`, { accion: 'tarea', otId: o.id, lineaId, hecha, ...(duracion ? { duracion } : {}) })}
             onFiltro={(filtro, cambiado) => void enviar(`f-${filtro}`, { accion: 'filtro', otId: o.id, filtro, cambiado })}
             onAceite={activo => void enviar(`a-${o.id}`, { accion: 'aceite', otId: o.id, activo })}
-            onProximo={fecha => void enviar(`p-${o.id}`, { accion: 'proximo', otId: o.id, fecha })}
+            onProximo={(fecha, km) => void enviar(`p-${o.id}`, { accion: 'proximo', otId: o.id, fecha, ...(km != null ? { km } : {}) })}
             onEmpezar={() => void enviar(`e-${o.id}`, { accion: 'empezar', otId: o.id })}
             onListo={() => {
               const { hechas, total } = progresoMecanico(o);
@@ -255,7 +255,7 @@ interface TarjetaProps {
   /** Marca o quita «es un cambio de aceite» en la orden. */
   onAceite?: (activo: boolean) => void;
   /** Fecha del próximo cambio de aceite (AAAA-MM-DD): rellena la ficha del vehículo. */
-  onProximo?: (fecha: string) => void;
+  onProximo?: (fecha: string, km?: number) => void;
   onEmpezar: () => void;
   onListo: () => void;
   onCancelarListo: () => void;
@@ -273,6 +273,13 @@ export function Tarjeta({ orden: o, color, ahora, abierta, nueva, ocupado, nota,
   // Fecha del próximo cambio de aceite que se está escribiendo (si no, la ya anotada).
   const [proximo, setProximo] = useState<string | null>(null);
   const proximoVisible = proximo ?? o.proximoCambio ?? '';
+  // Km del próximo cambio (opcional): lo que se escribe, o lo ya anotado.
+  const [proximoKm, setProximoKm] = useState<string | null>(null);
+  const kmVisible = proximoKm ?? (o.proximoKm != null ? String(o.proximoKm) : '');
+  const kmNum = kmVisible.trim() === '' ? null : Number(kmVisible);
+  const kmMinimo = (o.kilometraje ?? 0) + 1;
+  const kmValido = kmNum === null || (Number.isInteger(kmNum) && kmNum >= kmMinimo && kmNum <= 2_000_000);
+  const sinCambios = proximoVisible === (o.proximoCambio ?? '') && kmNum === (o.proximoKm ?? null);
   // Todas las tareas marcadas y el coche aún no está listo: se le recuerda al mecánico el último paso.
   const todoHecho = total > 0 && hechas === total && o.estado !== 'listo';
 
@@ -374,7 +381,7 @@ export function Tarjeta({ orden: o, color, ahora, abierta, nueva, ocupado, nota,
 
                 <div data-testid="proximo-cambio" className="rounded-xl border border-slate-200 bg-white p-3 space-y-2">
                   <label htmlFor={`proximo-${o.id}`} className="block text-sm font-bold text-slate-800">Próximo cambio de aceite</label>
-                  <p className="text-xs text-slate-500">Al guardarlo se actualiza la ficha del vehículo: último cambio de hoy, km y esta fecha.</p>
+                  <p className="text-xs text-slate-500">Al guardarlo se actualiza la ficha del vehículo: último cambio de hoy, los km de la orden y el próximo cambio.</p>
                   <input id={`proximo-${o.id}`} type="date" min={hoyLocal()} value={proximoVisible} onChange={e => setProximo(e.target.value)}
                     className="w-full min-h-[48px] px-3 border-2 border-slate-200 rounded-xl text-base focus:outline-none focus:border-blue-400" />
                   <div className="flex gap-2">
@@ -383,13 +390,17 @@ export function Tarjeta({ orden: o, color, ahora, abierta, nueva, ocupado, nota,
                         className="flex-1 min-h-[40px] rounded-lg bg-slate-100 text-xs font-bold text-slate-700 cursor-pointer active:bg-slate-200">{t}</button>
                     ))}
                   </div>
-                  <button type="button" data-testid="guardar-proximo" disabled={bloqueado || !onProximo || !proximoVisible || proximoVisible < hoyLocal() || proximoVisible === (o.proximoCambio ?? '')}
-                    onClick={() => { onProximo?.(proximoVisible); setProximo(null); }}
+                  <label htmlFor={`proximo-km-${o.id}`} className="block text-sm font-bold text-slate-800 pt-1">Km del próximo cambio <span className="font-semibold text-slate-400">(opcional)</span></label>
+                  <input id={`proximo-km-${o.id}`} data-testid="proximo-km" type="number" inputMode="numeric" min={kmMinimo} step="1" placeholder="Ej.: 100000" value={kmVisible} onChange={e => setProximoKm(e.target.value)}
+                    className="w-full min-h-[48px] px-3 border-2 border-slate-200 rounded-xl text-base focus:outline-none focus:border-blue-400" />
+                  {!kmValido && <p data-testid="proximo-km-error" role="alert" className="text-xs font-semibold text-rose-600">Tiene que ser más de {o.kilometraje ?? 0} km, que son los de ahora.</p>}
+                  <button type="button" data-testid="guardar-proximo" disabled={bloqueado || !onProximo || !proximoVisible || proximoVisible < hoyLocal() || !kmValido || sinCambios}
+                    onClick={() => { onProximo?.(proximoVisible, kmNum ?? undefined); setProximo(null); setProximoKm(null); }}
                     className="w-full min-h-[48px] rounded-xl text-sm font-extrabold text-white bg-blue-600 disabled:bg-slate-300 cursor-pointer disabled:cursor-not-allowed">
                     Guardar próximo cambio
                   </button>
                   {o.proximoCambio && (
-                    <p data-testid="proximo-anotado" role="status" className="text-xs font-semibold text-emerald-700">Anotado: {formatDate(o.proximoCambio)}. Ya está en la ficha del vehículo.</p>
+                    <p data-testid="proximo-anotado" role="status" className="text-xs font-semibold text-emerald-700">Anotado: {formatDate(o.proximoCambio)}{o.proximoKm != null ? ` o a los ${o.proximoKm.toLocaleString('es-ES')} km` : ''}. Ya está en la ficha del vehículo.</p>
                   )}
                 </div>
 
