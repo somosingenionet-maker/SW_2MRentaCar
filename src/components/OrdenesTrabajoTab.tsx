@@ -22,6 +22,7 @@ import type { EstadoFiltros, FiltroId } from '../utils/filtrosAceite';
 import { FILTROS_ACEITE } from '../utils/filtrosAceite';
 import { enlaceWhatsApp, mensajeAvisoMecanico } from '../utils/tallerMecanico';
 import { genId } from '../utils/id';
+import { admitePresupuesto, mensajePresupuesto, situacionPresupuesto } from '../utils/presupuestoOT';
 import { InputPrecio } from './InputPrecio';
 import { fmt2 } from '../utils/moneda';
 
@@ -124,8 +125,10 @@ function BadgeEstado({ estado, presupuestoEstado, presupuestoAprobado, notificac
   notificacionEnviada?: boolean;
 }) {
   const m = ESTADO_META[estado];
+  const presupuestoEnviado = presupuestoEstado === 'enviado';
   if (estado === 'presupuesto' && presupuestoEstado === 'enviado') return <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-green-100 text-green-700">Enviado</span>;
   if (estado === 'recibido' && presupuestoAprobado) return <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-teal-100 text-teal-700">Aprobado</span>;
+  if (estado === 'recibido' && presupuestoEnviado) return <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-blue-100 text-blue-700">Presupuesto enviado</span>;
   if (estado === 'recibido' && !presupuestoAprobado) return <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-amber-100 text-amber-700">Pdte. diagnóstico</span>;
   if (estado === 'listo' && notificacionEnviada) return <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-green-100 text-green-700">Notificado</span>;
   return <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${m.bg} ${m.color}`}>{m.label}</span>;
@@ -319,12 +322,26 @@ export default function OrdenesTrabajoTab({ ordenes, vehiculos, clientes, tecnic
     setRecepcionModal(null);
   };
 
-  const handleEnviarPresupuesto = (ot: OrdenTrabajo) => {
+  // «por» = cómo se mandó (WhatsApp o correo); sin él, solo se marca como enviado. Reenviar queda anotado como reenvío.
+  const handleEnviarPresupuesto = (ot: OrdenTrabajo, por?: 'WhatsApp' | 'correo') => {
+    const reenvio = ot.presupuestoEstado === 'enviado';
     const updated: OrdenTrabajo = {
       ...ot,
       presupuestoEstado: 'enviado',
       fechaActualizacion: new Date().toISOString(),
-      historial: [...(ot.historial ?? []), evento('Presupuesto enviado al cliente')],
+      historial: [...(ot.historial ?? []), evento(`Presupuesto ${reenvio ? 'reenviado' : 'enviado'} al cliente${por ? ` por ${por}` : ''}`)],
+    };
+    onUpdate(updated);
+    setSelected(updated);
+  };
+
+  // El coche ya está en el taller y el cliente da el visto bueno al presupuesto.
+  const handleAprobarPresupuesto = (ot: OrdenTrabajo) => {
+    const updated: OrdenTrabajo = {
+      ...ot,
+      presupuestoAprobado: true,
+      fechaActualizacion: new Date().toISOString(),
+      historial: [...(ot.historial ?? []), evento('Presupuesto aprobado por el cliente')],
     };
     onUpdate(updated);
     setSelected(updated);
@@ -774,37 +791,79 @@ export default function OrdenesTrabajoTab({ ordenes, vehiculos, clientes, tecnic
                   </div>
                 )}
 
-                {/* Bloque: Cotización — PDF y seguimiento */}
-                {/* Bloque: Presupuesto */}
-                {selected.estado === 'presupuesto' && selected.clienteId !== FLOTA_CLIENTE_ID && (() => {
-                  const enviado = selected.presupuestoEstado === 'enviado';
+                {/* Bloque: Presupuesto — antes de recibir el coche o con el coche ya en el taller */}
+                {admitePresupuesto(selected) && (() => {
+                  const empresa = getEmpresaConfig();
+                  const cli = clientes.find(c => c.id === selected.clienteId);
+                  const veh = vehiculos.find(v => v.id === selected.vehiculoId);
+                  const situacion = situacionPresupuesto(selected);
+                  const enTaller = selected.estado !== 'presupuesto';
+                  const sinLineas = selected.lineas.length === 0;
+                  const mensaje = mensajePresupuesto({ cliente: cli, vehiculo: veh, ot: selected, empresa: { nombre: empresa.nombre, telefono: empresa.telefono } });
+                  const waHref = cli?.telefono ? enlaceWhatsApp(cli.telefono, mensaje) : null;
+                  const mailHref = cli?.correo ? `mailto:${cli.correo}?subject=${encodeURIComponent(`Presupuesto ${selected.numero} - ${empresa.nombre}`)}&body=${encodeURIComponent(mensaje)}` : null;
+                  const colores = situacion === 'aprobado' ? 'bg-teal-50 border-teal-200' : situacion === 'enviado' ? 'bg-green-50 border-green-200' : 'bg-violet-50 border-violet-200';
+                  const etiqueta = situacion === 'aprobado' ? 'Aprobado por el cliente' : situacion === 'enviado' ? (enTaller ? 'Enviado: esperando respuesta' : 'Enviado') : 'Pendiente de envío';
+                  const colorEtiqueta = situacion === 'aprobado' ? 'bg-teal-100 text-teal-700' : situacion === 'enviado' ? 'bg-green-100 text-green-700' : 'bg-amber-100 text-amber-700';
                   return (
-                    <div className={`rounded-xl border p-4 space-y-3 ${enviado ? 'bg-green-50 border-green-200' : 'bg-violet-50 border-violet-200'}`}>
+                    <div data-testid="bloque-presupuesto" className={`rounded-xl border p-4 space-y-3 ${colores}`}>
                       <div className="flex items-center justify-between">
                         <p className="text-xs font-bold uppercase text-slate-500">Presupuesto</p>
-                        <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${enviado ? 'bg-green-100 text-green-700' : 'bg-amber-100 text-amber-700'}`}>
-                          {enviado ? 'Enviado' : 'Pendiente de envío'}
-                        </span>
+                        <span data-testid="situacion-presupuesto" className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${colorEtiqueta}`}>{etiqueta}</span>
                       </div>
-                      {!enviado && (
-                        <p className="text-xs text-slate-500">Genera el PDF del presupuesto y envíaselo al cliente para que apruebe.</p>
+                      {situacion !== 'aprobado' && (
+                        <p className="text-xs text-slate-500">
+                          {enTaller
+                            ? 'El coche ya está en el taller: envía al cliente el presupuesto con lo que habéis encontrado en la revisión. Cuando lo apruebe, márcalo aquí; el coche sigue en su lista del mecánico.'
+                            : 'Genera el PDF del presupuesto y envíaselo al cliente para que apruebe.'}
+                        </p>
                       )}
-                      <div className="flex gap-2">
+                      {sinLineas && situacion !== 'aprobado' && (
+                        <p data-testid="presupuesto-sin-lineas" className="text-[11px] font-semibold text-amber-700">Añade primero las líneas del presupuesto (editar la orden): ahora no tiene ninguna.</p>
+                      )}
+                      <div className="flex flex-wrap gap-2">
                         <button
                           onClick={() => setPresupuestoPDF(selected)}
-                          className="flex-1 flex items-center justify-center gap-2 py-2 rounded-lg bg-blue-600 hover:bg-blue-700 text-white text-xs font-semibold transition"
+                          className="flex-1 min-w-[160px] flex items-center justify-center gap-2 py-2 rounded-lg bg-blue-600 hover:bg-blue-700 text-white text-xs font-semibold transition"
                         >
                           <FileText size={13} /> Ver / Descargar PDF
                         </button>
-                        {!enviado && (
+                        {situacion !== 'aprobado' && (
+                          <>
+                            <button type="button" data-testid="presupuesto-whatsapp" disabled={!waHref || sinLineas}
+                              onClick={() => { if (waHref) { window.open(waHref, '_blank', 'noopener,noreferrer'); handleEnviarPresupuesto(selected, 'WhatsApp'); } }}
+                              className="flex items-center gap-1 px-3 py-2 rounded-lg bg-green-600 hover:bg-green-500 text-white text-xs font-semibold transition disabled:bg-slate-200 disabled:text-slate-400 disabled:cursor-not-allowed">
+                              <MessageCircle size={13} /> {waHref ? (situacion === 'enviado' ? 'Reenviar WhatsApp' : 'WhatsApp') : 'Sin teléfono'}
+                            </button>
+                            <button type="button" data-testid="presupuesto-correo" disabled={!mailHref || sinLineas}
+                              onClick={() => { if (mailHref) { window.open(mailHref, '_blank', 'noopener,noreferrer'); handleEnviarPresupuesto(selected, 'correo'); } }}
+                              className="flex items-center gap-1 px-3 py-2 rounded-lg bg-blue-600 hover:bg-blue-500 text-white text-xs font-semibold transition disabled:bg-slate-200 disabled:text-slate-400 disabled:cursor-not-allowed">
+                              <Mail size={13} /> {mailHref ? (situacion === 'enviado' ? 'Reenviar correo' : 'Correo') : 'Sin correo'}
+                            </button>
+                          </>
+                        )}
+                        {situacion === 'sin_enviar' && (
                           <button
+                            data-testid="presupuesto-marcar-enviado"
                             onClick={() => handleEnviarPresupuesto(selected)}
                             className="flex items-center gap-1 px-3 py-2 rounded-lg border border-slate-200 bg-white text-slate-600 text-xs font-semibold hover:bg-slate-50 transition"
                           >
                             <Check size={13} /> Marcar enviado
                           </button>
                         )}
+                        {enTaller && situacion !== 'aprobado' && (
+                          <button
+                            data-testid="presupuesto-aprobado"
+                            onClick={() => handleAprobarPresupuesto(selected)}
+                            className="flex items-center gap-1 px-3 py-2 rounded-lg border border-teal-300 bg-white text-teal-700 text-xs font-semibold hover:bg-teal-50 transition"
+                          >
+                            <Check size={13} /> El cliente lo aprobó
+                          </button>
+                        )}
                       </div>
+                      {waHref && !sinLineas && situacion !== 'aprobado' && (
+                        <p className="text-[11px] text-slate-400">WhatsApp y correo se abren con el presupuesto escrito en el mensaje. Si quieres mandar también el PDF, descárgalo y adjúntalo.</p>
+                      )}
                     </div>
                   );
                 })()}
@@ -926,15 +985,6 @@ export default function OrdenesTrabajoTab({ ordenes, vehiculos, clientes, tecnic
                   <div>
                     <p className="text-xs font-bold text-slate-500 uppercase mb-2">Avanzar estado</p>
                     <div className="flex flex-wrap gap-2">
-                      {/* Camino B: recibido sin presupuesto aprobado → puede generar presupuesto */}
-                      {selected.estado === 'recibido' && !selected.presupuestoAprobado && (
-                        <button
-                          onClick={() => handleEstadoChange(selected, 'presupuesto')}
-                          className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition border ${ESTADO_META['presupuesto'].bg} ${ESTADO_META['presupuesto'].color} border-current/20 hover:opacity-80`}
-                        >
-                          → {ESTADO_META['presupuesto'].label}
-                        </button>
-                      )}
                       {ESTADO_FLOW.filter(e => {
                         const currentIdx = ESTADO_FLOW.indexOf(selected.estado);
                         const targetIdx = ESTADO_FLOW.indexOf(e);
