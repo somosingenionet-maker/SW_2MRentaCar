@@ -1092,6 +1092,15 @@ export default function RentalsTab({
                               const e = estadoReserva(res);
                               return <span className={`px-2 py-1 rounded text-[10px] font-bold inline-flex ${e.cls}`}>{e.label}</span>;
                             })()}
+                            {res.ampliacion && res.ampliacion.extras.length > 0 && (() => {
+                              const diasExtra = res.ampliacion.extras.reduce((n, x) => n + x.dias, 0);
+                              return (
+                                <span data-testid="etiqueta-extras" title={`Se ampliaron ${diasExtra} ${diasExtra === 1 ? 'día' : 'días'}: ${fmt2(res.ampliacion.totalBase)} € la reserva inicial + ${fmt2(res.totalCobrado - res.ampliacion.totalBase)} € de extras`}
+                                  className="px-2 py-1 rounded text-[10px] font-extrabold uppercase tracking-wide inline-flex bg-amber-100 text-amber-800">
+                                  Extras
+                                </span>
+                              );
+                            })()}
                             {firmasVigentes[res.id] && (
                               <span title={`Contrato firmado el ${formatDate(firmasVigentes[res.id].slice(0, 10))}`}
                                 className="px-2 py-1 rounded text-[10px] font-bold inline-flex items-center gap-0.5 bg-emerald-50 text-emerald-700">
