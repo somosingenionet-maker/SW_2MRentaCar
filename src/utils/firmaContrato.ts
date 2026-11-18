@@ -25,6 +25,7 @@ export function crearSnapshot(
       incluyeSeguroTodoRiesgo: reserva.incluyeSeguroTodoRiesgo, fianza: reserva.fianza, seguroDia: reserva.seguroDia,
       dias: diasAlquiler(reserva.fechaInicio, reserva.fechaFin, reserva.horaInicio, reserva.horaFin),
       extras: reserva.extras?.length ? reserva.extras : undefined,
+      ampliacion: reserva.ampliacion?.extras.length ? reserva.ampliacion : undefined,
     },
     cliente: cliente ? {
       nombre: cliente.nombre, apellidos: cliente.apellidos, nifNiePasaporte: cliente.nifNiePasaporte, correo: cliente.correo,

@@ -30,6 +30,7 @@ import { CambioVehiculo } from './CambioVehiculo';
 import { EditorPrecio } from './EditorPrecio';
 import { EditorFechas } from './EditorFechas';
 import { puedeCambiarFechas, aplicarCambioFechas, type BorradorFechas } from '../utils/cambioFechas';
+import { ampliacionTrasCambio, ajustarBaseAmpliacion } from '../utils/ampliacionReserva';
 import MetodoPagoCampo from './MetodoPagoCampo';
 import { METODOS_PAGO, ESTILO_METODO_PAGO, etiquetaMetodoPago, metodoPagoValido } from '../utils/metodoPago';
 import { aplicarPrecio, importePositivo, importeAlquiler, type ModoPrecio } from '../utils/precioAlquiler';
@@ -401,7 +402,11 @@ export default function RentalsTab({
     const r = aplicarCambioFechas(selectedReserva, reservas, editandoFechas, permiso.inicioBloqueado);
     if (!r.ok) { setEditandoFechas({ ...editandoFechas, error: r.error }); return; }
     if (r.sinCambios && (r.cambios.totalCobrado === selectedReserva.totalCobrado) && (r.cambios.precioFijo ?? null) === (selectedReserva.precioFijo ?? null)) { setEditandoFechas(null); return; }
-    const actualizada = { ...selectedReserva, ...r.cambios };
+    // Si se amplía, lo que valía antes queda como «inicial» y los días nuevos con su importe, aparte.
+    const ampliacion = ampliacionTrasCambio(selectedReserva.ampliacion, {
+      diasAntes: r.diasAntes, diasDespues: r.diasDespues, totalAntes: selectedReserva.totalCobrado, totalDespues: r.cambios.totalCobrado, fechaFinNueva: r.cambios.fechaFin,
+    });
+    const actualizada = { ...selectedReserva, ...r.cambios, ampliacion };
     onUpdateReserva(actualizada);
     setSelectedReserva(actualizada);
     setEditandoFechas(null);
@@ -416,7 +421,7 @@ export default function RentalsTab({
     if (!selectedReserva || !editandoComplementos) return;
     const dias = diasAlquiler(selectedReserva.fechaInicio, selectedReserva.fechaFin, selectedReserva.horaInicio, selectedReserva.horaFin);
     const r = aplicarFilasEditor(selectedReserva, editandoComplementos, dias);
-    const actualizada = { ...selectedReserva, extras: r.extras, totalCobrado: r.total };
+    const actualizada = { ...selectedReserva, extras: r.extras, totalCobrado: r.total, ampliacion: ajustarBaseAmpliacion(selectedReserva.ampliacion, r.total - selectedReserva.totalCobrado) };
     onUpdateReserva(actualizada);
     setSelectedReserva(actualizada);
     setEditandoComplementos(null);
@@ -446,7 +451,7 @@ export default function RentalsTab({
     const dias = diasAlquiler(selectedReserva.fechaInicio, selectedReserva.fechaFin, selectedReserva.horaInicio, selectedReserva.horaFin);
     const r = aplicarPrecio(selectedReserva, editandoPrecio.modo, editandoPrecio.valor, dias);
     if (!r.ok) { setEditandoPrecio({ ...editandoPrecio, error: r.error }); return; }
-    const actualizada = { ...selectedReserva, tarifaDiaria: r.tarifaDiaria, precioFijo: r.precioFijo, totalCobrado: r.totalCobrado };
+    const actualizada = { ...selectedReserva, tarifaDiaria: r.tarifaDiaria, precioFijo: r.precioFijo, totalCobrado: r.totalCobrado, ampliacion: ajustarBaseAmpliacion(selectedReserva.ampliacion, r.totalCobrado - selectedReserva.totalCobrado) };
     onUpdateReserva(actualizada);
     setSelectedReserva(actualizada);
     setEditandoPrecio(null);

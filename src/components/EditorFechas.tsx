@@ -71,6 +71,14 @@ export function EditorFechas({ reserva, borrador, inicioBloqueado, firmada, erro
         </p>
       </div>
 
+      {diferencia > 0 && importe != null && (
+        <p data-testid="resumen-extras" className="rounded-md border border-emerald-200 bg-emerald-50 px-2 py-1 text-[11px] font-semibold text-emerald-800">
+          Se anotará así: reserva inicial {fmt2(reserva.ampliacion?.extras.length ? reserva.ampliacion.totalBase : totalActual)} €
+          {reserva.ampliacion?.extras.map((e, i) => <span key={i}> + {e.dias} {e.dias === 1 ? 'día' : 'días'} adicionales {fmt2(e.importe)} €</span>)}
+          {' '}+ extras {diferencia} {diferencia === 1 ? 'día adicional' : 'días adicionales'} {fmt2(importe - totalActual)} € = <strong>{fmt2(importe)} €</strong>
+        </p>
+      )}
+
       {firmada && (
         <p data-testid="editor-fechas-firmada" role="alert" className="rounded-md border border-amber-200 bg-amber-50 px-2 py-1 text-[11px] font-semibold text-amber-800">
           El cliente ya firmó el contrato con las fechas anteriores. Al guardar, ábrelo, anula la firma y vuelve a firmar con las nuevas.

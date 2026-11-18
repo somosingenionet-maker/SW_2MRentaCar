@@ -94,3 +94,25 @@ describe('desglose de la ficha con precio cerrado', () => {
     expect(h).not.toContain('total-no-cuadra');
   });
 });
+
+describe('desglose de la ficha de un alquiler ampliado', () => {
+  const ampliada = reserva({ fechaInicio: '2026-10-15', fechaFin: '2026-11-22', horaInicio: '10:30', horaFin: '10:30', tarifaDiaria: 1.13, totalCobrado: 617,
+    ampliacion: { diasBase: 31, totalBase: 600, extras: [{ dias: 7, importe: 17, hasta: '2026-11-22' }] } });
+  it('enseña la reserva inicial y, aparte, los días adicionales con su valor; el total es la suma y no salta el aviso', () => {
+    const h = renderToString(<DesgloseFicha reserva={ampliada} />);
+    const t = texto(h);
+    expect(t).toContain('Reserva inicial (31 días) 600,00 €');
+    expect(t).toContain('Extras: 7 días adicionales (hasta el 22 nov. 2026) 17,00 €');
+    expect(t).toContain('LIQUIDACIÓN TOTAL 617,00 €');
+    expect(h.match(/data-testid="linea-desglose"/g)).toHaveLength(2);
+    expect(h).not.toContain('total-no-cuadra');
+    expect(t).not.toContain('Otros ajustes');
+  });
+  it('con varias ampliaciones, una línea por cada una', () => {
+    const t = texto(renderToString(<DesgloseFicha reserva={{ ...ampliada, totalCobrado: 650,
+      ampliacion: { diasBase: 31, totalBase: 600, extras: [{ dias: 7, importe: 17, hasta: '2026-11-22' }, { dias: 1, importe: 33, hasta: '2026-11-23' }] } }} />));
+    expect(t).toContain('Extras: 7 días adicionales');
+    expect(t).toContain('Extras: 1 día adicional (hasta el 23 nov. 2026) 33,00 €');
+    expect(t).toContain('LIQUIDACIÓN TOTAL 650,00 €');
+  });
+});

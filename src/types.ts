@@ -197,6 +197,17 @@ export interface Reserva {
   descuento?: number;
   /** Código(s) del cupón de la web, si el pedido lo trae. */
   cupon?: string;
+  /** Si el alquiler se ha ampliado: lo que valía al principio y cada ampliación (días extra y su importe). null/ausente = nunca se amplió. */
+  ampliacion?: AmpliacionReserva | null;
+}
+
+/** Ampliaciones de un alquiler: el total inicial se conserva y cada ampliación suma sus días y su importe aparte. */
+export interface AmpliacionReserva {
+  /** Días del alquiler antes de la primera ampliación. */
+  diasBase: number;
+  /** Total (€) antes de la primera ampliación. */
+  totalBase: number;
+  extras: { dias: number; importe: number; /** Fecha de devolución (AAAA-MM-DD) tras esta ampliación. */ hasta: string }[];
 }
 
 /**
@@ -439,7 +450,7 @@ export interface EmpresaContrato {
 
 /** Copia congelada de lo que el cliente firmó: el contrato no cambia aunque se editen la reserva, el cliente o el coche. */
 export interface SnapshotContrato {
-  reserva: Pick<Reserva, 'id' | 'vehiculoId' | 'clienteId' | 'fechaInicio' | 'fechaFin' | 'horaInicio' | 'horaFin' | 'lugarRecogida' | 'lugarDevolucion' | 'tarifaDiaria' | 'precioFijo' | 'metodoPago' | 'totalCobrado' | 'incluyeSeguroTodoRiesgo' | 'fianza' | 'seguroDia' | 'extras' | 'descuento' | 'cupon'> & {
+  reserva: Pick<Reserva, 'id' | 'vehiculoId' | 'clienteId' | 'fechaInicio' | 'fechaFin' | 'horaInicio' | 'horaFin' | 'lugarRecogida' | 'lugarDevolucion' | 'tarifaDiaria' | 'precioFijo' | 'metodoPago' | 'totalCobrado' | 'incluyeSeguroTodoRiesgo' | 'fianza' | 'seguroDia' | 'extras' | 'descuento' | 'cupon' | 'ampliacion'> & {
     /** Días de alquiler tal como se contaron al firmar. Los contratos sin firmar lo calculan al vuelo. */
     dias?: number;
   };

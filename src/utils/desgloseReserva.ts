@@ -12,10 +12,14 @@ export type LineaDesglose =
   | { tipo: 'terceros'; importe: null }
   | { tipo: 'extra'; nombre: string; cantidad: number; precio?: number; porDia?: boolean; importe: number }
   | { tipo: 'descuento'; cupon?: string; importe: number }
+  /** Alquiler ampliado: lo que valía la reserva antes de ampliarla (seguro y complementos incluidos). */
+  | { tipo: 'reserva-inicial'; dias: number; importe: number }
+  /** Alquiler ampliado: días adicionales y lo que cuestan. */
+  | { tipo: 'ampliacion'; dias: number; importe: number; hasta: string }
   /** Diferencia entre la suma de las líneas y el total guardado: redondeo, o un total que no sale de la cuenta. */
   | { tipo: 'ajuste'; importe: number };
 
-type Datos = Pick<Reserva, 'tarifaDiaria' | 'precioFijo' | 'seguroDia' | 'incluyeSeguroTodoRiesgo' | 'totalCobrado' | 'fianza' | 'extras' | 'descuento' | 'cupon'>;
+type Datos = Pick<Reserva, 'tarifaDiaria' | 'precioFijo' | 'seguroDia' | 'incluyeSeguroTodoRiesgo' | 'totalCobrado' | 'fianza'> & Partial<Pick<Reserva, 'extras' | 'descuento' | 'cupon' | 'ampliacion'>>;
 
 const r2 = (n: number) => Math.round(n * 100) / 100;
 
@@ -25,6 +29,16 @@ const r2 = (n: number) => Math.round(n * 100) / 100;
  * La fianza es un depósito aparte y no forma parte del total.
  */
 export function desgloseReserva(r: Datos, dias: number): { lineas: LineaDesglose[]; total: number; fianza: number } {
+  // Alquiler ampliado: lo inicial tal como estaba y, aparte, cada ampliación; la suma es el total.
+  if (r.ampliacion && r.ampliacion.extras.length > 0) {
+    const lineas: LineaDesglose[] = [
+      { tipo: 'reserva-inicial', dias: r.ampliacion.diasBase, importe: r2(r.ampliacion.totalBase) },
+      ...r.ampliacion.extras.map((e): LineaDesglose => ({ tipo: 'ampliacion', dias: e.dias, importe: r2(e.importe), hasta: e.hasta })),
+    ];
+    const dif = r2(r.totalCobrado - r2(lineas.reduce((a, l) => a + (l.importe ?? 0), 0)));
+    if (Math.abs(dif) >= 0.005) lineas.push({ tipo: 'ajuste', importe: dif });
+    return { lineas, total: r.totalCobrado, fianza: r.fianza ?? 0 };
+  }
   const lineas: LineaDesglose[] = [r.precioFijo != null
     ? { tipo: 'alquiler-fijo', dias, importe: r2(r.precioFijo) }
     : { tipo: 'alquiler', dias, precio: r.tarifaDiaria, importe: r2(dias * r.tarifaDiaria) }];

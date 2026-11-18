@@ -3,9 +3,10 @@ import { diasAlquiler, duracionExacta } from '../utils/solicitudes';
 import { nombreComplemento } from '../utils/complementos';
 import { desgloseReserva, hayAjusteImportante, type LineaDesglose } from '../utils/desgloseReserva';
 import { fmt2 } from '../utils/moneda';
+import { formatDate } from '../utils/dateFormat';
 
 type Fechas = Pick<Reserva, 'fechaInicio' | 'fechaFin' | 'horaInicio' | 'horaFin'>;
-type ReservaEconomica = Fechas & Pick<Reserva, 'tarifaDiaria' | 'precioFijo' | 'seguroDia' | 'incluyeSeguroTodoRiesgo' | 'totalCobrado' | 'fianza' | 'extras' | 'descuento' | 'cupon'>;
+type ReservaEconomica = Fechas & Pick<Reserva, 'tarifaDiaria' | 'precioFijo' | 'seguroDia' | 'incluyeSeguroTodoRiesgo' | 'totalCobrado' | 'fianza' | 'extras' | 'descuento' | 'cupon' | 'ampliacion'>;
 
 const dias = (n: number) => `${n} ${n === 1 ? 'día' : 'días'}`;
 const euros = (n: number) => `${n < 0 ? '−' : ''}${fmt2(Math.abs(n))} €`;
@@ -37,6 +38,8 @@ function textoLinea(l: LineaDesglose): { concepto: string; importe: string; tono
       const cuenta = l.precio != null && l.porDia != null ? ` (${euros(l.precio)}${l.porDia ? ' / día' : ', precio fijo'})` : '';
       return { concepto: `${nombreComplemento(l.nombre)}${l.cantidad > 1 ? ` × ${l.cantidad}` : ''}${cuenta}`, importe: euros(l.importe) };
     }
+    case 'reserva-inicial': return { concepto: `Reserva inicial (${dias(l.dias)})`, importe: euros(l.importe) };
+    case 'ampliacion': return { concepto: `Extras: ${l.dias} ${l.dias === 1 ? 'día adicional' : 'días adicionales'} (hasta el ${formatDate(l.hasta)})`, importe: euros(l.importe) };
     case 'descuento': return { concepto: `Descuento${l.cupon ? ` (cupón ${l.cupon})` : ''}`, importe: euros(l.importe), tono: 'descuento' };
     case 'ajuste': return { concepto: Math.abs(l.importe) > 0.05 ? 'Otros ajustes' : 'Redondeo', importe: euros(l.importe), tono: 'aviso' };
   }

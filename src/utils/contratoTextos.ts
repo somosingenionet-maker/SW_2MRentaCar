@@ -74,6 +74,9 @@ export interface TextosContrato {
   diasPorPrecio: (dias: number, precio: string) => string;
   /** «4 días, precio pactado»: el alquiler va a un precio total acordado y no a días × tarifa. */
   diasPrecioPactado: (dias: number) => string;
+  /** «Reserva inicial (30 días)» y «Extras: 7 días adicionales (hasta el 22 nov. 2026)»: alquiler ampliado. */
+  reservaInicial: (dias: number) => string;
+  extrasAdicionales: (dias: number, hasta: string) => string;
   seguroCompleto: string;
   incluido: string;
   incluida: string;
@@ -155,6 +158,8 @@ const ES: TextosContrato = {
   alquiler: 'Alquiler',
   diasPorPrecio: (dias, precio) => `${dias} ${dias === 1 ? 'día' : 'días'} × ${precio} €`,
   diasPrecioPactado: dias => `${dias} ${dias === 1 ? 'día' : 'días'}, precio pactado`,
+  reservaInicial: dias => `Reserva inicial (${dias} ${dias === 1 ? 'día' : 'días'})`,
+  extrasAdicionales: (dias, hasta) => `Extras: ${dias} ${dias === 1 ? 'día adicional' : 'días adicionales'} (hasta el ${hasta})`,
   seguroCompleto: 'Seguro Técnico Completo',
   incluido: 'Incluido',
   incluida: 'Incluida',
@@ -230,6 +235,8 @@ const EN: TextosContrato = {
   alquiler: 'Rental',
   diasPorPrecio: (dias, precio) => `${dias} ${dias === 1 ? 'day' : 'days'} × ${precio} €`,
   diasPrecioPactado: dias => `${dias} ${dias === 1 ? 'day' : 'days'}, agreed price`,
+  reservaInicial: dias => `Initial booking (${dias} ${dias === 1 ? 'day' : 'days'})`,
+  extrasAdicionales: (dias, hasta) => `Extras: ${dias} additional ${dias === 1 ? 'day' : 'days'} (until ${hasta})`,
   seguroCompleto: 'Comprehensive insurance',
   incluido: 'Included',
   incluida: 'Included',

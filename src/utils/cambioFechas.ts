@@ -22,7 +22,7 @@ export interface BorradorFechas {
   valor: string | null;
 }
 
-type Datos = Pick<Reserva, 'id' | 'vehiculoId' | 'fechaInicio' | 'fechaFin' | 'horaInicio' | 'horaFin' | 'tarifaDiaria' | 'precioFijo' | 'seguroDia' | 'incluyeSeguroTodoRiesgo' | 'totalCobrado' | 'origen' | 'extras' | 'descuento'>;
+type Datos = Pick<Reserva, 'id' | 'vehiculoId' | 'fechaInicio' | 'fechaFin' | 'horaInicio' | 'horaFin' | 'tarifaDiaria' | 'precioFijo' | 'seguroDia' | 'incluyeSeguroTodoRiesgo' | 'totalCobrado' | 'origen' | 'extras' | 'descuento'> & Partial<Pick<Reserva, 'ampliacion'>>;
 
 /** Qué se le propone al cobrar con las fechas nuevas: el precio cerrado (si lo hay) o el total, y de dónde sale. */
 export function propuestaCambioFechas(r: Datos, b: Pick<BorradorFechas, 'fechaInicio' | 'fechaFin' | 'horaInicio' | 'horaFin'>): {

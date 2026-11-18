@@ -134,6 +134,30 @@ describe('contrato en los dos idiomas', () => {
   });
 });
 
+describe('contrato de un alquiler ampliado', () => {
+  const ampliada = { fechaFin: '2026-11-09', totalCobrado: 117, ampliacion: { diasBase: 3, totalBase: 76, extras: [{ dias: 7, importe: 41, hasta: '2026-11-09' }] } };
+  it('en español: reserva inicial y extras aparte, y el importe neto es la suma', () => {
+    const t = texto('es', { reserva: ampliada });
+    expect(t).toContain('Reserva inicial (3 días)');
+    expect(t).toContain('76,00 €');
+    expect(t).toContain('Extras: 7 días adicionales (hasta el 9 nov. 2026)');
+    expect(t).toContain('41,00 €');
+    expect(t).toContain('117,00 €');
+    expect(t).not.toContain('Otros ajustes');
+  });
+  it('en inglés lleva su traducción', () => {
+    const t = texto('en', { reserva: ampliada });
+    expect(t).toContain('Initial booking (3 days)');
+    expect(t).toContain('Extras: 7 additional days (until 9 Nov 2026)');
+    expect(t).toContain('117.00 €');
+  });
+  it('un contrato firmado antes de ampliar guarda su desglose; el snapshot nuevo lleva la ampliación', () => {
+    const snap = crearSnapshot({ ...reserva, ...ampliada } as Reserva, cliente, vehiculo, undefined, empresa);
+    expect(snap.reserva.ampliacion?.extras).toHaveLength(1);
+    expect(crearSnapshot(reserva, cliente, vehiculo, undefined, empresa).reserva.ampliacion).toBeUndefined();
+  });
+});
+
 describe('cajas de firma', () => {
   const html = (idioma: IdiomaContrato) =>
     renderToString(<ContratoAlquiler reserva={reserva} cliente={cliente} vehiculo={vehiculo} empresa={empresa} idioma={idioma} />);
