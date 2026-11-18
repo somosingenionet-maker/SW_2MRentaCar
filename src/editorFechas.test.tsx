@@ -21,13 +21,43 @@ describe('editor de fechas de la reserva', () => {
     expect(texto(h)).toContain('Total de la reserva (€)');
   });
 
-  it('al ampliar propone el total nuevo con la diferencia, y dice de dónde sale', () => {
+  it('al acortar propone el total nuevo y dice de dónde sale', () => {
+    const t = texto(pinta({ borrador: borrador({ fechaFin: '2027-01-12' }) }));
+    expect(t).toContain('2 días');
+    expect(t).toMatch(/−1 respecto a los 3 actuales/);
+    expect(t).toMatch(/Total: 80,00 € \( ?− ?40,00 €\)/);
+    expect(t).toContain('Calculado con los días nuevos');
+    expect(t).not.toContain('días adicionales');
+  });
+
+  it('al ampliar no pide el total: pide lo de los días adicionales (cerrado o por día) y deja intacto lo que ya había', () => {
     const h = pinta({ borrador: borrador({ fechaFin: '2027-01-15' }) });
     const t = texto(h);
     expect(t).toContain('5 días');
     expect(t).toMatch(/\+2 respecto a los 3 actuales/);
-    expect(t).toMatch(/Total: 200,00 € \( ?\+ ?80,00 €\)/);
-    expect(t).toContain('Calculado con los días nuevos');
+    expect(t).toContain('2 días adicionales');
+    expect(t).toContain('el precio de lo que ya estaba pactado no se toca');
+    expect(h).toContain('data-testid="modo-extra-cerrado"');
+    expect(h).toContain('data-testid="modo-extra-dia"');
+    expect(t).not.toContain('Total de la reserva (€)');
+    // reserva manual: por día, con la tarifa de la reserva sugerida
+    expect(t).toContain('Valor por día (€)');
+    expect(t).toContain('Sugerido con la tarifa');
+    expect(t).toMatch(/Total: 120,00 € \+ extras 2 días adicionales \(2 × 40,00 €\) 80,00 € = 200,00 €/);
+  });
+
+  it('con precio cerrado escrito: «Total: 500 € + extras 7 días adicionales 100 € = 600 €»', () => {
+    const inicial = { ...reserva, totalCobrado: 500, precioFijo: 500 } as Reserva;
+    const t = texto(pinta({ reserva: inicial, borrador: borrador({ fechaFin: '2027-01-20', modoExtra: 'cerrado', valorExtra: '100' }) }));
+    expect(t).toContain('Precio cerrado de los 7 días (€)');
+    expect(t).toMatch(/Total: 500,00 € \+ extras 7 días adicionales 100,00 € = 600,00 €/);
+    expect(t).toContain('Total: 600,00 €');
+  });
+
+  it('con un alquiler ya ampliado y una segunda ampliación, el total parte de lo guardado', () => {
+    const ya = { ...reserva, totalCobrado: 600, ampliacion: { diasBase: 3, totalBase: 500, extras: [{ dias: 7, importe: 100, hasta: '2027-01-20' }] } } as Reserva;
+    const t = texto(pinta({ reserva: { ...ya, fechaFin: '2027-01-20' } as Reserva, borrador: borrador({ fechaFin: '2027-01-22', modoExtra: 'cerrado', valorExtra: '30' }) }));
+    expect(t).toMatch(/Total: 600,00 € \+ extras 2 días adicionales 30,00 € = 630,00 €/);
   });
 
   it('con el coche ya entregado la fecha de entrega está bloqueada y lo dice', () => {
@@ -36,9 +66,9 @@ describe('editor de fechas de la reserva', () => {
     expect(h).toContain('inicio-bloqueado');
   });
 
-  it('con precio cerrado pide el precio cerrado y avisa de que no cambia solo', () => {
+  it('con precio cerrado, al acortar pide el precio cerrado y avisa de que no cambia solo', () => {
     const fijo = { ...reserva, precioFijo: 100 } as Reserva;
-    const t = texto(pinta({ reserva: fijo, borrador: borrador({ fechaFin: '2027-01-15' }) }));
+    const t = texto(pinta({ reserva: fijo, borrador: borrador({ fechaFin: '2027-01-12' }) }));
     expect(t).toContain('Precio cerrado del alquiler (€)');
     expect(t).toContain('no cambia solo');
     expect(t).toContain('Precio cerrado: 100,00 €');

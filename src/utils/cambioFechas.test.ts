@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { puedeCambiarFechas, propuestaCambioFechas, valorMostrado, aplicarCambioFechas, type BorradorFechas } from './cambioFechas';
+import { puedeCambiarFechas, propuestaCambioFechas, propuestaExtension, valorMostrado, aplicarCambioFechas, type BorradorFechas } from './cambioFechas';
 import { totalTrasCambioDePeriodo } from './condicionesAlquiler';
 import type { Reserva } from '../types';
 
@@ -18,11 +18,45 @@ describe('cambiar las fechas de una reserva', () => {
     expect(puedeCambiarFechas(reserva({ devolucion: { fechaHora: '2027-01-13T12:00:00Z', km: 2, combustible: 'lleno', danos: '', responsable: 'x' } }))).toMatchObject({ ok: false, motivo: expect.stringContaining('devolvió') });
   });
 
-  it('ampliar dos días en una reserva manual: el total se recalcula (3 → 5 días × 40 €)', () => {
+  it('ampliar dos días en una reserva manual: se sugiere 40 €/día y se suma a lo que ya había (120 + 2 × 40 = 200 €)', () => {
     const b = borrador({ fechaFin: '2027-01-15' });
-    expect(propuestaCambioFechas(reserva(), b)).toMatchObject({ modo: 'total', propuesta: 200, diasAntes: 3, diasDespues: 5, recalculado: true });
+    expect(propuestaExtension(reserva(), b)).toMatchObject({ dias: 2, modo: 'dia', sugerido: '40', valor: '40', importe: 80, precioDia: 40 });
     const r = aplicarCambioFechas(reserva(), [], b, false);
-    expect(r).toMatchObject({ ok: true, diasAntes: 3, diasDespues: 5, cambios: { fechaFin: '2027-01-15', totalCobrado: 200, tarifaDiaria: 40 } });
+    expect(r).toMatchObject({ ok: true, diasAntes: 3, diasDespues: 5, cambios: { fechaFin: '2027-01-15', totalCobrado: 200, tarifaDiaria: 40 }, extension: { dias: 2, importe: 80, modo: 'dia', precioDia: 40 } });
+  });
+
+  it('ampliar con un precio cerrado por los días nuevos: 500 + 100 = 600 sin tocar el precio inicial', () => {
+    const inicial = reserva({ totalCobrado: 500, precioFijo: 500, tarifaDiaria: 16.13 });
+    const b = borrador({ fechaFin: '2027-01-20', modoExtra: 'cerrado', valorExtra: '100' });
+    const r = aplicarCambioFechas(inicial, [], b, false);
+    expect(r).toMatchObject({ ok: true, diasDespues: 10, cambios: { totalCobrado: 600, tarifaDiaria: 16.13 }, extension: { dias: 7, importe: 100, modo: 'cerrado' } });
+    expect(r.ok && r.cambios.precioFijo).toBeUndefined();
+  });
+
+  it('ampliar por día: 7 días × 14,29 € (la coma también vale)', () => {
+    const b = borrador({ fechaFin: '2027-01-20', modoExtra: 'dia', valorExtra: '14,29' });
+    expect(propuestaExtension(reserva(), b)).toMatchObject({ dias: 7, modo: 'dia', importe: 100.03, precioDia: 14.29 });
+    expect(aplicarCambioFechas(reserva(), [], b, false)).toMatchObject({ ok: true, cambios: { totalCobrado: 220.03 }, extension: { modo: 'dia', precioDia: 14.29, importe: 100.03 } });
+  });
+
+  it('al ampliar hay que indicar lo de los días nuevos (mayor que 0), sea cerrado o por día', () => {
+    const cerrado = aplicarCambioFechas(reserva(), [], borrador({ fechaFin: '2027-01-20', modoExtra: 'cerrado' }), false);
+    expect(cerrado).toMatchObject({ ok: false, error: expect.stringContaining('precio cerrado de los 7 días adicionales') });
+    expect(aplicarCambioFechas(reserva(), [], borrador({ fechaFin: '2027-01-20', modoExtra: 'cerrado', valorExtra: '0' }), false)).toMatchObject({ ok: false });
+    expect(aplicarCambioFechas(reserva(), [], borrador({ fechaFin: '2027-01-20', modoExtra: 'dia', valorExtra: '' }), false)).toMatchObject({ ok: false, error: expect.stringContaining('valor por día') });
+    // un solo día adicional: singular
+    expect(aplicarCambioFechas(reserva(), [], borrador({ fechaFin: '2027-01-14', modoExtra: 'cerrado' }), false)).toMatchObject({ ok: false, error: expect.stringContaining('1 día adicional') });
+  });
+
+  it('una reserva que no se recalcula sola (web o precio pactado) no sugiere nada: empieza en precio cerrado', () => {
+    const fijo = reserva({ precioFijo: 100, tarifaDiaria: 33.33, totalCobrado: 145, incluyeSeguroTodoRiesgo: true, seguroDia: 15 });
+    expect(propuestaExtension(fijo, borrador({ fechaFin: '2027-01-14' }))).toMatchObject({ modo: 'cerrado', sugerido: '', valor: '', importe: null });
+    expect(propuestaExtension(reserva({ origen: 'web' }), borrador({ fechaFin: '2027-01-14' }))).toMatchObject({ modo: 'cerrado' });
+  });
+
+  it('sin ampliar (mismos días o menos) no hay extensión', () => {
+    expect(propuestaExtension(reserva(), borrador())).toBeNull();
+    expect(propuestaExtension(reserva(), borrador({ fechaFin: '2027-01-12' }))).toBeNull();
   });
 
   it('acortar también recalcula; el seguro por día y los complementos por día cuentan', () => {
@@ -34,11 +68,11 @@ describe('cambiar las fechas de una reserva', () => {
     expect(t.extras?.[0].total).toBe(16);
   });
 
-  it('el usuario puede corregir el total propuesto; es lo que se guarda', () => {
-    const b = borrador({ fechaFin: '2027-01-15', valor: '190,50' });
-    expect(valorMostrado(reserva(), b)).toBe('190,50');
-    expect(aplicarCambioFechas(reserva(), [], b, false)).toMatchObject({ ok: true, cambios: { totalCobrado: 190.5 } });
-    expect(valorMostrado(reserva(), borrador({ fechaFin: '2027-01-15' }))).toBe('200');
+  it('al acortar, el usuario puede corregir el total propuesto; es lo que se guarda', () => {
+    const b = borrador({ fechaFin: '2027-01-12', valor: '70,50' });
+    expect(valorMostrado(reserva(), b)).toBe('70,50');
+    expect(aplicarCambioFechas(reserva(), [], b, false)).toMatchObject({ ok: true, cambios: { totalCobrado: 70.5 } });
+    expect(valorMostrado(reserva(), borrador({ fechaFin: '2027-01-12' }))).toBe('80');
   });
 
   it('una reserva de la web no se recalcula sola: se propone sumar los días de más a la tarifa y se confirma', () => {
@@ -48,14 +82,14 @@ describe('cambiar las fechas de una reserva', () => {
     expect(p.propuesta).toBeCloseTo(100 + 43.33, 2);
   });
 
-  it('con precio cerrado se pide el precio cerrado: no cambia solo, y el seguro por día sí', () => {
+  it('con precio cerrado, al acortar se pide el precio cerrado: no cambia solo, y el seguro por día sí', () => {
     const fijo = reserva({ precioFijo: 100, tarifaDiaria: 33.33, totalCobrado: 145, incluyeSeguroTodoRiesgo: true, seguroDia: 15 });
-    const b = borrador({ fechaFin: '2027-01-14' });
+    const b = borrador({ fechaFin: '2027-01-12' });
     expect(propuestaCambioFechas(fijo, b)).toMatchObject({ modo: 'fijo', propuesta: 100 });
     const r = aplicarCambioFechas(fijo, [], b, false);
-    expect(r).toMatchObject({ ok: true, cambios: { precioFijo: 100, totalCobrado: 160 } });
-    const r2 = aplicarCambioFechas(fijo, [], { ...b, valor: '130' }, false);
-    expect(r2).toMatchObject({ ok: true, cambios: { precioFijo: 130, totalCobrado: 190, tarifaDiaria: 32.5 } });
+    expect(r).toMatchObject({ ok: true, cambios: { precioFijo: 100, totalCobrado: 130 } });
+    const r2 = aplicarCambioFechas(fijo, [], { ...b, valor: '80' }, false);
+    expect(r2).toMatchObject({ ok: true, cambios: { precioFijo: 80, totalCobrado: 110, tarifaDiaria: 40 } });
   });
 
   it('bloquea si el coche choca con otra reserva, y no cuenta ni la propia ni las anuladas', () => {
@@ -72,7 +106,7 @@ describe('cambiar las fechas de una reserva', () => {
     expect(aplicarCambioFechas(reserva(), [], borrador({ fechaFin: '' }), false)).toMatchObject({ ok: false });
     expect(aplicarCambioFechas(reserva(), [], borrador({ horaFin: '' }), false)).toMatchObject({ ok: false, error: expect.stringContaining('hora de devolución') });
     expect(aplicarCambioFechas(reserva(), [], borrador({ fechaFin: '2027-01-10', horaFin: '11:00' }), false)).toMatchObject({ ok: false });
-    expect(aplicarCambioFechas(reserva(), [], borrador({ fechaFin: '2027-01-15', valor: '0' }), false)).toMatchObject({ ok: false, error: expect.stringContaining('total') });
+    expect(aplicarCambioFechas(reserva(), [], borrador({ fechaFin: '2027-01-12', valor: '0' }), false)).toMatchObject({ ok: false, error: expect.stringContaining('total') });
   });
 
   it('con la entrega ya hecha, la fecha de entrega que llegue del formulario se ignora', () => {

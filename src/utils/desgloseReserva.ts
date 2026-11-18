@@ -15,7 +15,7 @@ export type LineaDesglose =
   /** Alquiler ampliado: lo que valía la reserva antes de ampliarla (seguro y complementos incluidos). */
   | { tipo: 'reserva-inicial'; dias: number; importe: number }
   /** Alquiler ampliado: días adicionales y lo que cuestan. */
-  | { tipo: 'ampliacion'; dias: number; importe: number; hasta: string }
+  | { tipo: 'ampliacion'; dias: number; importe: number; hasta: string; modo?: 'cerrado' | 'dia'; precioDia?: number }
   /** Diferencia entre la suma de las líneas y el total guardado: redondeo, o un total que no sale de la cuenta. */
   | { tipo: 'ajuste'; importe: number };
 
@@ -33,7 +33,7 @@ export function desgloseReserva(r: Datos, dias: number): { lineas: LineaDesglose
   if (r.ampliacion && r.ampliacion.extras.length > 0) {
     const lineas: LineaDesglose[] = [
       { tipo: 'reserva-inicial', dias: r.ampliacion.diasBase, importe: r2(r.ampliacion.totalBase) },
-      ...r.ampliacion.extras.map((e): LineaDesglose => ({ tipo: 'ampliacion', dias: e.dias, importe: r2(e.importe), hasta: e.hasta })),
+      ...r.ampliacion.extras.map((e): LineaDesglose => ({ tipo: 'ampliacion', dias: e.dias, importe: r2(e.importe), hasta: e.hasta, modo: e.modo, precioDia: e.precioDia })),
     ];
     const dif = r2(r.totalCobrado - r2(lineas.reduce((a, l) => a + (l.importe ?? 0), 0)));
     if (Math.abs(dif) >= 0.005) lineas.push({ tipo: 'ajuste', importe: dif });

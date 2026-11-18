@@ -207,7 +207,16 @@ export interface AmpliacionReserva {
   diasBase: number;
   /** Total (€) antes de la primera ampliación. */
   totalBase: number;
-  extras: { dias: number; importe: number; /** Fecha de devolución (AAAA-MM-DD) tras esta ampliación. */ hasta: string }[];
+  extras: {
+    dias: number;
+    importe: number;
+    /** Fecha de devolución (AAAA-MM-DD) tras esta ampliación. */
+    hasta: string;
+    /** Cómo se pactó: un precio cerrado por los días adicionales, o un valor por día. Ausente en ampliaciones antiguas. */
+    modo?: 'cerrado' | 'dia';
+    /** Valor por día pactado (solo con modo «dia»). */
+    precioDia?: number;
+  }[];
 }
 
 /**

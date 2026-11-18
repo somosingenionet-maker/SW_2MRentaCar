@@ -145,6 +145,14 @@ describe('contrato de un alquiler ampliado', () => {
     expect(t).toContain('117,00 €');
     expect(t).not.toContain('Otros ajustes');
   });
+  it('dice cómo se pactó: precio cerrado o por día, en los dos idiomas', () => {
+    const cerrado = { fechaFin: '2026-11-09', totalCobrado: 176, ampliacion: { diasBase: 3, totalBase: 76, extras: [{ dias: 7, importe: 100, hasta: '2026-11-09', modo: 'cerrado' as const }] } };
+    expect(texto('es', { reserva: cerrado })).toContain('Extras: 7 días adicionales, precio cerrado (hasta el 9 nov. 2026)');
+    expect(texto('en', { reserva: cerrado })).toContain('Extras: 7 additional days, fixed price (until 9 Nov 2026)');
+    const porDia = { ...cerrado, ampliacion: { diasBase: 3, totalBase: 76, extras: [{ dias: 7, importe: 100.03, hasta: '2026-11-09', modo: 'dia' as const, precioDia: 14.29 }] }, totalCobrado: 176.03 };
+    expect(texto('es', { reserva: porDia })).toContain('Extras: 7 días adicionales × 14,29 € (hasta el 9 nov. 2026)');
+    expect(texto('en', { reserva: porDia })).toContain('Extras: 7 additional days × 14.29 € (until 9 Nov 2026)');
+  });
   it('en inglés lleva su traducción', () => {
     const t = texto('en', { reserva: ampliada });
     expect(t).toContain('Initial booking (3 days)');

@@ -405,6 +405,7 @@ export default function RentalsTab({
     // Si se amplía, lo que valía antes queda como «inicial» y los días nuevos con su importe, aparte.
     const ampliacion = ampliacionTrasCambio(selectedReserva.ampliacion, {
       diasAntes: r.diasAntes, diasDespues: r.diasDespues, totalAntes: selectedReserva.totalCobrado, totalDespues: r.cambios.totalCobrado, fechaFinNueva: r.cambios.fechaFin,
+      modo: r.extension?.modo, precioDia: r.extension?.precioDia,
     });
     const actualizada = { ...selectedReserva, ...r.cambios, ampliacion };
     onUpdateReserva(actualizada);

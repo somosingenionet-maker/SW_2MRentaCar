@@ -3,7 +3,7 @@ import Hora24Field from './Hora24Field';
 import { InputPrecio } from './InputPrecio';
 import { fmt2 } from '../utils/moneda';
 import { formatDate } from '../utils/dateFormat';
-import { propuestaCambioFechas, valorMostrado, type BorradorFechas } from '../utils/cambioFechas';
+import { propuestaCambioFechas, propuestaExtension, valorMostrado, type BorradorFechas } from '../utils/cambioFechas';
 import { importePositivo } from '../utils/precioAlquiler';
 
 type DatosReserva = Parameters<typeof propuestaCambioFechas>[0];
@@ -27,6 +27,7 @@ const ETIQUETA = 'block text-[10px] font-bold uppercase text-slate-500 whitespac
 /** Cambio de las fechas y horas de una reserva (ampliar o acortar el alquiler), con el precio nuevo a la vista antes de guardar. */
 export function EditorFechas({ reserva, borrador, inicioBloqueado, firmada, error, onCambiar, onGuardar, onCancelar }: Props) {
   const p = propuestaCambioFechas(reserva, borrador);
+  const ext = propuestaExtension(reserva, borrador);
   const valor = valorMostrado(reserva, borrador);
   const importe = importePositivo(valor);
   const diferencia = p.diasDespues - p.diasAntes;
@@ -56,27 +57,47 @@ export function EditorFechas({ reserva, borrador, inicioBloqueado, firmada, erro
         <span className="ml-auto font-normal text-slate-400">{formatDate(inicioBloqueado ? reserva.fechaInicio : borrador.fechaInicio)} → {formatDate(borrador.fechaFin)}</span>
       </p>
 
+      {ext ? (
+        <div data-testid="bloque-extension" className="space-y-2 rounded-md border border-emerald-200 bg-emerald-50/60 p-2">
+          <p className="text-[11px] font-bold text-emerald-900">
+            {ext.dias} {ext.dias === 1 ? 'día adicional' : 'días adicionales'}: el precio de lo que ya estaba pactado no se toca.
+          </p>
+          <div role="group" aria-label="Cómo se cobran los días adicionales" className="grid grid-cols-2 gap-2">
+            {([['cerrado', 'Precio cerrado'], ['dia', 'Valor por día']] as const).map(([m, t]) => (
+              <button key={m} type="button" data-testid={`modo-extra-${m}`} aria-pressed={ext.modo === m}
+                onClick={() => onCambiar({ modoExtra: m, valorExtra: null })}
+                className={`h-[32px] cursor-pointer rounded-lg border text-[11px] font-bold ${ext.modo === m ? 'border-emerald-600 bg-emerald-600 text-white' : 'border-slate-200 bg-white text-slate-600 hover:bg-slate-50'}`}>{t}</button>
+            ))}
+          </div>
+          <div>
+            <label htmlFor="editor-fechas-extra" className={ETIQUETA}>
+              {ext.modo === 'dia' ? 'Valor por día (€)' : `Precio cerrado de los ${ext.dias} ${ext.dias === 1 ? 'día' : 'días'} (€)`}
+            </label>
+            <InputPrecio id="editor-fechas-extra" value={ext.valor} onChange={e => onCambiar({ valorExtra: e.target.value })}
+              className="mt-1 h-[34px] w-full rounded-lg border border-slate-200 bg-white px-3 font-mono text-sm focus:outline-none focus:ring-1 focus:ring-blue-500" />
+            {ext.modo === 'dia' && ext.sugerido && <p className="mt-1 text-[10px] text-slate-500">Sugerido con la tarifa, el seguro y los complementos por día de esta reserva: {fmt2(Number(ext.sugerido))} €/día. Puedes cambiarlo.</p>}
+          </div>
+          <p data-testid="resumen-extras" className="text-[11px] font-semibold text-emerald-800">
+            {ext.importe == null
+              ? 'Indica el importe para ver el total.'
+              : <>Total: {fmt2(totalActual)} € + extras {ext.dias} {ext.dias === 1 ? 'día adicional' : 'días adicionales'}{ext.modo === 'dia' && ext.precioDia != null ? ` (${ext.dias} × ${fmt2(ext.precioDia)} €)` : ''} {fmt2(ext.importe)} € = <strong>{fmt2(totalActual + ext.importe)} €</strong></>}
+          </p>
+        </div>
+      ) : (
       <div>
         <label htmlFor="editor-fechas-importe" className={ETIQUETA}>{p.modo === 'fijo' ? 'Precio cerrado del alquiler (€)' : 'Total de la reserva (€)'}</label>
         <InputPrecio id="editor-fechas-importe" value={valor} onChange={e => onCambiar({ valor: e.target.value })}
           className="mt-1 h-[34px] w-full rounded-lg border border-slate-200 bg-white px-3 font-mono text-sm focus:outline-none focus:ring-1 focus:ring-blue-500" />
         <p data-testid="nota-importe" className="mt-1 text-[10px] text-slate-500">
           {p.modo === 'fijo'
-            ? 'El precio cerrado no cambia solo al cambiar los días: súbelo o bájalo si la ampliación se cobra. El seguro y los complementos por día sí se recalculan.'
+            ? 'El precio cerrado no cambia solo al cambiar los días: súbelo o bájalo si el cambio se cobra. El seguro y los complementos por día sí se recalculan.'
             : p.recalculado
               ? 'Calculado con los días nuevos (tarifa, seguro y complementos por día). Puedes corregirlo.'
               : diferencia === 0
                 ? 'Los días no cambian: el total se mantiene.'
-                : 'Esta reserva no se recalcula sola (viene de la web o tiene un precio pactado): se propone sumar o restar los días de diferencia a la tarifa. Corrígelo si el precio es otro.'}
+                : 'Esta reserva no se recalcula sola (viene de la web o tiene un precio pactado): se propone restar los días de diferencia a la tarifa. Corrígelo si el precio es otro.'}
         </p>
       </div>
-
-      {diferencia > 0 && importe != null && (
-        <p data-testid="resumen-extras" className="rounded-md border border-emerald-200 bg-emerald-50 px-2 py-1 text-[11px] font-semibold text-emerald-800">
-          Se anotará así: reserva inicial {fmt2(reserva.ampliacion?.extras.length ? reserva.ampliacion.totalBase : totalActual)} €
-          {reserva.ampliacion?.extras.map((e, i) => <span key={i}> + {e.dias} {e.dias === 1 ? 'día' : 'días'} adicionales {fmt2(e.importe)} €</span>)}
-          {' '}+ extras {diferencia} {diferencia === 1 ? 'día adicional' : 'días adicionales'} {fmt2(importe - totalActual)} € = <strong>{fmt2(importe)} €</strong>
-        </p>
       )}
 
       {firmada && (
@@ -88,8 +109,8 @@ export function EditorFechas({ reserva, borrador, inicioBloqueado, firmada, erro
 
       <div className="flex items-center justify-between gap-2 border-t border-slate-100 pt-2 text-xs">
         <span data-testid="editor-fechas-total" className="font-bold">
-          {importe == null ? `Total: ${fmt2(totalActual)} €` : p.modo === 'fijo' ? `Precio cerrado: ${fmt2(importe)} €` : `Total: ${fmt2(importe)} €`}
-          {p.modo === 'total' && importe != null && Math.abs(importe - totalActual) >= 0.005 && (
+          {ext ? `Total: ${fmt2(totalActual + (ext.importe ?? 0))} €` : importe == null ? `Total: ${fmt2(totalActual)} €` : p.modo === 'fijo' ? `Precio cerrado: ${fmt2(importe)} €` : `Total: ${fmt2(importe)} €`}
+          {!ext && p.modo === 'total' && importe != null && Math.abs(importe - totalActual) >= 0.005 && (
             <span className="ml-1 font-semibold text-slate-500">({importe > totalActual ? '+' : '−'}{fmt2(Math.abs(importe - totalActual))} €)</span>
           )}
         </span>

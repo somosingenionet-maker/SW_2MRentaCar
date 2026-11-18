@@ -7,6 +7,11 @@ describe('ampliación de un alquiler', () => {
     const a = ampliacionTrasCambio(null, { diasAntes: 31, diasDespues: 38, totalAntes: 600, totalDespues: 617, fechaFinNueva: '2026-11-22' });
     expect(a).toEqual({ diasBase: 31, totalBase: 600, extras: [{ dias: 7, importe: 17, hasta: '2026-11-22' }] });
   });
+  it('anota cómo se pactaron los días: precio cerrado o valor por día', () => {
+    const c = { diasAntes: 31, diasDespues: 38, totalAntes: 500, totalDespues: 600, fechaFinNueva: '2026-11-22' };
+    expect(ampliacionTrasCambio(null, { ...c, modo: 'cerrado' })?.extras[0]).toEqual({ dias: 7, importe: 100, hasta: '2026-11-22', modo: 'cerrado' });
+    expect(ampliacionTrasCambio(null, { ...c, modo: 'dia', precioDia: 14.29 })?.extras[0]).toEqual({ dias: 7, importe: 100, hasta: '2026-11-22', modo: 'dia', precioDia: 14.29 });
+  });
   it('una segunda ampliación conserva lo inicial y suma otra línea', () => {
     const previa = { diasBase: 31, totalBase: 600, extras: [{ dias: 7, importe: 17, hasta: '2026-11-22' }] };
     const a = ampliacionTrasCambio(previa, { diasAntes: 38, diasDespues: 41, totalAntes: 617, totalDespues: 650, fechaFinNueva: '2026-11-25' });

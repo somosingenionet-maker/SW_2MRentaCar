@@ -13,6 +13,9 @@ export function puedeCambiarFechas(r: Pick<Reserva, 'estado' | 'entrega' | 'devo
   return { ok: true, inicioBloqueado: !!r.entrega };
 }
 
+/** Cómo se cobran los días que se añaden: un precio cerrado por todos ellos, o un valor por día. */
+export type ModoExtra = 'cerrado' | 'dia';
+
 export interface BorradorFechas {
   fechaInicio: string;
   fechaFin: string;
@@ -20,6 +23,9 @@ export interface BorradorFechas {
   horaFin: string;
   /** Lo escrito en el campo del dinero (precio cerrado o total). null = todavía se muestra la propuesta. */
   valor: string | null;
+  /** Solo al ampliar: cómo se pacta lo de los días adicionales y lo escrito (null = todavía se muestra la sugerencia). */
+  modoExtra?: ModoExtra;
+  valorExtra?: string | null;
 }
 
 type Datos = Pick<Reserva, 'id' | 'vehiculoId' | 'fechaInicio' | 'fechaFin' | 'horaInicio' | 'horaFin' | 'tarifaDiaria' | 'precioFijo' | 'seguroDia' | 'incluyeSeguroTodoRiesgo' | 'totalCobrado' | 'origen' | 'extras' | 'descuento'> & Partial<Pick<Reserva, 'ampliacion'>>;
@@ -33,11 +39,32 @@ export function propuestaCambioFechas(r: Datos, b: Pick<BorradorFechas, 'fechaIn
   return { modo: 'total', propuesta: t.recalculado ? t.total : t.proporcional, diasAntes: t.diasAntes, diasDespues: t.diasDespues, recalculado: t.recalculado };
 }
 
+/**
+ * Al ampliar (más días que antes) el precio inicial no se toca: se pacta solo lo de los días adicionales, a un precio cerrado o por día.
+ * Devuelve null si no se amplía. `sugerido` es el valor por día que salía antes de recalcular solo (vacío si la reserva no se recalcula sola).
+ */
+export function propuestaExtension(r: Datos, b: BorradorFechas): { dias: number; modo: ModoExtra; sugerido: string; valor: string; importe: number | null; precioDia: number | null } | null {
+  const t = totalTrasCambioDePeriodo(r, b);
+  const dias = t.diasDespues - t.diasAntes;
+  if (dias <= 0) return null;
+  const sugeridoNum = t.recalculado && r.precioFijo == null ? Math.round(((t.total - r.totalCobrado) / dias) * 100) / 100 : null;
+  const sugerido = sugeridoNum != null && sugeridoNum > 0 ? String(sugeridoNum) : '';
+  const modo: ModoExtra = b.modoExtra ?? (sugerido ? 'dia' : 'cerrado');
+  const valor = b.valorExtra ?? (modo === 'dia' ? sugerido : '');
+  const n = importePositivo(valor);
+  return {
+    dias, modo, sugerido, valor,
+    importe: n == null ? null : Math.round((modo === 'dia' ? n * dias : n) * 100) / 100,
+    precioDia: modo === 'dia' ? n : null,
+  };
+}
+
 /** Lo que se muestra en el campo del dinero: lo que ha escrito el usuario o, si no ha escrito nada, la propuesta. */
 export const valorMostrado = (r: Datos, b: BorradorFechas): string => b.valor ?? String(propuestaCambioFechas(r, b).propuesta);
 
 export type ResultadoCambioFechas =
-  | { ok: true; cambios: Pick<Reserva, 'fechaInicio' | 'fechaFin' | 'horaInicio' | 'horaFin' | 'tarifaDiaria' | 'totalCobrado' | 'extras'> & { precioFijo?: number | null }; diasAntes: number; diasDespues: number; sinCambios: boolean }
+  | { ok: true; cambios: Pick<Reserva, 'fechaInicio' | 'fechaFin' | 'horaInicio' | 'horaFin' | 'tarifaDiaria' | 'totalCobrado' | 'extras'> & { precioFijo?: number | null }; diasAntes: number; diasDespues: number; sinCambios: boolean;
+      /** Solo si se amplía: los días adicionales y cómo se pactaron. */ extension?: { dias: number; importe: number; modo: ModoExtra; precioDia?: number } }
   | { ok: false; error: string };
 
 /** Valida las fechas nuevas y calcula lo que hay que guardar: fechas, horas, total y, si procede, precio cerrado y complementos. */
@@ -55,6 +82,20 @@ export function aplicarCambioFechas(r: Datos, otras: Pick<Reserva, 'id' | 'vehic
   const t = totalTrasCambioDePeriodo(r, nuevo);
   const sinCambios = fechaInicio === r.fechaInicio && b.fechaFin === r.fechaFin && b.horaInicio === (r.horaInicio ?? '') && b.horaFin === (r.horaFin ?? '');
   const valor = valorMostrado(r, b);
+
+  // Ampliar: el precio inicial queda como está y se suma lo pactado por los días adicionales.
+  const ext = propuestaExtension(r, b);
+  if (ext) {
+    if (ext.importe == null) {
+      return { ok: false, error: ext.modo === 'dia' ? `Indica el valor por día de los ${ext.dias} ${ext.dias === 1 ? 'día adicional' : 'días adicionales'} (mayor que 0).` : `Indica el precio cerrado de los ${ext.dias} ${ext.dias === 1 ? 'día adicional' : 'días adicionales'} (mayor que 0).` };
+    }
+    const totalCobrado = Math.round((r.totalCobrado + ext.importe) * 100) / 100;
+    return {
+      ok: true, sinCambios, diasAntes: t.diasAntes, diasDespues: t.diasDespues,
+      cambios: { ...nuevo, tarifaDiaria: r.tarifaDiaria, totalCobrado, extras: r.extras },
+      extension: { dias: ext.dias, importe: ext.importe, modo: ext.modo, ...(ext.precioDia != null ? { precioDia: ext.precioDia } : {}) },
+    };
+  }
 
   if (r.precioFijo != null) {
     // Con precio cerrado el alquiler no depende de los días; el seguro y los complementos por día sí.

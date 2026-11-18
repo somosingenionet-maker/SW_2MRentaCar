@@ -56,7 +56,7 @@ export default function ContratoAlquiler({ reserva, cliente, vehiculo, empresa, 
         return { etiqueta: `${traducirComplemento(nombreComplemento(l.nombre), idioma)}${l.cantidad > 1 ? ` × ${l.cantidad}` : ''}${cuenta}`, importe: euros(l.importe) };
       }
       case 'reserva-inicial': return { etiqueta: tx.reservaInicial(l.dias), importe: euros(l.importe) };
-      case 'ampliacion': return { etiqueta: tx.extrasAdicionales(l.dias, fecha(l.hasta)), importe: euros(l.importe) };
+      case 'ampliacion': return { etiqueta: tx.extrasAdicionales(l.dias, fecha(l.hasta), l.modo === 'dia' && l.precioDia != null ? ` × ${f2(l.precioDia)} €` : l.modo === 'cerrado' ? `, ${tx.ampliacionCerrada}` : ''), importe: euros(l.importe) };
       case 'descuento': return { etiqueta: `${tx.descuento}${l.cupon ? ` (${tx.cupon} ${l.cupon})` : ''}`, importe: euros(l.importe), descuento: true };
       case 'ajuste': return { etiqueta: Math.abs(l.importe) > 0.05 ? tx.otrosAjustes : tx.redondeo, importe: euros(l.importe) };
     }

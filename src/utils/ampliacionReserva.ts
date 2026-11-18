@@ -9,6 +9,9 @@ interface Cambio {
   totalDespues: number;
   /** Fecha de devolución (AAAA-MM-DD) tras el cambio. */
   fechaFinNueva: string;
+  /** Cómo se pactaron los días nuevos (solo al ampliar). */
+  modo?: 'cerrado' | 'dia';
+  precioDia?: number;
 }
 
 /**
@@ -24,7 +27,10 @@ export function ampliacionTrasCambio(previa: AmpliacionReserva | null | undefine
   if (dif === 0) return previaValida;
   if (dif > 0) {
     const base = previaValida ?? { diasBase: c.diasAntes, totalBase: c.totalAntes, extras: [] };
-    return { ...base, extras: [...base.extras, { dias: dif, importe: r2(c.totalDespues - c.totalAntes), hasta: c.fechaFinNueva }] };
+    const nueva: AmpliacionReserva['extras'][number] = { dias: dif, importe: r2(c.totalDespues - c.totalAntes), hasta: c.fechaFinNueva };
+    if (c.modo) nueva.modo = c.modo;
+    if (c.modo === 'dia' && c.precioDia != null) nueva.precioDia = c.precioDia;
+    return { ...base, extras: [...base.extras, nueva] };
   }
   if (!previaValida) return null;
   let quitar = -dif;

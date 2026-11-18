@@ -108,6 +108,15 @@ describe('desglose de la ficha de un alquiler ampliado', () => {
     expect(h).not.toContain('total-no-cuadra');
     expect(t).not.toContain('Otros ajustes');
   });
+  it('dice cómo se pactó: precio cerrado o valor por día', () => {
+    const base = { fechaInicio: '2026-10-15', fechaFin: '2026-11-22', horaInicio: '10:30', horaFin: '10:30', totalCobrado: 600 };
+    const cerrado = texto(renderToString(<DesgloseFicha reserva={reserva({ ...base, ampliacion: { diasBase: 31, totalBase: 500, extras: [{ dias: 7, importe: 100, hasta: '2026-11-22', modo: 'cerrado' }] } })} />));
+    expect(cerrado).toContain('Reserva inicial (31 días) 500,00 €');
+    expect(cerrado).toContain('Extras: 7 días adicionales, precio cerrado (hasta el 22 nov. 2026) 100,00 €');
+    expect(cerrado).toContain('LIQUIDACIÓN TOTAL 600,00 €');
+    const porDia = texto(renderToString(<DesgloseFicha reserva={reserva({ ...base, ampliacion: { diasBase: 31, totalBase: 500, extras: [{ dias: 7, importe: 100.03, hasta: '2026-11-22', modo: 'dia', precioDia: 14.29 }] }, totalCobrado: 600.03 })} />));
+    expect(porDia).toContain('Extras: 7 días adicionales × 14,29 € (hasta el 22 nov. 2026) 100,03 €');
+  });
   it('con varias ampliaciones, una línea por cada una', () => {
     const t = texto(renderToString(<DesgloseFicha reserva={{ ...ampliada, totalCobrado: 650,
       ampliacion: { diasBase: 31, totalBase: 600, extras: [{ dias: 7, importe: 17, hasta: '2026-11-22' }, { dias: 1, importe: 33, hasta: '2026-11-23' }] } }} />));

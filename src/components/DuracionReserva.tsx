@@ -39,7 +39,7 @@ function textoLinea(l: LineaDesglose): { concepto: string; importe: string; tono
       return { concepto: `${nombreComplemento(l.nombre)}${l.cantidad > 1 ? ` × ${l.cantidad}` : ''}${cuenta}`, importe: euros(l.importe) };
     }
     case 'reserva-inicial': return { concepto: `Reserva inicial (${dias(l.dias)})`, importe: euros(l.importe) };
-    case 'ampliacion': return { concepto: `Extras: ${l.dias} ${l.dias === 1 ? 'día adicional' : 'días adicionales'} (hasta el ${formatDate(l.hasta)})`, importe: euros(l.importe) };
+    case 'ampliacion': return { concepto: `Extras: ${l.dias} ${l.dias === 1 ? 'día adicional' : 'días adicionales'}${l.modo === 'dia' && l.precioDia != null ? ` × ${euros(l.precioDia)}` : l.modo === 'cerrado' ? ', precio cerrado' : ''} (hasta el ${formatDate(l.hasta)})`, importe: euros(l.importe) };
     case 'descuento': return { concepto: `Descuento${l.cupon ? ` (cupón ${l.cupon})` : ''}`, importe: euros(l.importe), tono: 'descuento' };
     case 'ajuste': return { concepto: Math.abs(l.importe) > 0.05 ? 'Otros ajustes' : 'Redondeo', importe: euros(l.importe), tono: 'aviso' };
   }
